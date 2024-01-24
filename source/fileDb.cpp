@@ -6,6 +6,8 @@
 #include <string>
 
 namespace aws::gg {
+static constexpr const int UINT64_MAX_DECIMAL_COUNT = 19;
+
 std::shared_ptr<StreamInterface> FileStream::openOrCreate(StreamOptions &&opts) {
     return std::shared_ptr<StreamInterface>(new FileStream(std::move(opts)));
 }
@@ -34,7 +36,7 @@ void FileStream::loadExistingSegments() {
 FileSegment::FileSegment(uint64_t base, std::shared_ptr<FileSystemInterface> interface)
     : _file_implementation(std::move(interface)), _base_seq_num(base), _highest_seq_num(base) {
     std::ostringstream oss;
-    oss << std::setw(19) << std::setfill('0') << _base_seq_num << ".log";
+    oss << std::setw(UINT64_MAX_DECIMAL_COUNT) << std::setfill('0') << _base_seq_num << ".log";
 
     _segment_id = oss.str();
     _f = _file_implementation->open(_segment_id.string());

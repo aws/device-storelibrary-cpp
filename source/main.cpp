@@ -1,3 +1,4 @@
+// NOLINTBEGIN
 #undef NDEBUG
 
 #include <array>
@@ -88,3 +89,4 @@ int main() {
     std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms" << std::endl;
     do_memory();
 }
+// NOLINTEND

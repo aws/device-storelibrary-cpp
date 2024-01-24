@@ -5,6 +5,7 @@
 #include <memory>
 #include <string_view>
 #include <utility>
+#include <functional>
 
 namespace aws::gg {
 class BorrowedSlice {

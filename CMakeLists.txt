@@ -3,6 +3,23 @@ project(greenlake_db)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
+
+if(NOT CLANGTIDY_EXECUTABLE)
+    set(CLANGTIDY_EXECUTABLE clang-tidy)
+endif()
+
+if(NOT EXISTS ${CLANGTIDY_EXECUTABLE})
+    find_program(clangtidy_executable_tmp ${CLANGTIDY_EXECUTABLE})
+    if(clangtidy_executable_tmp)
+        set(CLANGTIDY_EXECUTABLE ${clangtidy_executable_tmp})
+        unset(clangtidy_executable_tmp)
+    else()
+        message(FATAL_ERROR "Clang-Tidy: ${CLANGTIDY_EXECUTABLE} not found! Aborting")
+    endif()
+endif()
+
+set(CMAKE_CXX_CLANG_TIDY ${CLANGTIDY_EXECUTABLE})
+
 if (CMAKE_BUILD_TYPE MATCHES "Release")
     set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
     message("IPO enabled, debugging will not work")
