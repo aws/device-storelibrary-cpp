@@ -4,11 +4,11 @@
 #include <chrono>
 #include <cstdlib>
 #include <cstring>
-#include <stdexcept>
+#include <functional>
 #include <memory>
+#include <stdexcept>
 #include <string_view>
 #include <utility>
-#include <functional>
 
 namespace aws::gg {
 class BorrowedSlice {

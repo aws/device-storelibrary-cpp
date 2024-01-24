@@ -1,8 +1,8 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <cstdlib>
-#include <array>
 
 struct crc32 {
     constexpr static uint32_t crc32_polynomial = 0xEDB88320;

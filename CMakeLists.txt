@@ -12,10 +12,11 @@ if(CMAKE_BUILD_TYPE MATCHES "Release")
     message("IPO enabled, debugging will not work")
 endif()
 
-add_executable(greenlake_db source/memoryDb.cpp source/fileDb.cpp source/main.cpp)
-target_include_directories(greenlake_db PRIVATE include)
-
 include(cmake/ClangFormat.cmake)
+
+add_executable(greenlake_db source/memoryDb.cpp source/fileDb.cpp source/main.cpp
+        include/db.hpp include/fileDb.hpp include/memoryDb.hpp include/crc32.hpp)
+target_include_directories(greenlake_db PRIVATE include)
 target_clangformat_setup(greenlake_db)
 
 if(CMAKE_BUILD_TYPE MATCHES "Debug")
