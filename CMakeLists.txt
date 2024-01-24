@@ -1,0 +1,31 @@
+cmake_minimum_required(VERSION 3.25)
+project(greenlake_db)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_VISIBILITY_PRESET hidden)
+if (CMAKE_BUILD_TYPE MATCHES "Release")
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+    message("IPO enabled, debugging will not work")
+endif ()
+
+add_executable(greenlake_db
+        source/memoryDb.cpp source/fileDb.cpp source/main.cpp
+)
+target_include_directories(greenlake_db PRIVATE include)
+
+if (CMAKE_BUILD_TYPE MATCHES "Debug")
+    include(cmake/Sanitizers.cmake)
+    myproject_enable_sanitizers(
+            greenlake_db
+            ON # asan
+            ON # ub
+            OFF # thread
+            OFF # memory
+    )
+    message("ASAN and UBSan enabled")
+endif ()
+
+enable_testing()
+
+# Brazil
+add_custom_target(release ALL)
