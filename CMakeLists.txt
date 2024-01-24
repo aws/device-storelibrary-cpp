@@ -30,7 +30,32 @@ if(CMAKE_BUILD_TYPE MATCHES "Debug")
     message("ASAN and UBSan enabled")
 endif()
 
+# Setup unit tests
 enable_testing()
+add_custom_target(build-tests COMMENT "Build all the unit tests.")
+add_test(NAME build-tests
+        COMMAND "${CMAKE_COMMAND}" --build "${CMAKE_BINARY_DIR}" --target build-tests)
+add_subdirectory(test)
 
-# Brazil
-add_custom_target(release ALL)
+# Brazil targets after this point
+
+# Setup a default target that runs when no target is specified.
+add_custom_target(default ALL DEPENDS greenlake_db)
+if (TARGET cmakeformat)
+    add_dependencies(default cmakeformat)
+endif ()
+if (TARGET clangformat)
+    add_dependencies(default clangformat)
+endif ()
+if (TARGET clangtidy)
+    add_dependencies(default clangtidy)
+endif ()
+
+# Setup the 'release' target (which is run on Package Builder).
+add_custom_target(release
+        COMMENT "Build and install the library, and run the unit tests."
+        # TODO: execute tests
+        # COMMAND "${CMAKE_COMMAND}" -E chdir "${CMAKE_BINARY_DIR}" "${CMAKE_CTEST_COMMAND}" --output-on-failure
+        COMMAND "${CMAKE_COMMAND}" --build "${CMAKE_BINARY_DIR}" --target greenlake_db
+        DEPENDS build-tests
+        USES_TERMINAL)
