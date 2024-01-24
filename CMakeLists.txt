@@ -40,15 +40,12 @@ add_subdirectory(test)
 # Brazil targets after this point
 
 # Setup a default target that runs when no target is specified.
-add_custom_target(default ALL DEPENDS greenlake_db)
+add_custom_target(default DEPENDS greenlake_db)
 if (TARGET cmakeformat)
     add_dependencies(default cmakeformat)
 endif ()
 if (TARGET clangformat)
     add_dependencies(default clangformat)
-endif ()
-if (TARGET clangtidy)
-    add_dependencies(default clangtidy)
 endif ()
 
 # Setup the 'release' target (which is run on Package Builder).

@@ -66,7 +66,8 @@ FileSegment::FileSegment(uint64_t base, std::shared_ptr<FileSystemInterface> int
 }
 
 LogEntryHeader const *FileSegment::convertSliceToHeader(const OwnedSlice &data) {
-    auto *header = reinterpret_cast<LogEntryHeader *>(data.data());
+    auto *header =
+        reinterpret_cast<LogEntryHeader *>(data.data()); // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
     header->payload_length_bytes = static_cast<int32_t>(_ntohl(header->payload_length_bytes));
     header->relative_sequence_number = static_cast<int32_t>(_ntohl(header->relative_sequence_number));
     header->byte_position = static_cast<int32_t>(_ntohl(header->byte_position));
@@ -90,7 +91,9 @@ void FileSegment::append(BorrowedSlice d, int64_t timestamp_ms, uint64_t sequenc
     };
 
     // TODO: Handle errors and rollback changes to internal state if required (eg. _total_bytes)
-    _f->append(BorrowedSlice{reinterpret_cast<const uint8_t *>(&header), sizeof(header)});
+    _f->append(
+        BorrowedSlice{reinterpret_cast<const uint8_t *>(&header), // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+                      sizeof(header)});
     _f->append(d);
 
     _highest_seq_num = std::max(_highest_seq_num.load(), sequence_number);
