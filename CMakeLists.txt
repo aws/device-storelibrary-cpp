@@ -13,6 +13,9 @@ add_executable(greenlake_db
 )
 target_include_directories(greenlake_db PRIVATE include)
 
+include(cmake/ClangFormat.cmake)
+target_clangformat_setup(greenlake_db)
+
 if (CMAKE_BUILD_TYPE MATCHES "Debug")
     include(cmake/Sanitizers.cmake)
     myproject_enable_sanitizers(
