@@ -1,12 +1,57 @@
 #include "fileDb.hpp"
 #include "crc32.hpp"
 #include <algorithm>
+#include <arpa/inet.h>
 #include <numeric>
 #include <sstream>
 #include <string>
 
 namespace aws::gg {
 static constexpr const int UINT64_MAX_DECIMAL_COUNT = 19;
+
+// NOLINTBEGIN
+constexpr auto _htonll(std::uint64_t h) {
+    if (htonl(0xFFFF0000) != 0xFFFF0000) {
+        static_assert(CHAR_BIT == 8);
+        constexpr auto shift_bytes1{8};
+        constexpr auto shift_bytes2{16};
+        constexpr auto shift_bytes4{32};
+        h = ((h & UINT64_C(0x00FF00FF00FF00FF)) << shift_bytes1) | ((h & UINT64_C(0xFF00FF00FF00FF00)) >> shift_bytes1);
+        h = ((h & UINT64_C(0x0000FFFF0000FFFF)) << shift_bytes2) | ((h & UINT64_C(0xFFFF0000FFFF0000)) >> shift_bytes2);
+        h = ((h & UINT64_C(0x00000000FFFFFFFF)) << shift_bytes4) | ((h & UINT64_C(0xFFFFFFFF00000000)) >> shift_bytes4);
+    }
+    return h;
+}
+
+constexpr auto _ntohll(std::uint64_t h) { return _htonll(h); }
+
+constexpr auto _htonl(std::uint32_t h) {
+    if (htonl(0xFFFF0000) != 0xFFFF0000) {
+        h = ((((h) & 0xff000000u) >> 24) | (((h) & 0x00ff0000u) >> 8) | (((h) & 0x0000ff00u) << 8) |
+             (((h) & 0x000000ffu) << 24));
+    }
+    return h;
+}
+constexpr auto _ntohl(std::uint32_t h) { return _htonl(h); }
+// NOLINTEND
+
+constexpr size_t HEADER_SIZE = 32;
+constexpr int32_t MAGIC_BYTES = 0xAAAAAA;
+constexpr uint8_t VERSION = 0x01;
+constexpr uint32_t MAGIC_AND_VERSION = MAGIC_BYTES << 8 | VERSION;
+
+#pragma pack(push, 4)
+struct LogEntryHeader {
+    int32_t magic_and_version = _htonl(MAGIC_AND_VERSION);
+    int32_t relative_sequence_number = 0;
+    int32_t byte_position = 0;
+    int64_t crc = 0;
+    int64_t timestamp = 0;
+    int32_t payload_length_bytes = 0;
+};
+#pragma pack(pop)
+
+static_assert(sizeof(LogEntryHeader) == HEADER_SIZE, "Header size must be 32 bytes!");
 
 std::shared_ptr<StreamInterface> FileStream::openOrCreate(StreamOptions &&opts) {
     return std::shared_ptr<StreamInterface>(new FileStream(std::move(opts)));
