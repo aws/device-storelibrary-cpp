@@ -7,9 +7,14 @@ package.AWSGreenlakeDBCpp = {
             BrazilCMake = 2.x;
             CMake = 3.25.x;
             Ninja = 1.x;
-#            CFlags = 1.0;
-            Clang = 15.x;
-            CFlagsClang = 15.x;
+
+            # Use GGC
+            GCC = 13.x;
+            CFlagsGCC = 13.x;
+
+            # Or use Clang
+            #Clang = 15.x;
+            #CFlagsClang = 15.x;
         };
     };
 

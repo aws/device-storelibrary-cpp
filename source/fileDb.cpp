@@ -28,8 +28,9 @@ void FileStream::loadExistingSegments() {
     if (!_segments.empty()) {
         _next_sequence_number = _segments.back().getHighestSeqNum() + 1;
         _first_sequence_number = _segments.front().getBaseSeqNum();
-        _current_size_bytes =
-            std::reduce(_segments.begin(), _segments.end(), 0, [](auto a, auto &b) { return a + b.totalSizeBytes(); });
+        _current_size_bytes = std::transform_reduce(
+            _segments.begin(), _segments.end(), 0, [](auto a, auto b) { return a + b; },
+            [](FileSegment const &a) { return a.totalSizeBytes(); });
     }
 }
 

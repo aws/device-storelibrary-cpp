@@ -1,7 +1,10 @@
 #pragma once
 
+#include <atomic>
 #include <chrono>
 #include <cstdlib>
+#include <cstring>
+#include <stdexcept>
 #include <memory>
 #include <string_view>
 #include <utility>

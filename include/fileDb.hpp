@@ -1,6 +1,7 @@
 #pragma once
 #include "db.hpp"
 #include <arpa/inet.h>
+#include <climits>
 #include <filesystem>
 #include <unordered_map>
 
