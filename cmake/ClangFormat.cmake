@@ -1,7 +1,5 @@
-# Copyright Tomas Zeman 2019-2020.
-# Distributed under the Boost Software License, Version 1.0.
-# (See accompanying file LICENSE_1_0.txt or copy at
-# http://www.boost.org/LICENSE_1_0.txt)
+# Copyright Tomas Zeman 2019-2020. Distributed under the Boost Software License, Version 1.0. (See accompanying file
+# LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
 function(prefix_clangformat_setup prefix)
     if(NOT CLANGFORMAT_EXECUTABLE)
@@ -24,17 +22,12 @@ function(prefix_clangformat_setup prefix)
         list(APPEND clangformat_sources ${clangformat_source})
     endforeach()
 
-    if (EXISTS ${CLANGFORMAT_EXECUTABLE})
-        add_custom_target(${prefix}_clangformat
-                COMMAND
-                ${CLANGFORMAT_EXECUTABLE}
-                -style=file
-                -i
-                ${clangformat_sources}
-                WORKING_DIRECTORY
-                ${CMAKE_SOURCE_DIR}
-                COMMENT
-                "Formatting ${prefix} with ${CLANGFORMAT_EXECUTABLE} ..."
+    if(EXISTS ${CLANGFORMAT_EXECUTABLE})
+        add_custom_target(
+            ${prefix}_clangformat
+            COMMAND ${CLANGFORMAT_EXECUTABLE} -style=file -i ${clangformat_sources}
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+            COMMENT "Formatting ${prefix} with ${CLANGFORMAT_EXECUTABLE} ..."
         )
 
         if(TARGET clangformat)
@@ -42,7 +35,7 @@ function(prefix_clangformat_setup prefix)
         else()
             add_custom_target(clangformat DEPENDS ${prefix}_clangformat)
         endif()
-    endif ()
+    endif()
 endfunction()
 
 function(clangformat_setup)

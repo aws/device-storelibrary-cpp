@@ -11,8 +11,8 @@
       "description": "General settings that apply to all configurations",
       "hidden": true,
       "generator": "Ninja",
-      "binaryDir": "${sourceDir}/cmake-build-${presetName}/build",
-      "installDir": "${sourceDir}/cmake-build-${presetName}/install"
+      "binaryDir": "${sourceDir}/build/cmake-build-${presetName}/build",
+      "installDir": "${sourceDir}/build/cmake-build-${presetName}/install"
     },
     {
       "name": "conf-windows-common",

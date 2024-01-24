@@ -1,0 +1,18 @@
+if(NOT CLANGTIDY_EXECUTABLE)
+    set(CLANGTIDY_EXECUTABLE clang-tidy)
+endif()
+
+if(NOT EXISTS ${CLANGTIDY_EXECUTABLE})
+    find_program(clangtidy_executable_tmp ${CLANGTIDY_EXECUTABLE})
+    if(clangtidy_executable_tmp)
+        set(CLANGTIDY_EXECUTABLE ${clangtidy_executable_tmp})
+        unset(clangtidy_executable_tmp)
+    else()
+        message("Clang-Tidy: ${CLANGTIDY_EXECUTABLE} not found!")
+        unset(CLANGTIDY_EXECUTABLE)
+    endif()
+endif()
+
+if(EXISTS ${CLANGTIDY_EXECUTABLE})
+    set(CMAKE_CXX_CLANG_TIDY ${CLANGTIDY_EXECUTABLE})
+endif()
