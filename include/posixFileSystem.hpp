@@ -10,7 +10,7 @@ namespace gg __attribute__((visibility("default"))) {
         FILE *_f = nullptr;
 
       public:
-        PosixFileLike(std::filesystem::path &&path) : _path(std::move(path)) {
+        explicit PosixFileLike(std::filesystem::path &&path) : _path(std::move(path)) {
             _f = std::fopen(_path.c_str(), "ab+");
             if (!_f) {
                 throw std::runtime_error(std::string{"Cannot open file "} + std::strerror(errno));
@@ -36,8 +36,7 @@ namespace gg __attribute__((visibility("default"))) {
             if (std::fseek(_f, begin, SEEK_SET) != 0) {
                 throw std::runtime_error(std::strerror(errno));
             }
-            auto freadOut = std::fread((void *)d.data(), d.size(), 1, _f);
-            if (freadOut != 1) {
+            if (std::fread((void *)d.data(), d.size(), 1, _f) != 1) {
                 if (feof(_f) != 0) {
                     throw std::runtime_error("EOF");
                 } else {
@@ -61,7 +60,7 @@ namespace gg __attribute__((visibility("default"))) {
         std::filesystem::path _base_path;
 
       public:
-        PosixFileSystem(std::filesystem::path &&base_path) : _base_path(std::move(base_path)) {
+        explicit PosixFileSystem(std::filesystem::path &&base_path) : _base_path(std::move(base_path)) {
             std::filesystem::create_directories(_base_path);
         };
 

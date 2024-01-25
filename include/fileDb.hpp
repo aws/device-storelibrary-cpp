@@ -11,7 +11,7 @@ namespace gg __attribute__((visibility("default"))) {
       public:
         FileSegment(uint64_t base, std::shared_ptr<FileSystemInterface>);
 
-        FileSegment(FileSegment &&s)
+        FileSegment(FileSegment &&s) noexcept
             : _f(std::move(s._f)), _file_implementation(std::move(s._file_implementation)),
               _base_seq_num(s._base_seq_num), _highest_seq_num(s._highest_seq_num.load()),
               _total_bytes(s._total_bytes.load()), _segment_id(std::move(s._segment_id)){};

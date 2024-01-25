@@ -27,12 +27,13 @@ constexpr auto _ntohll(std::uint64_t h) { return _htonll(h); }
 
 constexpr auto _htonl(std::uint32_t h) {
     if (htonl(0xFFFF0000) != 0xFFFF0000) {
-        h = ((((h) & 0xff000000u) >> 24) | (((h) & 0x00ff0000u) >> 8) | (((h) & 0x0000ff00u) << 8) |
-             (((h) & 0x000000ffu) << 24));
+        h = (((h & 0xff000000u) >> 24) | ((h & 0x00ff0000u) >> 8) | ((h & 0x0000ff00u) << 8) |
+             ((h & 0x000000ffu) << 24));
     }
     return h;
 }
 constexpr auto _ntohl(std::uint32_t h) { return _htonl(h); }
+static_assert(htonl(0xFFEE) == _htonl(0xFFEE));
 // NOLINTEND
 
 constexpr size_t HEADER_SIZE = 32;
