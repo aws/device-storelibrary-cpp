@@ -48,7 +48,7 @@ uint64_t MemoryStream::append(OwnedSlice &&d) {
 
 static constexpr const char *const RecordNotFoundErrorStr = "Record not found";
 
-[[nodiscard]] const OwnedRecord MemoryStream::read(uint64_t sequence_number, uint64_t suggested_start) const {
+[[nodiscard]] OwnedRecord MemoryStream::read(uint64_t sequence_number, uint64_t suggested_start) const {
     if (sequence_number < _first_sequence_number) {
         throw std::runtime_error(RecordNotFoundErrorStr);
     }
@@ -71,7 +71,7 @@ static constexpr const char *const RecordNotFoundErrorStr = "Record not found";
 }
 
 [[nodiscard]] Iterator MemoryStream::openOrCreateIterator(char identifier, IteratorOptions) {
-    return Iterator{weak_from_this(), identifier,
+    return Iterator{WEAK_FROM_THIS(), identifier,
                     _iterators.count(identifier) ? _iterators[identifier] : _first_sequence_number};
 }
 

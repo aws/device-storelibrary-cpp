@@ -24,12 +24,10 @@ namespace gg __attribute__((visibility("default"))) {
 
         [[nodiscard]] size_t size() const { return _size; };
 
-        [[nodiscard]] std::string_view stringView() const {
-            return std::string_view(reinterpret_cast<const char *>(_data), _size);
-        };
+        [[nodiscard]] std::string_view stringView() const { return {reinterpret_cast<const char *>(_data), _size}; };
     };
 
-    class __attribute__((visibility("default"))) OwnedSlice : private std::unique_ptr<uint8_t[]> {
+    class OwnedSlice : private std::unique_ptr<uint8_t[]> {
       private:
         size_t _size;
 
@@ -175,11 +173,17 @@ namespace gg __attribute__((visibility("default"))) {
         bool operator!=(const int) const { return true; }
     };
 
+#if __cplusplus >= 201703L
+#define WEAK_FROM_THIS weak_from_this
+#else
+#define WEAK_FROM_THIS shared_from_this
+#endif
+
     class StreamInterface : public std::enable_shared_from_this<StreamInterface> {
       protected:
         uint64_t _first_sequence_number = 0;
-        std::atomic_uint64_t _next_sequence_number = 0;
-        std::atomic_uint64_t _current_size_bytes = 0;
+        std::atomic_uint64_t _next_sequence_number = {0};
+        std::atomic_uint64_t _current_size_bytes = {0};
 
       public:
         StreamInterface(StreamInterface &) = delete;
@@ -205,7 +209,7 @@ namespace gg __attribute__((visibility("default"))) {
          * @param sequence_number the sequence number of the record to read.
          * @return the Record.
          */
-        [[nodiscard]] virtual const OwnedRecord read(uint64_t sequence_number) const = 0;
+        [[nodiscard]] virtual OwnedRecord read(uint64_t sequence_number) const = 0;
 
         /**
          * Read a record from the DB by its sequence number with an optional hint to the storage engine for where to
@@ -216,7 +220,7 @@ namespace gg __attribute__((visibility("default"))) {
          * @param suggested_start an optional hint to the storage engine for where to start looking for the record.
          * @return the Record.
          */
-        [[nodiscard]] virtual const OwnedRecord read(uint64_t sequence_number, uint64_t suggested_start) const = 0;
+        [[nodiscard]] virtual OwnedRecord read(uint64_t sequence_number, uint64_t suggested_start) const = 0;
 
         /**
          * Create an iterator identified by the chosen identifier. If an iterator already exists with the same

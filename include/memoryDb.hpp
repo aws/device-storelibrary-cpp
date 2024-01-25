@@ -20,10 +20,8 @@ namespace gg __attribute__((visibility("default"))) {
         uint64_t append(BorrowedSlice) override;
         uint64_t append(OwnedSlice &&) override;
 
-        [[nodiscard]] const OwnedRecord read(uint64_t sequence_number) const override {
-            return read(sequence_number, 0);
-        };
-        [[nodiscard]] const OwnedRecord read(uint64_t sequence_number, uint64_t suggested_start) const override;
+        [[nodiscard]] OwnedRecord read(uint64_t sequence_number) const override { return read(sequence_number, 0); };
+        [[nodiscard]] OwnedRecord read(uint64_t sequence_number, uint64_t suggested_start) const override;
 
         [[nodiscard]] Iterator openOrCreateIterator(char identifier, IteratorOptions) override;
         void deleteIterator(char identifier) override;

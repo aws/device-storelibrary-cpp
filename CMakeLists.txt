@@ -15,12 +15,13 @@ endif()
 include(cmake/ClangFormat.cmake)
 
 add_library(greenlake_lib source/memoryDb.cpp source/fileDb.cpp
-        include/db.hpp include/fileDb.hpp include/memoryDb.hpp include/crc32.hpp)
+        include/db.hpp include/fileDb.hpp include/memoryDb.hpp
+        include/crc32.hpp)
 set_target_properties(greenlake_lib PROPERTIES LINKER_LANGUAGE CXX)
 target_include_directories(greenlake_lib PRIVATE include)
 target_clangformat_setup(greenlake_lib)
 
-add_executable(greenlake_db source/main.cpp)
+add_executable(greenlake_db include/posixFileSystem.hpp source/main.cpp)
 target_include_directories(greenlake_db PRIVATE include)
 target_link_libraries(greenlake_db PRIVATE greenlake_lib)
 target_clangformat_setup(greenlake_db)

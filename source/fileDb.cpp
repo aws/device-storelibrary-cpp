@@ -2,7 +2,7 @@
 #include "crc32.hpp"
 #include <algorithm>
 #include <arpa/inet.h>
-#include <numeric>
+#include <iomanip>
 #include <sstream>
 #include <string>
 
@@ -73,9 +73,11 @@ void FileStream::loadExistingSegments() {
     if (!_segments.empty()) {
         _next_sequence_number = _segments.back().getHighestSeqNum() + 1;
         _first_sequence_number = _segments.front().getBaseSeqNum();
-        _current_size_bytes = std::transform_reduce(
-            _segments.begin(), _segments.end(), 0, [](auto a, auto b) { return a + b; },
-            [](FileSegment const &a) { return a.totalSizeBytes(); });
+        uint64_t size = 0;
+        for (const auto &s : _segments) {
+            size += s.totalSizeBytes();
+        }
+        _current_size_bytes = size;
     }
 }
 
@@ -85,7 +87,7 @@ FileSegment::FileSegment(uint64_t base, std::shared_ptr<FileSystemInterface> int
     oss << std::setw(UINT64_MAX_DECIMAL_COUNT) << std::setfill('0') << _base_seq_num << ".log";
 
     _segment_id = oss.str();
-    _f = _file_implementation->open(_segment_id.string());
+    _f = _file_implementation->open(_segment_id);
 
     size_t offset = 0;
     try {
@@ -204,7 +206,7 @@ OwnedRecord FileSegment::getRecord(uint64_t sequence_number, size_t offset, bool
 void FileSegment::remove() {
     // Close file handle, then delete file
     _f.reset(nullptr);
-    _file_implementation->remove(_segment_id.string());
+    _file_implementation->remove(_segment_id);
 }
 
 void FileStream::makeNextSegment() { _segments.emplace_back(_next_sequence_number, _opts.file_implementation); }
@@ -253,7 +255,7 @@ uint64_t FileStream::append(OwnedSlice &&d) {
 
 static constexpr const char *const RecordNotFoundErrorStr = "Record not found";
 
-[[nodiscard]] const OwnedRecord FileStream::read(uint64_t sequence_number, uint64_t suggested_start) const {
+[[nodiscard]] OwnedRecord FileStream::read(uint64_t sequence_number, uint64_t suggested_start) const {
     if (sequence_number < _first_sequence_number) {
         throw std::runtime_error(RecordNotFoundErrorStr);
     }
@@ -271,7 +273,7 @@ static constexpr const char *const RecordNotFoundErrorStr = "Record not found";
 }
 
 [[nodiscard]] Iterator FileStream::openOrCreateIterator(char identifier, IteratorOptions) {
-    return Iterator{weak_from_this(), identifier,
+    return Iterator{WEAK_FROM_THIS(), identifier,
                     _iterators.count(identifier) ? _iterators[identifier] : _first_sequence_number};
 }
 

@@ -8,6 +8,7 @@
 
 #include "fileDb.hpp"
 #include "memoryDb.hpp"
+#include "posixFileSystem.hpp"
 #include <string_view>
 
 #if __APPLE__
