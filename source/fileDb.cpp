@@ -6,13 +6,14 @@
 #include <sstream>
 #include <string>
 
-namespace aws::gg {
+namespace aws {
+namespace gg {
 static constexpr const int UINT64_MAX_DECIMAL_COUNT = 19;
 
 // NOLINTBEGIN
 constexpr auto _htonll(std::uint64_t h) {
     if (htonl(0xFFFF0000) != 0xFFFF0000) {
-        static_assert(CHAR_BIT == 8);
+        static_assert(CHAR_BIT == 8, "Char must be 8 bits");
         constexpr auto shift_bytes1{8};
         constexpr auto shift_bytes2{16};
         constexpr auto shift_bytes4{32};
@@ -33,7 +34,7 @@ constexpr auto _htonl(std::uint32_t h) {
     return h;
 }
 constexpr auto _ntohl(std::uint32_t h) { return _htonl(h); }
-static_assert(htonl(0xFFEE) == _htonl(0xFFEE));
+static_assert(htonl(0xFFEE) == _htonl(0xFFEE), "Expect our htonl works correctly");
 // NOLINTEND
 
 constexpr size_t HEADER_SIZE = 32;
@@ -175,8 +176,8 @@ OwnedRecord FileSegment::getRecord(uint64_t sequence_number, size_t offset, bool
             if (header->relative_sequence_number == expected_rel_seq_num) {
                 auto data = _f->read(offset + HEADER_SIZE, offset + HEADER_SIZE + header->payload_length_bytes);
                 auto data_len_swap = static_cast<int32_t>(_htonl(header->payload_length_bytes));
-                if (auto ts_swap = static_cast<int64_t>(_htonll(header->timestamp));
-                    header->crc !=
+                auto ts_swap = static_cast<int64_t>(_htonll(header->timestamp));
+                if (header->crc !=
                     static_cast<int64_t>(crc32::update(
                         crc32::update(crc32::update(0, &ts_swap, sizeof(int64_t)), &data_len_swap, sizeof(int32_t)),
                         data.data(), data.size()))) {
@@ -219,8 +220,9 @@ uint64_t FileStream::append(BorrowedSlice d) {
     if (_segments.empty()) {
         makeNextSegment();
     }
-    if (auto const &last_segment = _segments.back();
-        last_segment.totalSizeBytes() >= _opts.minimum_segment_size_bytes) {
+
+    auto const &last_segment = _segments.back();
+    if (last_segment.totalSizeBytes() >= _opts.minimum_segment_size_bytes) {
         makeNextSegment();
     }
 
@@ -282,4 +284,5 @@ void FileStream::deleteIterator(char identifier) { _iterators.erase(identifier);
 
 void FileStream::setCheckpoint(char identifier, uint64_t sequence_number) { _iterators[identifier] = sequence_number; }
 
-}; // namespace aws::gg
+} // namespace gg
+}; // namespace aws

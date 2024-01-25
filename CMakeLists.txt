@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.25)
 project(greenlake_db)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
 include(cmake/ClangTidy.cmake)
@@ -14,13 +14,14 @@ endif()
 
 include(cmake/ClangFormat.cmake)
 
-add_library(greenlake_lib source/memoryDb.cpp source/fileDb.cpp
-        include/db.hpp include/fileDb.hpp include/memoryDb.hpp
-        include/crc32.hpp)
+add_library(greenlake_lib include/db.hpp include/fileDb.hpp
+        include/memoryDb.hpp include/crc32.hpp
+        source/memoryDb.cpp source/fileDb.cpp)
 set_target_properties(greenlake_lib PROPERTIES LINKER_LANGUAGE CXX)
 target_include_directories(greenlake_lib PRIVATE include)
 target_clangformat_setup(greenlake_lib)
 
+set(CMAKE_CXX_STANDARD 17)
 add_executable(greenlake_db include/posixFileSystem.hpp source/main.cpp)
 target_include_directories(greenlake_db PRIVATE include)
 target_link_libraries(greenlake_db PRIVATE greenlake_lib)

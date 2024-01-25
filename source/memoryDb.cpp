@@ -2,7 +2,8 @@
 #include <algorithm>
 #include <iostream>
 
-namespace aws::gg {
+namespace aws {
+namespace gg {
 std::shared_ptr<StreamInterface> MemoryStream::openOrCreate(StreamOptions &&opts) {
     return std::shared_ptr<StreamInterface>(new MemoryStream(std::move(opts)));
 }
@@ -81,4 +82,5 @@ void MemoryStream::setCheckpoint(char identifier, uint64_t sequence_number) {
     _iterators[identifier] = sequence_number;
 }
 
-}; // namespace aws::gg
+} // namespace gg
+}; // namespace aws
