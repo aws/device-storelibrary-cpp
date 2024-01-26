@@ -82,12 +82,21 @@
       }
     },
     {
-      "name": "unixlike-release",
+      "name": "unixlike-relwithdebinfo",
       "displayName": "Release",
       "description": "Target Unix-like OS with the default compiler, release build type",
       "inherits": "conf-unixlike-common",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+      }
+    },
+    {
+      "name": "unixlike-release",
+      "displayName": "Release",
+      "description": "Target Unix-like OS with the default compiler, release build type",
+      "inherits": "conf-unixlike-common",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
       }
     }
   ],

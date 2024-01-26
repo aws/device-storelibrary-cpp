@@ -69,7 +69,7 @@ int main() {
         }
 
         try {
-            for (const auto &r : s->openOrCreateIterator('a', IteratorOptions{})) {
+            for (auto r : s->openOrCreateIterator('a', IteratorOptions{})) {
                 // Do something with the record....
                 // std::cout << r.sequence_number << std::endl;
 

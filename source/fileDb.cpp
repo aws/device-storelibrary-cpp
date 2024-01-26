@@ -101,6 +101,7 @@ FileSegment::FileSegment(uint64_t base, std::shared_ptr<FileSystemInterface> int
             if (header->magic_and_version != MAGIC_AND_VERSION) {
                 throw std::runtime_error("Invalid magic bytes");
             }
+            // TODO: Add option to check the CRC of the data too
 
             offset += HEADER_SIZE;
             offset += header->payload_length_bytes;

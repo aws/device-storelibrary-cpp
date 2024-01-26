@@ -46,7 +46,8 @@ namespace gg __attribute__((visibility("default"))) {
         OwnedSlice(uint8_t d[], const size_t size) : _size(size) { reset(d); };
 
         OwnedSlice(OwnedSlice &&) = default;
-
+        OwnedSlice(OwnedSlice &) = delete;
+        OwnedSlice operator=(OwnedSlice &) = delete;
         OwnedSlice &operator=(OwnedSlice &&) = default;
 
         ~OwnedSlice() = default;
@@ -68,8 +69,9 @@ namespace gg __attribute__((visibility("default"))) {
             : data(std::move(data)), timestamp(timestamp), sequence_number(sequence_number), offset(offset){};
 
         OwnedRecord(OwnedRecord &&o) = default;
-
         OwnedRecord &operator=(OwnedRecord &&) = default;
+        OwnedRecord(OwnedRecord &) = delete;
+        OwnedRecord operator=(OwnedRecord &) = delete;
 
         ~OwnedRecord() = default;
     };
@@ -123,6 +125,12 @@ namespace gg __attribute__((visibility("default"))) {
       public:
         CheckpointableOwnedRecord(OwnedRecord &&o, std::function<void(void)> &&checkpoint)
             : OwnedRecord(std::move(o)), _checkpoint(std::move(checkpoint)){};
+        CheckpointableOwnedRecord(CheckpointableOwnedRecord &) = delete;
+        CheckpointableOwnedRecord(CheckpointableOwnedRecord &&) = default;
+        ~CheckpointableOwnedRecord() = default;
+
+        CheckpointableOwnedRecord &operator=(CheckpointableOwnedRecord &&o) = default;
+        CheckpointableOwnedRecord operator=(CheckpointableOwnedRecord &) = delete;
 
         void checkpoint() const { _checkpoint(); }
     };
