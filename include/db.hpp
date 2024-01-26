@@ -7,8 +7,9 @@
 #include <functional>
 #include <memory>
 #include <stdexcept>
-#include <string_view>
+#include <string>
 #include <utility>
+#include <vector>
 
 namespace aws {
 namespace gg __attribute__((visibility("default"))) {
@@ -24,7 +25,7 @@ namespace gg __attribute__((visibility("default"))) {
 
         [[nodiscard]] size_t size() const { return _size; };
 
-        [[nodiscard]] std::string_view stringView() const { return {reinterpret_cast<const char *>(_data), _size}; };
+        [[nodiscard]] std::string string() const { return {reinterpret_cast<const char *>(_data), _size}; };
     };
 
     class OwnedSlice : private std::unique_ptr<uint8_t[]> {
@@ -56,7 +57,7 @@ namespace gg __attribute__((visibility("default"))) {
 
         [[nodiscard]] size_t size() const { return _size; };
 
-        [[nodiscard]] std::string_view stringView() const { return {reinterpret_cast<const char *>(get()), _size}; };
+        [[nodiscard]] std::string string() const { return {reinterpret_cast<const char *>(get()), _size}; };
     };
 
     struct OwnedRecord {
@@ -99,13 +100,13 @@ namespace gg __attribute__((visibility("default"))) {
 
     class FileSystemInterface {
       public:
-        virtual std::unique_ptr<FileLike> open(std::string_view identifier) = 0;
+        virtual std::unique_ptr<FileLike> open(std::string identifier) = 0;
 
-        virtual bool exists(std::string_view identifier) = 0;
+        virtual bool exists(std::string identifier) = 0;
 
-        virtual void rename(std::string_view old_id, std::string_view new_id) = 0;
+        virtual void rename(std::string old_id, std::string new_id) = 0;
 
-        virtual void remove(std::string_view) = 0;
+        virtual void remove(std::string) = 0;
 
         virtual std::vector<std::string> list() = 0;
 

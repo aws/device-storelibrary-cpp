@@ -34,7 +34,6 @@ constexpr auto _htonl(std::uint32_t h) {
     return h;
 }
 constexpr auto _ntohl(std::uint32_t h) { return _htonl(h); }
-static_assert(htonl(0xFFEE) == _htonl(0xFFEE), "Expect our htonl works correctly");
 // NOLINTEND
 
 constexpr size_t HEADER_SIZE = 32;

@@ -9,7 +9,6 @@
 #include "fileDb.hpp"
 #include "memoryDb.hpp"
 #include "posixFileSystem.hpp"
-#include <string_view>
 
 #if __APPLE__
 
@@ -63,7 +62,7 @@ int main() {
         }
 
         try {
-            std::cout << s->read(last_sequence_number).data.stringView() << std::endl;
+            std::cout << s->read(last_sequence_number).data.string() << std::endl;
         } catch (const std::exception &e) {
             std::cout << e.what() << std::endl;
         }

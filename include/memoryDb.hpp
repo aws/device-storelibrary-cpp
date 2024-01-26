@@ -1,6 +1,7 @@
 #pragma once
 #include "db.hpp"
 #include <list>
+#include <unordered_map>
 
 namespace aws {
 namespace gg __attribute__((visibility("default"))) {

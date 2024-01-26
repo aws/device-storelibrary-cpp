@@ -64,17 +64,17 @@ namespace gg __attribute__((visibility("default"))) {
             std::filesystem::create_directories(_base_path);
         };
 
-        std::unique_ptr<FileLike> open(std::string_view identifier) override {
+        std::unique_ptr<FileLike> open(std::string identifier) override {
             return std::make_unique<PosixFileLike>(_base_path / identifier);
         };
 
-        bool exists(std::string_view identifier) override { return std::filesystem::exists(_base_path / identifier); };
+        bool exists(std::string identifier) override { return std::filesystem::exists(_base_path / identifier); };
 
-        void rename(std::string_view old_id, std::string_view new_id) override {
+        void rename(std::string old_id, std::string new_id) override {
             std::filesystem::rename(_base_path / old_id, _base_path / new_id);
         };
 
-        void remove(std::string_view id) override { std::filesystem::remove(_base_path / id); };
+        void remove(std::string id) override { std::filesystem::remove(_base_path / id); };
 
         std::vector<std::string> list() override {
             std::vector<std::string> output;

@@ -3,6 +3,7 @@
 #include <climits>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 namespace aws {
 namespace gg __attribute__((visibility("default"))) {
