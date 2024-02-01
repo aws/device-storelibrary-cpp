@@ -64,7 +64,7 @@ void FileStream::loadExistingSegments() {
     for (const auto &f : files) {
         auto idx = f.rfind(".log");
         if (idx != std::string::npos) {
-            auto base = std::stoull(std::string{f.substr(0, idx - 3)});
+            auto base = std::stoull(std::string{f.substr(0, idx)});
             _segments.emplace_back(base, _opts.file_implementation);
         }
     }
