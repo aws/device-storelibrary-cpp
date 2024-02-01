@@ -301,16 +301,8 @@ PersistentIterator::PersistentIterator(char id, uint64_t start, std::shared_ptr<
     : _id(id), _file_implementation(std::move(fs)), _sequence_number(start) {
     using namespace std::string_literals;
     auto filename = id + ".it"s;
-    auto shadow_filename = _id + ".its"s;
 
-    auto main_exists = _file_implementation->exists(filename);
-    auto shadow_exists = _file_implementation->exists(shadow_filename);
-
-    if (shadow_exists && !main_exists) {
-        _file_implementation->rename(shadow_filename, filename);
-    }
-
-    if (main_exists || shadow_exists) {
+    if (_file_implementation->exists(filename)) {
         auto it_file = _file_implementation->open(filename);
         auto last_value_raw = it_file->read(0, sizeof(uint64_t));
         uint64_t last_value =
