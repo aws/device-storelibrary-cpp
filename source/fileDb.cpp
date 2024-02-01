@@ -307,7 +307,7 @@ PersistentIterator::PersistentIterator(char id, uint64_t start, std::shared_ptr<
         auto last_value_raw = it_file->read(0, sizeof(uint64_t));
         uint64_t last_value =
             *reinterpret_cast<uint64_t *>(last_value_raw.data()); // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
-        _sequence_number = last_value;
+        _sequence_number = std::max(start, last_value);
     }
 }
 
