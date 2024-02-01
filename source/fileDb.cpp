@@ -5,6 +5,7 @@
 #include <iomanip>
 #include <sstream>
 #include <string>
+#include <utility>
 
 namespace aws {
 namespace gg {
@@ -61,7 +62,7 @@ std::shared_ptr<StreamInterface> FileStream::openOrCreate(StreamOptions &&opts) 
 void FileStream::loadExistingSegments() {
     auto files = _opts.file_implementation->list();
     for (const auto &f : files) {
-        auto idx = f.find_last_of(".log");
+        auto idx = f.rfind(".log");
         if (idx != std::string::npos) {
             auto base = std::stoull(std::string{f.substr(0, idx - 3)});
             _segments.emplace_back(base, _opts.file_implementation);
@@ -276,13 +277,76 @@ static constexpr const char *const RecordNotFoundErrorStr = "Record not found";
 }
 
 [[nodiscard]] Iterator FileStream::openOrCreateIterator(char identifier, IteratorOptions) {
-    return Iterator{WEAK_FROM_THIS(), identifier,
-                    _iterators.count(identifier) ? _iterators[identifier] : _first_sequence_number};
+    if (!_iterators.count(identifier)) {
+        _iterators.insert(std::make_pair(
+            identifier, PersistentIterator{identifier, _first_sequence_number, _opts.file_implementation}));
+    }
+
+    return Iterator{WEAK_FROM_THIS(), identifier, _iterators.at(identifier).getSequenceNumber()};
 }
 
-void FileStream::deleteIterator(char identifier) { _iterators.erase(identifier); }
+void FileStream::deleteIterator(char identifier) {
+    if (_iterators.count(identifier)) {
+        _iterators.at(identifier).remove();
+        _iterators.erase(identifier);
+    }
+}
 
-void FileStream::setCheckpoint(char identifier, uint64_t sequence_number) { _iterators[identifier] = sequence_number; }
+void FileStream::setCheckpoint(char identifier, uint64_t sequence_number) {
+    // TODO: if no identifier in map
+    _iterators.at(identifier).setCheckpoint(sequence_number);
+}
+
+PersistentIterator::PersistentIterator(char id, uint64_t start, std::shared_ptr<FileSystemInterface> fs)
+    : _id(id), _file_implementation(std::move(fs)), _sequence_number(start) {
+    using namespace std::string_literals;
+    auto filename = id + ".it"s;
+    auto shadow_filename = _id + ".its"s;
+
+    auto main_exists = _file_implementation->exists(filename);
+    auto shadow_exists = _file_implementation->exists(shadow_filename);
+
+    if (shadow_exists && !main_exists) {
+        _file_implementation->rename(shadow_filename, filename);
+    }
+
+    if (main_exists || shadow_exists) {
+        auto it_file = _file_implementation->open(filename);
+        auto last_value_raw = it_file->read(0, sizeof(uint64_t));
+        uint64_t last_value =
+            *reinterpret_cast<uint64_t *>(last_value_raw.data()); // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+        _sequence_number = last_value;
+    }
+}
+
+void PersistentIterator::setCheckpoint(uint64_t sequence_number) {
+    using namespace std::string_literals;
+    auto filename = _id + ".it"s;
+    auto shadow_filename = _id + ".its"s;
+
+    // Remove any old shadow which can only contain partly written data
+    _file_implementation->remove(shadow_filename);
+
+    // Write value into shadow
+    {
+        auto it_file = _file_implementation->open(shadow_filename);
+        it_file->append(BorrowedSlice{
+            reinterpret_cast<const uint8_t *>(&sequence_number), // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+            sizeof(uint64_t)});
+    }
+
+    // Overwrite old file
+    _file_implementation->rename(shadow_filename, filename);
+}
+
+void PersistentIterator::remove() {
+    using namespace std::string_literals;
+    auto filename = _id + ".it"s;
+    auto shadow_filename = _id + ".its"s;
+
+    _file_implementation->remove(shadow_filename);
+    _file_implementation->remove(filename);
+}
 
 } // namespace gg
 }; // namespace aws

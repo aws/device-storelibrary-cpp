@@ -42,7 +42,7 @@ int main() {
 
     constexpr int NUM_RECORDS = 100000;
 
-    std::filesystem::remove_all(std::filesystem::current_path() / "stream1");
+    // std::filesystem::remove_all(std::filesystem::current_path() / "stream1");
 
     auto start = std::chrono::high_resolution_clock::now();
     {

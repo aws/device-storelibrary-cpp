@@ -47,10 +47,10 @@ namespace gg __attribute__((visibility("default"))) {
 
       private:
         std::unique_ptr<FileLike> _f;
-        std::shared_ptr<FileSystemInterface> _file_implementation = {};
-        std::uint64_t _base_seq_num = {1};
-        std::atomic_uint64_t _highest_seq_num = {0};
-        std::atomic_uint64_t _total_bytes = {0};
+        std::shared_ptr<FileSystemInterface> _file_implementation{};
+        std::uint64_t _base_seq_num{1};
+        std::atomic_uint64_t _highest_seq_num{0};
+        std::atomic_uint64_t _total_bytes{0};
         std::string _segment_id;
 
         OwnedRecord getRecord(uint64_t sequence_number, size_t offset, bool suggested_start) const;
@@ -58,11 +58,25 @@ namespace gg __attribute__((visibility("default"))) {
         static LogEntryHeader const *convertSliceToHeader(const OwnedSlice &);
     };
 
+    class PersistentIterator {
+      public:
+        PersistentIterator(char id, uint64_t start, std::shared_ptr<FileSystemInterface>);
+
+        uint64_t getSequenceNumber() const { return _sequence_number; }
+        void setCheckpoint(uint64_t);
+        void remove();
+
+      private:
+        char _id;
+        std::shared_ptr<FileSystemInterface> _file_implementation{};
+        uint64_t _sequence_number{0};
+    };
+
     class FileStream : public StreamInterface {
       private:
         StreamOptions _opts;
-        std::unordered_map<char, uint64_t> _iterators = {};
-        std::vector<FileSegment> _segments = {};
+        std::unordered_map<char, PersistentIterator> _iterators{};
+        std::vector<FileSegment> _segments{};
 
         explicit FileStream(StreamOptions &&o) : _opts(std::move(o)) { loadExistingSegments(); }
 
