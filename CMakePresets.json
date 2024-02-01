@@ -96,7 +96,8 @@
       "description": "Target Unix-like OS with the default compiler, release build type",
       "inherits": "conf-unixlike-common",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release"
+        "CMAKE_BUILD_TYPE": "Release",
+        "BUILD_SHARED_LIBS": "OFF"
       }
     }
   ],
