@@ -59,13 +59,23 @@ std::shared_ptr<StreamInterface> FileStream::openOrCreate(StreamOptions &&opts) 
     return std::shared_ptr<StreamInterface>(new FileStream(std::move(opts)));
 }
 
-void FileStream::loadExistingSegments() {
-    auto files = _opts.file_implementation->list();
+FileError FileStream::loadExistingSegments() {
+    auto files_or = _opts.file_implementation->list();
+    if (!files_or) {
+        return files_or.err();
+    }
+
+    auto files = std::move(files_or.val());
     for (const auto &f : files) {
         auto idx = f.rfind(".log");
         if (idx != std::string::npos) {
             auto base = std::stoull(std::string{f.substr(0, idx)});
-            _segments.emplace_back(base, _opts.file_implementation);
+            FileSegment segment{base, _opts.file_implementation};
+            auto err = segment.open();
+            if (err.code != FileErrorCode::NoError) {
+                return err;
+            }
+            _segments.push_back(std::move(segment));
         }
     }
 
@@ -81,6 +91,8 @@ void FileStream::loadExistingSegments() {
         }
         _current_size_bytes = size;
     }
+
+    return FileError{FileErrorCode::NoError};
 }
 
 FileSegment::FileSegment(uint64_t base, std::shared_ptr<FileSystemInterface> interface)
@@ -89,29 +101,36 @@ FileSegment::FileSegment(uint64_t base, std::shared_ptr<FileSystemInterface> int
     oss << std::setw(UINT64_MAX_DECIMAL_COUNT) << std::setfill('0') << _base_seq_num << ".log";
 
     _segment_id = oss.str();
-    _f = _file_implementation->open(_segment_id);
+}
+
+FileError FileSegment::open() {
+    auto file_or = _file_implementation->open(_segment_id);
+    if (file_or) {
+        _f = std::move(file_or.val());
+    }
 
     size_t offset = 0;
-    try {
-        while (true) {
-            const auto headerData = _f->read(offset, offset + HEADER_SIZE);
-            LogEntryHeader const *header = convertSliceToHeader(headerData);
 
-            // TODO: Do something if corrupted
-            if (header->magic_and_version != MAGIC_AND_VERSION) {
-                throw std::runtime_error("Invalid magic bytes");
+    while (true) {
+        const auto header_data_or = _f->read(offset, offset + HEADER_SIZE);
+        if (!header_data_or) {
+            if (header_data_or.err().code == FileErrorCode::EndOfFile) {
+                return FileError{FileErrorCode::NoError};
             }
-            // TODO: Add option to check the CRC of the data too
+            return header_data_or.err();
+        }
+        LogEntryHeader const *header = convertSliceToHeader(header_data_or.val());
 
-            offset += HEADER_SIZE;
-            offset += header->payload_length_bytes;
-            _total_bytes += header->payload_length_bytes + HEADER_SIZE;
-            _highest_seq_num = std::max(_highest_seq_num.load(), _base_seq_num + header->relative_sequence_number);
+        // TODO: Do something if corrupted
+        if (header->magic_and_version != MAGIC_AND_VERSION) {
+            return FileError{FileErrorCode::Unknown, "Magic bytes and version does not match expected value"};
         }
-    } catch (std::runtime_error &e) {
-        if (strncmp(e.what(), "EOF", 3) != 0) {
-            throw e;
-        }
+        // TODO: Add option to check the CRC of the data too
+
+        offset += HEADER_SIZE;
+        offset += header->payload_length_bytes;
+        _total_bytes += header->payload_length_bytes + HEADER_SIZE;
+        _highest_seq_num = std::max(_highest_seq_num.load(), _base_seq_num + header->relative_sequence_number);
     }
 }
 
@@ -149,60 +168,64 @@ void FileSegment::append(BorrowedSlice d, int64_t timestamp_ms, uint64_t sequenc
     _highest_seq_num = std::max(_highest_seq_num.load(), sequence_number);
 }
 
-OwnedRecord FileSegment::read(uint64_t sequence_number, uint64_t suggested_start) const {
+expected<OwnedRecord, DBError> FileSegment::read(uint64_t sequence_number, uint64_t suggested_start) const {
     return getRecord(sequence_number, suggested_start, suggested_start != 0);
 }
 
-OwnedRecord FileSegment::getRecord(uint64_t sequence_number, size_t offset, bool suggested_start) const {
+expected<OwnedRecord, DBError> FileSegment::getRecord(uint64_t sequence_number, size_t offset,
+                                                      bool suggested_start) const {
     // We will try to find the record by reading the segment starting at the offset.
     // If a suggested starting position within the segment was suggested to us, we start from further into the file.
     // If any error occurs with the suggested starting point, we will restart from the beginning of the file.
     // Any failures during reading without a suggested started point are raised immediately.
 
     while (true) {
-        try {
-            const auto headerData = _f->read(offset, offset + HEADER_SIZE);
-            LogEntryHeader const *header = convertSliceToHeader(headerData);
-
-            if (header->magic_and_version != MAGIC_AND_VERSION) {
-                throw std::runtime_error("Invalid magic bytes");
-            }
-
-            uint64_t expected_rel_seq_num = sequence_number - _base_seq_num;
-            if (header->relative_sequence_number > expected_rel_seq_num) {
-                throw std::runtime_error("Record not found");
-            }
-
-            // We found the one we want!
-            if (header->relative_sequence_number == expected_rel_seq_num) {
-                auto data = _f->read(offset + HEADER_SIZE, offset + HEADER_SIZE + header->payload_length_bytes);
-                auto data_len_swap = static_cast<int32_t>(_htonl(header->payload_length_bytes));
-                auto ts_swap = static_cast<int64_t>(_htonll(header->timestamp));
-                if (header->crc !=
-                    static_cast<int64_t>(crc32::update(
-                        crc32::update(crc32::update(0, &ts_swap, sizeof(int64_t)), &data_len_swap, sizeof(int32_t)),
-                        data.data(), data.size()))) {
-                    throw std::runtime_error("CRC does not match. Record corrupted");
-                }
-
-                return OwnedRecord{
-                    std::move(data),
-                    header->timestamp,
-                    sequence_number,
-                    offset + HEADER_SIZE,
-                };
-            }
-
-            offset += HEADER_SIZE;
-            offset += header->payload_length_bytes;
-        } catch (std::exception &e) {
+        auto header_data_or = _f->read(offset, offset + HEADER_SIZE);
+        if (!header_data_or) {
             if (suggested_start) {
                 offset = 0;
                 suggested_start = false;
                 continue;
             }
-            throw e;
+            return DBError{DBErrorCode::ReadError, header_data_or.err().msg};
         }
+        LogEntryHeader const *header = convertSliceToHeader(header_data_or.val());
+
+        if (header->magic_and_version != MAGIC_AND_VERSION) {
+            return DBError{DBErrorCode::HeaderDataCorrupted};
+        }
+
+        uint64_t expected_rel_seq_num = sequence_number - _base_seq_num;
+        if (header->relative_sequence_number > expected_rel_seq_num) {
+            return DBError{DBErrorCode::RecordNotFound};
+        }
+
+        // We found the one we want!
+        if (header->relative_sequence_number == expected_rel_seq_num) {
+            auto data_or = _f->read(offset + HEADER_SIZE, offset + HEADER_SIZE + header->payload_length_bytes);
+            if (!data_or) {
+                return DBError{DBErrorCode::ReadError, header_data_or.err().msg};
+            }
+            auto data = std::move(data_or.val());
+            auto data_len_swap = static_cast<int32_t>(_htonl(header->payload_length_bytes));
+            auto ts_swap = static_cast<int64_t>(_htonll(header->timestamp));
+            if (header->crc !=
+                static_cast<int64_t>(crc32::update(
+                    crc32::update(crc32::update(0, &ts_swap, sizeof(int64_t)), &data_len_swap, sizeof(int32_t)),
+                    data.data(), data.size()))) {
+                return DBError{DBErrorCode::RecordDataCorrupted};
+            }
+
+            return OwnedRecord{
+                std::move(data),
+                header->timestamp,
+                sequence_number,
+                offset + HEADER_SIZE,
+            };
+        }
+
+        offset += HEADER_SIZE;
+        offset += header->payload_length_bytes;
     }
 }
 
@@ -212,11 +235,24 @@ void FileSegment::remove() {
     _file_implementation->remove(_segment_id);
 }
 
-void FileStream::makeNextSegment() { _segments.emplace_back(_next_sequence_number, _opts.file_implementation); }
+FileError FileStream::makeNextSegment() {
+    FileSegment segment{_next_sequence_number, _opts.file_implementation};
 
-uint64_t FileStream::append(BorrowedSlice d) {
+    auto err = segment.open();
+    if (err.code != FileErrorCode::NoError) {
+        return err;
+    }
+
+    _segments.push_back(std::move(segment));
+    return FileError{FileErrorCode::NoError};
+}
+
+expected<uint64_t, DBError> FileStream::append(BorrowedSlice d) {
     auto record_size = d.size();
-    removeSegmentsIfNewRecordBeyondMaxSize(record_size);
+    auto err = removeSegmentsIfNewRecordBeyondMaxSize(record_size);
+    if (err.code != DBErrorCode::NoError) {
+        return err;
+    }
 
     if (_segments.empty()) {
         makeNextSegment();
@@ -236,9 +272,9 @@ uint64_t FileStream::append(BorrowedSlice d) {
     return seq;
 }
 
-void FileStream::removeSegmentsIfNewRecordBeyondMaxSize(size_t record_size) {
+DBError FileStream::removeSegmentsIfNewRecordBeyondMaxSize(size_t record_size) {
     if (record_size > _opts.maximum_db_size_bytes) {
-        throw std::runtime_error("Record too large");
+        return DBError{DBErrorCode::RecordTooLarge};
     }
 
     // Make room if we need more room
@@ -250,21 +286,20 @@ void FileStream::removeSegmentsIfNewRecordBeyondMaxSize(size_t record_size) {
         _segments.erase(_segments.begin());
         _first_sequence_number = _segments.front().getBaseSeqNum();
     }
+    return DBError{DBErrorCode::NoError};
 }
 
-uint64_t FileStream::append(OwnedSlice &&d) {
+expected<uint64_t, DBError> FileStream::append(OwnedSlice &&d) {
     auto x = std::move(d);
     return append(BorrowedSlice(x.data(), x.size()));
 }
 
 static constexpr const char *const RecordNotFoundErrorStr = "Record not found";
 
-[[nodiscard]] OwnedRecord FileStream::read(uint64_t sequence_number, uint64_t suggested_start) const {
-    if (sequence_number < _first_sequence_number) {
-        throw std::runtime_error(RecordNotFoundErrorStr);
-    }
-    if (sequence_number >= _next_sequence_number) {
-        throw std::runtime_error(RecordNotFoundErrorStr);
+[[nodiscard]] expected<OwnedRecord, DBError> FileStream::read(uint64_t sequence_number,
+                                                              uint64_t suggested_start) const {
+    if (sequence_number < _first_sequence_number || sequence_number >= _next_sequence_number) {
+        return DBError{DBErrorCode::RecordNotFound};
     }
 
     for (const auto &seg : _segments) {
@@ -273,7 +308,7 @@ static constexpr const char *const RecordNotFoundErrorStr = "Record not found";
         }
     }
 
-    throw std::runtime_error(RecordNotFoundErrorStr);
+    return DBError{DBErrorCode::RecordNotFound};
 }
 
 [[nodiscard]] Iterator FileStream::openOrCreateIterator(char identifier, IteratorOptions) {
@@ -303,11 +338,17 @@ PersistentIterator::PersistentIterator(char id, uint64_t start, std::shared_ptr<
     auto filename = id + ".it"s;
 
     if (_file_implementation->exists(filename)) {
-        auto it_file = _file_implementation->open(filename);
-        auto last_value_raw = it_file->read(0, sizeof(uint64_t));
-        uint64_t last_value =
-            *reinterpret_cast<uint64_t *>(last_value_raw.data()); // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
-        _sequence_number = std::max(start, last_value);
+        auto it_file_or = _file_implementation->open(filename);
+        // TODO: Handle errors
+        if (it_file_or) {
+            auto last_value_raw_or = it_file_or.val()->read(0, sizeof(uint64_t));
+            if (last_value_raw_or) {
+                uint64_t last_value =
+                    *reinterpret_cast<uint64_t *>( // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+                        last_value_raw_or.val().data());
+                _sequence_number = std::max(start, last_value);
+            }
+        }
     }
 }
 
@@ -321,10 +362,13 @@ void PersistentIterator::setCheckpoint(uint64_t sequence_number) {
 
     // Write value into shadow
     {
-        auto it_file = _file_implementation->open(shadow_filename);
-        it_file->append(BorrowedSlice{
-            reinterpret_cast<const uint8_t *>(&sequence_number), // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
-            sizeof(uint64_t)});
+        auto it_file_or = _file_implementation->open(shadow_filename);
+        if (it_file_or) {
+            it_file_or.val()->append(
+                BorrowedSlice{reinterpret_cast<const uint8_t *>( // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+                                  &sequence_number),
+                              sizeof(uint64_t)});
+        }
     }
 
     // Overwrite old file

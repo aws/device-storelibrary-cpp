@@ -8,9 +8,12 @@ std::shared_ptr<StreamInterface> MemoryStream::openOrCreate(StreamOptions &&opts
     return std::shared_ptr<StreamInterface>(new MemoryStream(std::move(opts)));
 }
 
-uint64_t MemoryStream::append(BorrowedSlice d) {
+expected<uint64_t, DBError> MemoryStream::append(BorrowedSlice d) {
     auto record_size = d.size();
-    remove_records_if_new_record_beyond_max_size(record_size);
+    auto err = remove_records_if_new_record_beyond_max_size(record_size);
+    if (err.code != DBErrorCode::NoError) {
+        return err;
+    }
 
     auto seq = _next_sequence_number++;
     _current_size_bytes += d.size();
@@ -18,9 +21,9 @@ uint64_t MemoryStream::append(BorrowedSlice d) {
     return seq;
 }
 
-void MemoryStream::remove_records_if_new_record_beyond_max_size(size_t record_size) {
+DBError MemoryStream::remove_records_if_new_record_beyond_max_size(size_t record_size) {
     if (record_size > _opts.maximum_db_size_bytes) {
-        throw std::runtime_error("Record too large");
+        return DBError{DBErrorCode::RecordTooLarge};
     }
 
     // Make room if we need more room
@@ -35,11 +38,16 @@ void MemoryStream::remove_records_if_new_record_beyond_max_size(size_t record_si
         });
         _first_sequence_number = _records.front().sequence_number;
     }
+
+    return DBError{DBErrorCode::NoError};
 }
 
-uint64_t MemoryStream::append(OwnedSlice &&d) {
+expected<uint64_t, DBError> MemoryStream::append(OwnedSlice &&d) {
     auto record_size = d.size();
-    remove_records_if_new_record_beyond_max_size(record_size);
+    auto err = remove_records_if_new_record_beyond_max_size(record_size);
+    if (err.code != DBErrorCode::NoError) {
+        return err;
+    }
 
     uint64_t seq = _next_sequence_number++;
     _current_size_bytes += d.size();
@@ -49,9 +57,10 @@ uint64_t MemoryStream::append(OwnedSlice &&d) {
 
 static constexpr const char *const RecordNotFoundErrorStr = "Record not found";
 
-[[nodiscard]] OwnedRecord MemoryStream::read(uint64_t sequence_number, uint64_t suggested_start) const {
+[[nodiscard]] expected<OwnedRecord, DBError> MemoryStream::read(uint64_t sequence_number,
+                                                                uint64_t suggested_start) const {
     if (sequence_number < _first_sequence_number) {
-        throw std::runtime_error(RecordNotFoundErrorStr);
+        return DBError{DBErrorCode::RecordNotFound};
     }
     for (auto &r : _records) {
         if (r.sequence_number > sequence_number) {
@@ -68,7 +77,7 @@ static constexpr const char *const RecordNotFoundErrorStr = "Record not found";
         }
     }
 
-    throw std::runtime_error(RecordNotFoundErrorStr);
+    return DBError{DBErrorCode::RecordNotFound};
 }
 
 [[nodiscard]] Iterator MemoryStream::openOrCreateIterator(char identifier, IteratorOptions) {

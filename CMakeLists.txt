@@ -16,7 +16,8 @@ include(cmake/ClangFormat.cmake)
 
 add_library(greenlake_lib include/db.hpp include/fileDb.hpp
         include/memoryDb.hpp include/crc32.hpp
-        source/memoryDb.cpp source/fileDb.cpp)
+        source/memoryDb.cpp source/fileDb.cpp
+        include/expected.hpp)
 set_target_properties(greenlake_lib PROPERTIES LINKER_LANGUAGE CXX)
 target_include_directories(greenlake_lib PRIVATE include)
 target_compile_options(greenlake_lib PUBLIC -fno-rtti)

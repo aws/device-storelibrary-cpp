@@ -31,11 +31,13 @@ class FileSegment {
 
     ~FileSegment() = default;
 
+    FileError open();
+
     bool operator<(const FileSegment &other) const { return _base_seq_num < other._base_seq_num; }
 
     void append(BorrowedSlice d, int64_t timestamp_ms, uint64_t sequence_number);
 
-    OwnedRecord read(uint64_t sequence_number, uint64_t suggested_start) const;
+    expected<OwnedRecord, DBError> read(uint64_t sequence_number, uint64_t suggested_start) const;
 
     void remove();
 
@@ -53,7 +55,7 @@ class FileSegment {
     std::atomic_uint64_t _total_bytes{0};
     std::string _segment_id;
 
-    OwnedRecord getRecord(uint64_t sequence_number, size_t offset, bool suggested_start) const;
+    expected<OwnedRecord, DBError> getRecord(uint64_t sequence_number, size_t offset, bool suggested_start) const;
 
     static LogEntryHeader const *convertSliceToHeader(const OwnedSlice &);
 };
@@ -84,19 +86,22 @@ class __attribute__((visibility("default"))) FileStream : public StreamInterface
         loadExistingSegments();
     }
 
-    void removeSegmentsIfNewRecordBeyondMaxSize(size_t record_size);
+    DBError removeSegmentsIfNewRecordBeyondMaxSize(size_t record_size);
 
-    void makeNextSegment();
-    void loadExistingSegments();
+    FileError makeNextSegment();
+    FileError loadExistingSegments();
 
   public:
     static std::shared_ptr<StreamInterface> openOrCreate(StreamOptions &&);
 
-    uint64_t append(BorrowedSlice) override;
-    uint64_t append(OwnedSlice &&) override;
+    expected<uint64_t, DBError> append(BorrowedSlice) override;
+    expected<uint64_t, DBError> append(OwnedSlice &&) override;
 
-    [[nodiscard]] OwnedRecord read(uint64_t sequence_number) const override { return read(sequence_number, 0); };
-    [[nodiscard]] OwnedRecord read(uint64_t sequence_number, uint64_t suggested_start) const override;
+    [[nodiscard]] expected<OwnedRecord, DBError> read(uint64_t sequence_number) const override {
+        return read(sequence_number, 0);
+    };
+    [[nodiscard]] expected<OwnedRecord, DBError> read(uint64_t sequence_number,
+                                                      uint64_t suggested_start) const override;
 
     [[nodiscard]] Iterator openOrCreateIterator(char identifier, IteratorOptions) override;
     void deleteIterator(char identifier) override;

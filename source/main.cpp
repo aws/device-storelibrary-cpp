@@ -47,7 +47,6 @@ int main() {
     auto start = std::chrono::high_resolution_clock::now();
     {
         using namespace aws::gg;
-        using namespace std::literals;
 
         // auto s = MemoryStream::openOrCreate(StreamOptions{.maximum_db_size_bytes = 500 * 1024 * 1024});
         auto s = FileStream::openOrCreate(StreamOptions{
@@ -55,16 +54,17 @@ int main() {
             .maximum_db_size_bytes = 10 * 1024 * 1024,
             .file_implementation = std::make_unique<PosixFileSystem>(std::filesystem::current_path() / "stream1")});
 
-        uint64_t last_sequence_number = 0;
+        expected<uint64_t, DBError> last_sequence_number = 0;
         for (int i = 0; i < NUM_RECORDS; i++) {
             last_sequence_number =
                 s->append(BorrowedSlice{reinterpret_cast<const uint8_t *>(data.data()), data.size()});
         }
 
-        try {
-            std::cout << s->read(last_sequence_number).data.string() << std::endl;
-        } catch (const std::exception &e) {
-            std::cout << e.what() << std::endl;
+        auto last_record_or = s->read(last_sequence_number.val());
+        if (last_record_or) {
+            std::cout << last_record_or.val().data.string() << std::endl;
+        } else {
+            std::cerr << last_record_or.err().msg << std::endl;
         }
 
         try {

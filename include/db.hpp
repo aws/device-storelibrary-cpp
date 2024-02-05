@@ -1,5 +1,6 @@
 #pragma once
 
+#include "expected.hpp"
 #include <atomic>
 #include <chrono>
 #include <cstdlib>
@@ -33,6 +34,7 @@ namespace gg __attribute__((visibility("default"))) {
         size_t _size;
 
       public:
+        OwnedSlice() = default;
         explicit OwnedSlice(BorrowedSlice b) : _size(b.size()) {
             std::unique_ptr<uint8_t[]> mem{new (std::nothrow) uint8_t[_size]};
             memcpy(mem.get(), b.data(), b.size());
@@ -66,6 +68,7 @@ namespace gg __attribute__((visibility("default"))) {
         uint64_t sequence_number;
         uint64_t offset;
 
+        OwnedRecord() = default;
         OwnedRecord(OwnedSlice &&data, int64_t timestamp, uint64_t sequence_number, uint64_t offset)
             : data(std::move(data)), timestamp(timestamp), sequence_number(sequence_number), offset(offset){};
 
@@ -77,11 +80,38 @@ namespace gg __attribute__((visibility("default"))) {
         ~OwnedRecord() = default;
     };
 
+    enum class FileErrorCode : std::uint8_t {
+        NoError,
+        InvalidArguments,
+        EndOfFile,
+        InsufficientPermissions,
+        FileDoesNotExist,
+        Unknown,
+    };
+
+    enum class DBErrorCode : std::uint8_t {
+        NoError,
+        RecordNotFound,
+        RecordDataCorrupted,
+        HeaderDataCorrupted,
+        RecordTooLarge,
+        ReadError,
+        WriteError,
+        Unknown,
+    };
+
+    template <class E> struct GenericError {
+        E code;
+        std::string msg;
+    };
+
+    using FileError = GenericError<FileErrorCode>;
+
     class FileLike {
       public:
-        virtual OwnedSlice read(size_t begin, size_t end) = 0;
+        virtual expected<OwnedSlice, FileError> read(size_t begin, size_t end) = 0;
 
-        virtual void append(BorrowedSlice data) = 0;
+        virtual FileError append(BorrowedSlice data) = 0;
 
         virtual void flush() = 0;
 
@@ -100,15 +130,15 @@ namespace gg __attribute__((visibility("default"))) {
 
     class FileSystemInterface {
       public:
-        virtual std::unique_ptr<FileLike> open(std::string identifier) = 0;
+        virtual expected<std::unique_ptr<FileLike>, FileError> open(const std::string &identifier) = 0;
 
-        virtual bool exists(std::string identifier) = 0;
+        virtual bool exists(const std::string &identifier) = 0;
 
-        virtual void rename(std::string old_id, std::string new_id) = 0;
+        virtual FileError rename(const std::string &old_id, const std::string &new_id) = 0;
 
-        virtual void remove(std::string) = 0;
+        virtual FileError remove(const std::string &) = 0;
 
-        virtual std::vector<std::string> list() = 0;
+        virtual expected<std::vector<std::string>, FileError> list() = 0;
 
         FileSystemInterface() = default;
 
@@ -188,6 +218,8 @@ namespace gg __attribute__((visibility("default"))) {
 #define WEAK_FROM_THIS shared_from_this
 #endif
 
+    using DBError = GenericError<DBErrorCode>;
+
     class StreamInterface : public std::enable_shared_from_this<StreamInterface> {
       protected:
         uint64_t _first_sequence_number = 0;
@@ -202,14 +234,14 @@ namespace gg __attribute__((visibility("default"))) {
          *
          * @return the sequence number of the record appended.
          */
-        virtual uint64_t append(BorrowedSlice) = 0;
+        virtual expected<uint64_t, DBError> append(BorrowedSlice) = 0;
 
         /**
          * Append data into the DB.
          *
          * @return the sequence number of the record appended.
          */
-        virtual uint64_t append(OwnedSlice &&) = 0;
+        virtual expected<uint64_t, DBError> append(OwnedSlice &&) = 0;
 
         /**
          * Read a record from the DB by its sequence number.
@@ -218,7 +250,7 @@ namespace gg __attribute__((visibility("default"))) {
          * @param sequence_number the sequence number of the record to read.
          * @return the Record.
          */
-        [[nodiscard]] virtual OwnedRecord read(uint64_t sequence_number) const = 0;
+        [[nodiscard]] virtual expected<OwnedRecord, DBError> read(uint64_t sequence_number) const = 0;
 
         /**
          * Read a record from the DB by its sequence number with an optional hint to the storage engine for where to
@@ -229,7 +261,8 @@ namespace gg __attribute__((visibility("default"))) {
          * @param suggested_start an optional hint to the storage engine for where to start looking for the record.
          * @return the Record.
          */
-        [[nodiscard]] virtual OwnedRecord read(uint64_t sequence_number, uint64_t suggested_start) const = 0;
+        [[nodiscard]] virtual expected<OwnedRecord, DBError> read(uint64_t sequence_number,
+                                                                  uint64_t suggested_start) const = 0;
 
         /**
          * Create an iterator identified by the chosen identifier. If an iterator already exists with the same
@@ -272,7 +305,12 @@ namespace gg __attribute__((visibility("default"))) {
 
     inline CheckpointableOwnedRecord Iterator::operator*() {
         if (auto stream = _stream.lock()) {
-            OwnedRecord x = stream->read(sequence_number, _offset);
+            auto record_or = stream->read(sequence_number, _offset);
+            if (!record_or) {
+                // TODO: No throw
+                throw std::runtime_error(record_or.err().msg);
+            }
+            auto x = std::move(record_or.val());
             timestamp = x.timestamp;
             _offset = x.offset + x.data.size();
             return {std::move(x), [this] { checkpoint(); }};
