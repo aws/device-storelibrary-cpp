@@ -5,13 +5,13 @@ namespace aws {
 namespace gg __attribute__((visibility("default"))) {
     template <class ExpectedT, class UnexpectedT> class expected {
       private:
+        bool _is_set{false};
         ExpectedT _val;
         UnexpectedT _unexpected;
-        bool _is_set{false};
 
       public:
         expected(ExpectedT &&val) : _is_set(true), _val(std::move(val)) {}
-        expected(UnexpectedT &&unexpect) : _is_set(false), _unexpected(std::move(unexpect)) {}
+        expected(UnexpectedT &&unexpect) : _unexpected(std::move(unexpect)) {}
         explicit operator bool() const { return _is_set; }
 
         [[nodiscard]] const ExpectedT &val() const & { return _val; }

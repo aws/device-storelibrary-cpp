@@ -4,6 +4,8 @@
 
 namespace aws {
 namespace gg {
+static constexpr const char *const RecordNotFoundErrorStr = "Record not found";
+
 std::shared_ptr<StreamInterface> MemoryStream::openOrCreate(StreamOptions &&opts) {
     return std::shared_ptr<StreamInterface>(new MemoryStream(std::move(opts)));
 }
@@ -23,7 +25,7 @@ expected<uint64_t, DBError> MemoryStream::append(BorrowedSlice d) {
 
 DBError MemoryStream::remove_records_if_new_record_beyond_max_size(size_t record_size) {
     if (record_size > _opts.maximum_db_size_bytes) {
-        return DBError{DBErrorCode::RecordTooLarge};
+        return DBError{DBErrorCode::RecordTooLarge, {}};
     }
 
     // Make room if we need more room
@@ -39,7 +41,7 @@ DBError MemoryStream::remove_records_if_new_record_beyond_max_size(size_t record
         _first_sequence_number = _records.front().sequence_number;
     }
 
-    return DBError{DBErrorCode::NoError};
+    return DBError{DBErrorCode::NoError, {}};
 }
 
 expected<uint64_t, DBError> MemoryStream::append(OwnedSlice &&d) {
@@ -55,12 +57,10 @@ expected<uint64_t, DBError> MemoryStream::append(OwnedSlice &&d) {
     return seq;
 }
 
-static constexpr const char *const RecordNotFoundErrorStr = "Record not found";
-
 [[nodiscard]] expected<OwnedRecord, DBError> MemoryStream::read(uint64_t sequence_number,
-                                                                uint64_t suggested_start) const {
+                                                                [[maybe_unused]] uint64_t suggested_start) const {
     if (sequence_number < _first_sequence_number) {
-        return DBError{DBErrorCode::RecordNotFound};
+        return DBError{DBErrorCode::RecordNotFound, RecordNotFoundErrorStr};
     }
     for (auto &r : _records) {
         if (r.sequence_number > sequence_number) {
@@ -77,7 +77,7 @@ static constexpr const char *const RecordNotFoundErrorStr = "Record not found";
         }
     }
 
-    return DBError{DBErrorCode::RecordNotFound};
+    return DBError{DBErrorCode::RecordNotFound, RecordNotFoundErrorStr};
 }
 
 [[nodiscard]] Iterator MemoryStream::openOrCreateIterator(char identifier, IteratorOptions) {

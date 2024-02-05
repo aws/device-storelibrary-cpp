@@ -54,7 +54,7 @@ int main() {
             .maximum_db_size_bytes = 10 * 1024 * 1024,
             .file_implementation = std::make_unique<PosixFileSystem>(std::filesystem::current_path() / "stream1")});
 
-        expected<uint64_t, DBError> last_sequence_number = 0;
+        expected<uint64_t, DBError> last_sequence_number{0};
         for (int i = 0; i < NUM_RECORDS; i++) {
             last_sequence_number =
                 s->append(BorrowedSlice{reinterpret_cast<const uint8_t *>(data.data()), data.size()});

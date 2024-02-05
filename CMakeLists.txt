@@ -20,14 +20,14 @@ add_library(greenlake_lib include/db.hpp include/fileDb.hpp
         include/expected.hpp)
 set_target_properties(greenlake_lib PROPERTIES LINKER_LANGUAGE CXX)
 target_include_directories(greenlake_lib PRIVATE include)
-target_compile_options(greenlake_lib PUBLIC -fno-rtti)
+target_compile_options(greenlake_lib PUBLIC -fno-rtti -Wall -Wextra -Werror)
 target_clangformat_setup(greenlake_lib)
 
 set(CMAKE_CXX_STANDARD 17)
 add_executable(greenlake_db include/posixFileSystem.hpp source/main.cpp)
 target_include_directories(greenlake_db PRIVATE include)
 target_link_libraries(greenlake_db PRIVATE greenlake_lib)
-target_compile_options(greenlake_db PUBLIC -fno-rtti)
+target_compile_options(greenlake_db PUBLIC -fno-rtti -Wall -Wextra -Werror)
 target_clangformat_setup(greenlake_db)
 
 if(CMAKE_BUILD_TYPE MATCHES "Debug")
