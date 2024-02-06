@@ -3,9 +3,9 @@
 #include "expected.hpp"
 #include "slices.hpp"
 #include "util.hpp"
+#include <cstdint>
 #include <string>
 #include <vector>
-#include <cstdint>
 
 namespace aws {
 namespace gg __attribute__((visibility("default"))) {

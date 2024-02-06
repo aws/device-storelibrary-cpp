@@ -1,6 +1,6 @@
 #pragma once
-#include "filesystem.hpp"
 #include "expected.hpp"
+#include "filesystem.hpp"
 #include <filesystem>
 
 namespace aws {
@@ -33,9 +33,12 @@ namespace gg __attribute__((visibility("default"))) {
         }
 
         expected<OwnedSlice, FileError> read(size_t begin, size_t end) override {
-            if (end <= begin) {
+            if (end < begin) {
                 return FileError{FileErrorCode::InvalidArguments, "End must be after the beginning"};
+            } else if (end == begin) {
+                return FileError{FileErrorCode::InvalidArguments, "Beginning and end should not be equal"};
             }
+
             clearerr(_f);
             auto d = OwnedSlice{(end - begin)};
             if (std::fseek(_f, begin, SEEK_SET) != 0) {

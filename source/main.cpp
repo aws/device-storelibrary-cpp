@@ -33,12 +33,25 @@ int main() {
     {
         using namespace aws::gg;
 
+        auto fs = std::make_shared<PosixFileSystem>(std::filesystem::current_path() / "stream1");
+
         // auto s = MemoryStream::openOrCreate(StreamOptions{.maximum_db_size_bytes = 500 * 1024 * 1024});
-        auto s = FileStream::openOrCreate(StreamOptions{.minimum_segment_size_bytes = 1024 * 1024,
-                                                        .maximum_db_size_bytes = 10 * 1024 * 1024,
-                                                        .file_implementation = std::make_unique<PosixFileSystem>(
-                                                            std::filesystem::current_path() / "stream1")})
-                     .val();
+        auto s_or = FileStream::openOrCreate(StreamOptions{
+            .minimum_segment_size_bytes = 1024 * 1024,
+            .maximum_db_size_bytes = 10 * 1024 * 1024,
+            .file_implementation = fs,
+            .kv_options =
+                KVOptions{
+                    .filesystem_implementation = fs,
+                    .identifier = "m",
+                    .compact_after = 512 * 1024,
+                },
+        });
+        if (!s_or) {
+            std::cerr << s_or.err().msg << std::endl;
+            std::terminate();
+        }
+        auto s = s_or.val();
 
         std::cout << "loaded checkpoint: " << s->openOrCreateIterator("a", IteratorOptions{}).sequence_number
                   << std::endl;

@@ -67,11 +67,12 @@ expected<std::shared_ptr<StreamInterface>, FileError> FileStream::openOrCreate(S
 }
 
 FileError FileStream::loadExistingSegments() {
-    auto kv_err = _kv_store->initialize();
-    if (kv_err.code != KVErrorCodes::NoError) {
+    auto kv_err_or = KV::openOrCreate(std::move(_opts.kv_options));
+    if (!kv_err_or) {
         // TODO: Better error mapping
-        return FileError{FileErrorCode::Unknown, kv_err.msg};
+        return FileError{FileErrorCode::Unknown, kv_err_or.err().msg};
     }
+    _kv_store = std::move(kv_err_or.val());
 
     auto files_or = _opts.file_implementation->list();
     if (!files_or) {

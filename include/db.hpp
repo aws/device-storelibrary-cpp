@@ -2,13 +2,14 @@
 
 #include "expected.hpp"
 #include "filesystem.hpp"
+#include "kv.hpp"
 #include "slices.hpp"
 #include "util.hpp"
 #include <atomic>
 #include <chrono>
+#include <cstdint>
 #include <cstdlib>
 #include <cstring>
-#include <cstdint>
 #include <functional>
 #include <memory>
 #include <stdexcept>
@@ -203,6 +204,8 @@ namespace gg __attribute__((visibility("default"))) {
         size_t minimum_segment_size_bytes = 16 * 1024 * 1024; // 16MB minimum segment size before making a new segment
         size_t maximum_db_size_bytes = 128 * 1024 * 1024;     // 128MB max db size
         std::shared_ptr<FileSystemInterface> file_implementation = {};
+        KVOptions kv_options = {
+            .filesystem_implementation = file_implementation, .identifier = "kv", .compact_after = 128 * 1024};
     };
 
     inline CheckpointableOwnedRecord Iterator::operator*() {

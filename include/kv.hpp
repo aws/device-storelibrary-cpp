@@ -1,9 +1,9 @@
 #pragma once
 
+#include <cstdint>
+#include <mutex>
 #include <utility>
 #include <vector>
-#include <cstdint>
-#include <atomic>
 
 #include "filesystem.hpp"
 #include "slices.hpp"
@@ -19,26 +19,53 @@ namespace gg __attribute__((visibility("default"))) {
     };
     using KVError = GenericError<KVErrorCodes>;
 
+    struct KVOptions {
+        std::shared_ptr<FileSystemInterface> filesystem_implementation;
+        std::string identifier;
+        uint32_t compact_after;
+    };
+
+    struct KVHeader {
+        uint8_t flags;
+        uint32_t crc32;
+        uint16_t key_length;
+        uint16_t value_length;
+    };
+
     class KV {
       private:
-        std::string _name;
+        KVOptions _opts;
         std::string _shadow_name;
-        std::shared_ptr<FileSystemInterface> _filesystem_implementation;
         std::vector<std::pair<std::string, uint32_t>> _key_pointers{};
         std::unique_ptr<FileLike> _f{nullptr};
-        std::atomic_uint32_t _byte_position{0};
+        std::uint32_t _byte_position{0};
+        std::uint32_t _added_bytes{0};
+        mutable std::mutex _lock{};
 
-        [[nodiscard]] expected<OwnedSlice, KVError> readFrom(uint32_t);
+        [[nodiscard]] expected<KVHeader, FileError> readHeaderFrom(uint32_t) const;
+        [[nodiscard]] expected<std::string, FileError> readKeyFrom(uint32_t, uint16_t) const;
+        [[nodiscard]] expected<OwnedSlice, FileError> readValueFrom(uint32_t, uint16_t, uint16_t) const;
+        [[nodiscard]] expected<OwnedSlice, FileError> readValueFrom(uint32_t) const;
 
-      public:
-        KV(std::shared_ptr<FileSystemInterface> filesystemI, std::string name)
-            : _name(std::move(name)), _shadow_name(_name + "s"), _filesystem_implementation(std::move(filesystemI)) {}
+        [[nodiscard]] FileError readWrite(std::pair<std::string, uint32_t> &, FileLike &);
+
+        KV(KVOptions &&opts) : _opts(std::move(opts)), _shadow_name(_opts.identifier + "s") {}
 
         [[nodiscard]] KVError initialize();
+        [[nodiscard]] KVError compactNoLock();
+        void removeKey(const std::string &key);
 
-        [[nodiscard]] expected<OwnedSlice, KVError> get(const std::string &);
+      public:
+        [[nodiscard]] static expected<std::shared_ptr<KV>, KVError> openOrCreate(KVOptions &&);
+
+        [[nodiscard]] expected<OwnedSlice, KVError> get(const std::string &) const;
         [[nodiscard]] KVError put(const std::string &, BorrowedSlice);
         [[nodiscard]] KVError remove(const std::string &);
+        [[nodiscard]] expected<std::vector<std::string>, KVError> listKeys() const;
+        [[nodiscard]] KVError compact() {
+            std::lock_guard<std::mutex> lock(_lock);
+            return compactNoLock();
+        }
     };
 } // namespace gg
 } // namespace aws

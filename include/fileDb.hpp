@@ -78,12 +78,11 @@ class PersistentIterator {
 class __attribute__((visibility("default"))) FileStream : public StreamInterface {
   private:
     StreamOptions _opts;
-    std::shared_ptr<KV> _kv_store;
+    std::shared_ptr<KV> _kv_store{};
     std::vector<PersistentIterator> _iterators{};
     std::vector<FileSegment> _segments{};
 
-    explicit FileStream(StreamOptions &&o)
-        : _opts(std::move(o)), _kv_store(std::make_shared<KV>(_opts.file_implementation, "m")) {
+    explicit FileStream(StreamOptions &&o) : _opts(std::move(o)) {
         _iterators.reserve(1);
         _segments.reserve(1 + ((_opts.maximum_db_size_bytes - 1) / _opts.minimum_segment_size_bytes));
     }

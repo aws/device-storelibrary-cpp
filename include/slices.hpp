@@ -1,7 +1,7 @@
 #pragma once
+#include <cstring>
 #include <memory>
 #include <string>
-#include <cstring>
 
 namespace aws {
 namespace gg __attribute__((visibility("default"))) {
@@ -12,6 +12,8 @@ namespace gg __attribute__((visibility("default"))) {
 
       public:
         BorrowedSlice(const uint8_t *data, const size_t size) : _data(data), _size(size){};
+        explicit BorrowedSlice(const std::string &s)
+            : _data(reinterpret_cast<const uint8_t *>(s.data())), _size(s.length()){};
 
         [[nodiscard]] const uint8_t *data() const { return _data; };
 
