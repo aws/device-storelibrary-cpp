@@ -57,11 +57,22 @@ static_assert(sizeof(LogEntryHeader) == HEADER_SIZE, "Header size must be 32 byt
 
 static constexpr const char *const RecordNotFoundErrorStr = "Record not found";
 
-std::shared_ptr<StreamInterface> FileStream::openOrCreate(StreamOptions &&opts) {
-    return std::shared_ptr<StreamInterface>(new FileStream(std::move(opts)));
+expected<std::shared_ptr<StreamInterface>, FileError> FileStream::openOrCreate(StreamOptions &&opts) {
+    auto stream = std::shared_ptr<FileStream>(new FileStream(std::move(opts)));
+    auto err = stream->loadExistingSegments();
+    if (err.code != FileErrorCode::NoError) {
+        return err;
+    }
+    return std::shared_ptr<StreamInterface>(stream);
 }
 
 FileError FileStream::loadExistingSegments() {
+    auto kv_err = _kv_store->initialize();
+    if (kv_err.code != KVErrorCodes::NoError) {
+        // TODO: Better error mapping
+        return FileError{FileErrorCode::Unknown, kv_err.msg};
+    }
+
     auto files_or = _opts.file_implementation->list();
     if (!files_or) {
         return files_or.err();
@@ -251,18 +262,26 @@ FileError FileStream::makeNextSegment() {
 
 expected<uint64_t, DBError> FileStream::append(BorrowedSlice d) {
     auto record_size = d.size();
-    auto err = removeSegmentsIfNewRecordBeyondMaxSize(record_size);
-    if (err.code != DBErrorCode::NoError) {
-        return err;
+    {
+        auto err = removeSegmentsIfNewRecordBeyondMaxSize(record_size);
+        if (err.code != DBErrorCode::NoError) {
+            return err;
+        }
     }
 
     if (_segments.empty()) {
-        makeNextSegment();
+        auto err = makeNextSegment();
+        if (err.code != FileErrorCode::NoError) {
+            return DBError{DBErrorCode::WriteError, err.msg};
+        }
     }
 
     auto const &last_segment = _segments.back();
     if (last_segment.totalSizeBytes() >= _opts.minimum_segment_size_bytes) {
-        makeNextSegment();
+        auto err = makeNextSegment();
+        if (err.code != FileErrorCode::NoError) {
+            return DBError{DBErrorCode::WriteError, err.msg};
+        }
     }
 
     auto seq = _next_sequence_number++;
@@ -311,77 +330,63 @@ expected<uint64_t, DBError> FileStream::append(OwnedSlice &&d) {
     return DBError{DBErrorCode::RecordNotFound, RecordNotFoundErrorStr};
 }
 
-[[nodiscard]] Iterator FileStream::openOrCreateIterator(char identifier, IteratorOptions) {
-    if (!_iterators.count(identifier)) {
-        _iterators.insert(std::make_pair(
-            identifier, PersistentIterator{identifier, _first_sequence_number, _opts.file_implementation}));
-    }
-
-    return Iterator{WEAK_FROM_THIS(), identifier, _iterators.at(identifier).getSequenceNumber()};
-}
-
-void FileStream::deleteIterator(char identifier) {
-    if (_iterators.count(identifier)) {
-        _iterators.at(identifier).remove();
-        _iterators.erase(identifier);
-    }
-}
-
-void FileStream::setCheckpoint(char identifier, uint64_t sequence_number) {
-    // TODO: if no identifier in map
-    _iterators.at(identifier).setCheckpoint(sequence_number);
-}
-
-PersistentIterator::PersistentIterator(char id, uint64_t start, std::shared_ptr<FileSystemInterface> fs)
-    : _id(id), _file_implementation(std::move(fs)), _sequence_number(start) {
-    using namespace std::string_literals;
-    auto filename = id + ".it"s;
-
-    if (_file_implementation->exists(filename)) {
-        auto it_file_or = _file_implementation->open(filename);
-        // TODO: Handle errors
-        if (it_file_or) {
-            auto last_value_raw_or = it_file_or.val()->read(0, sizeof(uint64_t));
-            if (last_value_raw_or) {
-                uint64_t last_value =
-                    *reinterpret_cast<uint64_t *>( // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
-                        last_value_raw_or.val().data());
-                _sequence_number = std::max(start, last_value);
-            }
+[[nodiscard]] Iterator FileStream::openOrCreateIterator(const std::string &identifier, IteratorOptions) {
+    for (const auto &iter : _iterators) {
+        if (iter.getIdentifier() == identifier) {
+            return Iterator{WEAK_FROM_THIS(), identifier, std::max(_first_sequence_number, iter.getSequenceNumber())};
         }
+    }
+
+    _iterators.emplace_back(identifier, _first_sequence_number, _kv_store);
+    return Iterator{WEAK_FROM_THIS(), identifier,
+                    std::max(_first_sequence_number, _iterators.back().getSequenceNumber())};
+}
+
+void FileStream::deleteIterator(const std::string &identifier) {
+    for (size_t i = 0; i < _iterators.size(); i++) {
+        auto iter = _iterators[i];
+        if (iter.getIdentifier() == identifier) {
+            iter.remove();
+            auto it = _iterators.begin();
+            std::advance(it, i);
+            _iterators.erase(it);
+            break;
+        }
+    }
+}
+
+void FileStream::setCheckpoint(const std::string &identifier, uint64_t sequence_number) {
+    // TODO: if no identifier in map
+    for (auto &iter : _iterators) {
+        if (iter.getIdentifier() == identifier) {
+            iter.setCheckpoint(sequence_number);
+            return;
+        }
+    }
+}
+
+PersistentIterator::PersistentIterator(std::string id, uint64_t start, std::shared_ptr<KV> kv)
+    : _id(std::move(id)), _store(std::move(kv)), _sequence_number(start) {
+    auto value_or = _store->get(_id);
+    if (value_or) {
+        auto last_value = *reinterpret_cast<uint64_t *>( // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+            value_or.val().data());
+        _sequence_number = std::max(start, last_value);
     }
 }
 
 void PersistentIterator::setCheckpoint(uint64_t sequence_number) {
-    using namespace std::string_literals;
-    auto filename = _id + ".it"s;
-    auto shadow_filename = _id + ".its"s;
-
-    // Remove any old shadow which can only contain partly written data
-    _file_implementation->remove(shadow_filename);
-
-    // Write value into shadow
-    {
-        auto it_file_or = _file_implementation->open(shadow_filename);
-        if (it_file_or) {
-            it_file_or.val()->append(
-                BorrowedSlice{reinterpret_cast<const uint8_t *>( // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
-                                  &sequence_number),
-                              sizeof(uint64_t)});
-        }
-    }
-
-    // Overwrite old file
-    _file_implementation->rename(shadow_filename, filename);
+    // TODO: something with the error
+    _sequence_number = sequence_number;
+    [[maybe_unused]] auto _ = _store->put(
+        _id, BorrowedSlice{reinterpret_cast<const uint8_t *>( // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+                               &sequence_number),
+                           sizeof(uint64_t)});
 }
 
 void PersistentIterator::remove() {
-    using namespace std::string_literals;
-    auto filename = _id + ".it"s;
-    auto shadow_filename = _id + ".its"s;
-
-    _file_implementation->remove(shadow_filename);
-    _file_implementation->remove(filename);
+    // TODO: something with the error
+    [[maybe_unused]] auto _ = _store->remove(_id);
 }
 
 } // namespace gg

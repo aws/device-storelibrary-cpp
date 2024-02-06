@@ -14,20 +14,30 @@ endif()
 
 include(cmake/ClangFormat.cmake)
 
+add_library(kv include/kv.hpp include/expected.hpp include/crc32.hpp include/filesystem.hpp include/slices.hpp
+        include/util.hpp
+        source/kv.cpp)
+set_target_properties(kv PROPERTIES LINKER_LANGUAGE CXX)
+target_include_directories(kv PRIVATE include)
+target_compile_options(kv PRIVATE -fno-rtti -fno-exceptions -Wall -Wextra -Werror)
+target_clangformat_setup(kv)
+
 add_library(greenlake_lib include/db.hpp include/fileDb.hpp
-        include/memoryDb.hpp include/crc32.hpp
+        include/memoryDb.hpp include/crc32.hpp include/slices.hpp
         source/memoryDb.cpp source/fileDb.cpp
-        include/expected.hpp)
+        include/expected.hpp
+        include/util.hpp)
 set_target_properties(greenlake_lib PROPERTIES LINKER_LANGUAGE CXX)
 target_include_directories(greenlake_lib PRIVATE include)
-target_compile_options(greenlake_lib PUBLIC -fno-rtti -Wall -Wextra -Werror)
+target_link_libraries(greenlake_lib PUBLIC kv)
+target_compile_options(greenlake_lib PRIVATE -fno-rtti -Wall -Wextra -Werror)
 target_clangformat_setup(greenlake_lib)
 
 set(CMAKE_CXX_STANDARD 17)
 add_executable(greenlake_db include/posixFileSystem.hpp source/main.cpp)
 target_include_directories(greenlake_db PRIVATE include)
 target_link_libraries(greenlake_db PRIVATE greenlake_lib)
-target_compile_options(greenlake_db PUBLIC -fno-rtti -Wall -Wextra -Werror)
+target_compile_options(greenlake_db PRIVATE -fno-rtti -Wall -Wextra -Werror)
 target_clangformat_setup(greenlake_db)
 
 if(CMAKE_BUILD_TYPE MATCHES "Debug")

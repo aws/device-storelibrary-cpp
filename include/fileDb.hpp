@@ -1,8 +1,8 @@
 #pragma once
 #include "db.hpp"
+#include "kv.hpp"
 #include <climits>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 namespace aws {
@@ -62,37 +62,39 @@ class FileSegment {
 
 class PersistentIterator {
   public:
-    PersistentIterator(char id, uint64_t start, std::shared_ptr<FileSystemInterface>);
+    PersistentIterator(std::string id, uint64_t start, std::shared_ptr<KV>);
 
     uint64_t getSequenceNumber() const { return _sequence_number; }
+    const std::string &getIdentifier() const { return _id; }
     void setCheckpoint(uint64_t);
     void remove();
 
   private:
-    char _id;
-    std::shared_ptr<FileSystemInterface> _file_implementation{};
+    std::string _id;
+    std::shared_ptr<KV> _store;
     uint64_t _sequence_number{0};
 };
 
 class __attribute__((visibility("default"))) FileStream : public StreamInterface {
   private:
     StreamOptions _opts;
-    std::unordered_map<char, PersistentIterator> _iterators{};
+    std::shared_ptr<KV> _kv_store;
+    std::vector<PersistentIterator> _iterators{};
     std::vector<FileSegment> _segments{};
 
-    explicit FileStream(StreamOptions &&o) : _opts(std::move(o)) {
+    explicit FileStream(StreamOptions &&o)
+        : _opts(std::move(o)), _kv_store(std::make_shared<KV>(_opts.file_implementation, "m")) {
         _iterators.reserve(1);
         _segments.reserve(1 + ((_opts.maximum_db_size_bytes - 1) / _opts.minimum_segment_size_bytes));
-        loadExistingSegments();
     }
 
-    DBError removeSegmentsIfNewRecordBeyondMaxSize(size_t record_size);
+    [[nodiscard]] DBError removeSegmentsIfNewRecordBeyondMaxSize(size_t record_size);
 
-    FileError makeNextSegment();
-    FileError loadExistingSegments();
+    [[nodiscard]] FileError makeNextSegment();
+    [[nodiscard]] FileError loadExistingSegments();
 
   public:
-    static std::shared_ptr<StreamInterface> openOrCreate(StreamOptions &&);
+    [[nodiscard]] static expected<std::shared_ptr<StreamInterface>, FileError> openOrCreate(StreamOptions &&);
 
     expected<uint64_t, DBError> append(BorrowedSlice) override;
     expected<uint64_t, DBError> append(OwnedSlice &&) override;
@@ -103,10 +105,10 @@ class __attribute__((visibility("default"))) FileStream : public StreamInterface
     [[nodiscard]] expected<OwnedRecord, DBError> read(uint64_t sequence_number,
                                                       uint64_t suggested_start) const override;
 
-    [[nodiscard]] Iterator openOrCreateIterator(char identifier, IteratorOptions) override;
-    void deleteIterator(char identifier) override;
+    [[nodiscard]] Iterator openOrCreateIterator(const std::string &identifier, IteratorOptions) override;
+    void deleteIterator(const std::string &identifier) override;
 
-    void setCheckpoint(char, uint64_t) override;
+    void setCheckpoint(const std::string &, uint64_t) override;
 };
 
 } // namespace gg

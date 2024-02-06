@@ -80,14 +80,14 @@ expected<uint64_t, DBError> MemoryStream::append(OwnedSlice &&d) {
     return DBError{DBErrorCode::RecordNotFound, RecordNotFoundErrorStr};
 }
 
-[[nodiscard]] Iterator MemoryStream::openOrCreateIterator(char identifier, IteratorOptions) {
+[[nodiscard]] Iterator MemoryStream::openOrCreateIterator(const std::string &identifier, IteratorOptions) {
     return Iterator{WEAK_FROM_THIS(), identifier,
                     _iterators.count(identifier) ? _iterators[identifier] : _first_sequence_number};
 }
 
-void MemoryStream::deleteIterator(char identifier) { _iterators.erase(identifier); }
+void MemoryStream::deleteIterator(const std::string &identifier) { _iterators.erase(identifier); }
 
-void MemoryStream::setCheckpoint(char identifier, uint64_t sequence_number) {
+void MemoryStream::setCheckpoint(const std::string &identifier, uint64_t sequence_number) {
     _iterators[identifier] = sequence_number;
 }
 
