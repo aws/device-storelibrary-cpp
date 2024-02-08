@@ -7,6 +7,13 @@ namespace kv {
 constexpr static uint8_t DELETED_FLAG = 0x01;
 
 expected<std::shared_ptr<KV>, KVError> KV::openOrCreate(KVOptions &&opts) {
+    if (opts.identifier.empty()) {
+        return KVError{KVErrorCodes::InvalidArguments, "Identifier cannot be empty"};
+    }
+    if (opts.filesystem_implementation == nullptr) {
+        return KVError{KVErrorCodes::InvalidArguments, "Filesystem implementation cannot be null"};
+    }
+
     auto kv = std::shared_ptr<KV>(new KV(std::move(opts)));
     auto err = kv->initialize();
     if (err.code != KVErrorCodes::NoError) {
