@@ -9,12 +9,17 @@
 #include "filesystem/filesystem.hpp"
 
 namespace aws {
-namespace gg __attribute__((visibility("default"))) {
+namespace gg {
+namespace kv __attribute__((visibility("default"))) {
     enum class KVErrorCodes : std::uint8_t {
         NoError,
         KeyNotFound,
         ReadError,
         WriteError,
+        HeaderCorrupted,
+        DataCorrupted,
+        EndOfFile,
+        InvalidArguments,
         Unknown,
     };
     using KVError = GenericError<KVErrorCodes>;
@@ -25,11 +30,16 @@ namespace gg __attribute__((visibility("default"))) {
         uint32_t compact_after;
     };
 
+    constexpr uint8_t VERSION = 0x01;
+    constexpr uint8_t MAGIC = 0xB0;
+    constexpr uint8_t MAGIC_AND_VERSION = static_cast<const uint8_t>(MAGIC << 4 | VERSION);
+
     struct KVHeader {
-        uint8_t flags;
-        uint32_t crc32;
-        uint16_t key_length;
-        uint16_t value_length;
+        uint8_t magic_and_version{MAGIC_AND_VERSION};
+        uint8_t flags{0};
+        uint16_t key_length{0};
+        uint32_t crc32{0};
+        uint32_t value_length{0};
     };
 
     class KV {
@@ -42,12 +52,12 @@ namespace gg __attribute__((visibility("default"))) {
         std::uint32_t _added_bytes{0};
         mutable std::mutex _lock{};
 
-        [[nodiscard]] expected<KVHeader, FileError> readHeaderFrom(uint32_t) const;
-        [[nodiscard]] expected<std::string, FileError> readKeyFrom(uint32_t, uint16_t) const;
-        [[nodiscard]] expected<OwnedSlice, FileError> readValueFrom(uint32_t, uint16_t, uint16_t) const;
-        [[nodiscard]] expected<OwnedSlice, FileError> readValueFrom(uint32_t) const;
+        [[nodiscard]] expected<KVHeader, KVError> readHeaderFrom(uint32_t) const;
+        [[nodiscard]] expected<std::string, KVError> readKeyFrom(uint32_t, uint16_t) const;
+        [[nodiscard]] expected<OwnedSlice, KVError> readValueFrom(uint32_t, uint16_t, uint16_t) const;
+        [[nodiscard]] expected<OwnedSlice, KVError> readValueFrom(uint32_t) const;
 
-        [[nodiscard]] FileError readWrite(std::pair<std::string, uint32_t> &, FileLike &);
+        [[nodiscard]] KVError readWrite(std::pair<std::string, uint32_t> &, FileLike &);
 
         KV(KVOptions &&opts) : _opts(std::move(opts)), _shadow_name(_opts.identifier + "s") {}
 
@@ -67,5 +77,6 @@ namespace gg __attribute__((visibility("default"))) {
             return compactNoLock();
         }
     };
+} // namespace kv
 } // namespace gg
 } // namespace aws

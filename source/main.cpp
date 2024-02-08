@@ -27,13 +27,30 @@ int main() {
 
     constexpr int NUM_RECORDS = 100000;
 
-    // std::filesystem::remove_all(std::filesystem::current_path() / "stream1");
+    std::filesystem::remove_all(std::filesystem::current_path() / "stream1");
 
     auto start = std::chrono::high_resolution_clock::now();
     {
         using namespace aws::gg;
+        using namespace aws::gg::kv;
 
         auto fs = std::make_shared<PosixFileSystem>(std::filesystem::current_path() / "stream1");
+
+        /*
+        auto kv_or = KV::openOrCreate(KVOptions{
+            .filesystem_implementation = fs,
+            .identifier = "m",
+            .compact_after = 16 * 1024 * 1024,
+        });
+        if (!kv_or) {
+            std::cerr << kv_or.err().msg << std::endl;
+            std::terminate();
+        }
+        auto kv = kv_or.val();
+        for (int i = 0; i < NUM_RECORDS; i++) {
+            auto x = kv->put("key" + std::to_string(i), BorrowedSlice{data.data(), data.size()});
+        }
+     */
 
         // auto s = MemoryStream::openOrCreate(StreamOptions{.maximum_size_bytes = 500 * 1024 * 1024});
         auto s_or = FileStream::openOrCreate(StreamOptions{

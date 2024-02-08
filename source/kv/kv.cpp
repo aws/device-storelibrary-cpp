@@ -3,6 +3,7 @@
 
 namespace aws {
 namespace gg {
+namespace kv {
 constexpr static uint8_t DELETED_FLAG = 0x01;
 
 expected<std::shared_ptr<KV>, KVError> KV::openOrCreate(KVOptions &&opts) {
@@ -34,12 +35,16 @@ KVError KV::initialize() {
         uint32_t beginning_pointer = _byte_position;
         auto header_or = readHeaderFrom(beginning_pointer);
         if (!header_or) {
-            if (header_or.err().code == FileErrorCode::EndOfFile) {
+            if (header_or.err().code == KVErrorCodes::EndOfFile) {
                 return KVError{KVErrorCodes::NoError, {}};
             }
             return KVError{KVErrorCodes::ReadError, "Incomplete header read. " + header_or.err().msg};
         }
         _byte_position += sizeof(KVHeader);
+
+        if (header_or.val().key_length == 0) {
+            continue;
+        }
 
         auto key_or = readKeyFrom(beginning_pointer, header_or.val().key_length);
         if (!key_or) {
@@ -71,25 +76,38 @@ KVError KV::initialize() {
     return KVError{KVErrorCodes::NoError, {}};
 }
 
-expected<KVHeader, FileError> KV::readHeaderFrom(uint32_t begin) const {
+static KVError fileErrorToKVError(const FileError &e) {
+    if (e.code == FileErrorCode::EndOfFile) {
+        return KVError{KVErrorCodes::EndOfFile, e.msg};
+    }
+    return KVError{KVErrorCodes::ReadError, e.msg};
+}
+
+expected<KVHeader, KVError> KV::readHeaderFrom(uint32_t begin) const {
     auto header_or = _f->read(begin, begin + sizeof(KVHeader));
     if (!header_or) {
-        return std::move(header_or.err());
+        return fileErrorToKVError(header_or.err());
     }
     auto const *header = reinterpret_cast<KVHeader *>( // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
         header_or.val().data());
-    return KVHeader{*header};
+    auto ret = KVHeader{*header};
+
+    if (ret.magic_and_version != MAGIC_AND_VERSION) {
+        return KVError{KVErrorCodes::HeaderCorrupted, "Invalid magic and version"};
+    }
+
+    return ret;
 }
 
-expected<std::string, FileError> KV::readKeyFrom(uint32_t begin, uint16_t key_length) const {
+expected<std::string, KVError> KV::readKeyFrom(uint32_t begin, uint16_t key_length) const {
     auto key_or = _f->read(begin + sizeof(KVHeader), begin + sizeof(KVHeader) + key_length);
     if (!key_or) {
-        return std::move(key_or.err());
+        return fileErrorToKVError(key_or.err());
     }
     return key_or.val().string();
 }
 
-expected<OwnedSlice, FileError> KV::readValueFrom(const uint32_t begin) const {
+expected<OwnedSlice, KVError> KV::readValueFrom(const uint32_t begin) const {
     auto header_or = readHeaderFrom(begin);
     if (!header_or) {
         return std::move(header_or.err());
@@ -99,12 +117,12 @@ expected<OwnedSlice, FileError> KV::readValueFrom(const uint32_t begin) const {
     return readValueFrom(begin, header.key_length, header.value_length);
 }
 
-expected<OwnedSlice, FileError> KV::readValueFrom(const uint32_t begin, uint16_t key_length,
-                                                  uint16_t value_length) const {
+expected<OwnedSlice, KVError> KV::readValueFrom(const uint32_t begin, uint16_t key_length,
+                                                uint16_t value_length) const {
     auto value_or =
         _f->read(begin + sizeof(KVHeader) + key_length, begin + sizeof(KVHeader) + key_length + value_length);
     if (!value_or) {
-        return std::move(value_or.err());
+        return fileErrorToKVError(value_or.err());
     }
     // TODO: Check CRC
     return std::move(value_or.val());
@@ -125,28 +143,35 @@ expected<OwnedSlice, KVError> KV::get(const std::string &key) const {
 
     for (const auto &point : _key_pointers) {
         if (point.first == key) {
-            auto value_or = readValueFrom(point.second);
-            if (value_or) {
-                return std::move(value_or.val());
-            }
-            return KVError{KVErrorCodes::ReadError, value_or.err().msg};
+            return readValueFrom(point.second);
         }
     }
     return KVError{KVErrorCodes::KeyNotFound, {}};
 }
 
 KVError KV::put(const std::string &key, BorrowedSlice data) {
+    if (key.empty()) {
+        return KVError{KVErrorCodes::InvalidArguments, "Key cannot be empty"};
+    }
+    if (key.length() > UINT16_MAX) {
+        return KVError{KVErrorCodes::InvalidArguments, "Key length cannot exceed " + std::to_string(UINT16_MAX)};
+    }
+    if (data.size() > UINT32_MAX) {
+        return KVError{KVErrorCodes::InvalidArguments, "Value length cannot exceed " + std::to_string(UINT32_MAX)};
+    }
+
     std::lock_guard<std::mutex> lock(_lock);
     auto key_len = static_cast<uint16_t>(key.length());
-    auto value_len = static_cast<uint16_t>(data.size());
+    auto value_len = static_cast<uint32_t>(data.size());
     uint8_t flags = 0;
     auto header = KVHeader{
+        .magic_and_version = MAGIC_AND_VERSION,
         .flags = flags,
+        .key_length = key_len,
         .crc32 = crc32::update(
             crc32::update(crc32::update(crc32::update(0, &flags, sizeof(flags)), &key_len, sizeof(key_len)), &value_len,
                           sizeof(value_len)),
             data.data(), data.size()),
-        .key_length = key_len,
         .value_length = value_len,
     };
     _f->append(
@@ -182,7 +207,7 @@ KVError KV::put(const std::string &key, BorrowedSlice data) {
     return KVError{KVErrorCodes::NoError, {}};
 }
 
-FileError KV::readWrite(std::pair<std::string, uint32_t> &p, FileLike &f) {
+KVError KV::readWrite(std::pair<std::string, uint32_t> &p, FileLike &f) {
     auto header_or = readHeaderFrom(p.second);
     if (!header_or) {
         return std::move(header_or.err());
@@ -203,7 +228,7 @@ FileError KV::readWrite(std::pair<std::string, uint32_t> &p, FileLike &f) {
     p.second = _byte_position;
     _byte_position += sizeof(header) + header.key_length + header.value_length;
 
-    return FileError{FileErrorCode::NoError, {}};
+    return KVError{KVErrorCodes::NoError, {}};
 }
 
 KVError KV::compactNoLock() {
@@ -225,7 +250,7 @@ KVError KV::compactNoLock() {
 
         for (auto &point : _key_pointers) {
             auto err = readWrite(point, *shadow);
-            if (err.code != FileErrorCode::NoError) {
+            if (err.code != KVErrorCodes::NoError) {
                 return KVError{KVErrorCodes::WriteError, err.msg};
             }
         }
@@ -265,13 +290,14 @@ KVError KV::remove(const std::string &key) {
     removeKey(key);
 
     uint16_t key_len = key.size();
-    uint16_t value_len = 0;
+    uint32_t value_len = 0;
     uint8_t flags = DELETED_FLAG;
     auto header = KVHeader{
+        .magic_and_version = MAGIC_AND_VERSION,
         .flags = flags,
+        .key_length = key_len,
         .crc32 = crc32::update(crc32::update(crc32::update(0, &flags, sizeof(flags)), &key_len, sizeof(key_len)),
                                &value_len, sizeof(value_len)),
-        .key_length = key_len,
         .value_length = value_len,
     };
     _f->append(
@@ -283,5 +309,6 @@ KVError KV::remove(const std::string &key) {
 
     return KVError{KVErrorCodes::NoError, {}};
 }
+} // namespace kv
 } // namespace gg
 } // namespace aws

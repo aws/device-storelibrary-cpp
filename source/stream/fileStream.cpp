@@ -67,7 +67,7 @@ expected<std::shared_ptr<StreamInterface>, FileError> FileStream::openOrCreate(S
 }
 
 FileError FileStream::loadExistingSegments() {
-    auto kv_err_or = KV::openOrCreate(std::move(_opts.kv_options));
+    auto kv_err_or = kv::KV::openOrCreate(std::move(_opts.kv_options));
     if (!kv_err_or) {
         // TODO: Better error mapping
         return FileError{FileErrorCode::Unknown, kv_err_or.err().msg};
@@ -366,7 +366,7 @@ void FileStream::setCheckpoint(const std::string &identifier, uint64_t sequence_
     }
 }
 
-PersistentIterator::PersistentIterator(std::string id, uint64_t start, std::shared_ptr<KV> kv)
+PersistentIterator::PersistentIterator(std::string id, uint64_t start, std::shared_ptr<kv::KV> kv)
     : _id(std::move(id)), _store(std::move(kv)), _sequence_number(start) {
     auto value_or = _store->get(_id);
     if (value_or) {

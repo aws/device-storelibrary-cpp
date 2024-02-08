@@ -62,7 +62,7 @@ class FileSegment {
 
 class PersistentIterator {
   public:
-    PersistentIterator(std::string id, uint64_t start, std::shared_ptr<KV>);
+    PersistentIterator(std::string id, uint64_t start, std::shared_ptr<kv::KV>);
 
     uint64_t getSequenceNumber() const { return _sequence_number; }
     const std::string &getIdentifier() const { return _id; }
@@ -71,14 +71,14 @@ class PersistentIterator {
 
   private:
     std::string _id;
-    std::shared_ptr<KV> _store;
+    std::shared_ptr<kv::KV> _store;
     uint64_t _sequence_number{0};
 };
 
 class __attribute__((visibility("default"))) FileStream : public StreamInterface {
   private:
     StreamOptions _opts;
-    std::shared_ptr<KV> _kv_store{};
+    std::shared_ptr<kv::KV> _kv_store{};
     std::vector<PersistentIterator> _iterators{};
     std::vector<FileSegment> _segments{};
 
