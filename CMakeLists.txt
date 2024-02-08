@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(greenlake_db)
+project(greenlake)
 
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
@@ -22,28 +22,28 @@ target_include_directories(kv PRIVATE include)
 target_compile_options(kv PRIVATE -fno-rtti -fno-exceptions -Wall -Wextra -Werror)
 target_clangformat_setup(kv)
 
-add_library(greenlake_lib include/db.hpp include/fileDb.hpp
-        include/memoryDb.hpp include/crc32.hpp include/slices.hpp
-        source/memoryDb.cpp source/fileDb.cpp
+add_library(greenlake_stream include/stream.hpp include/fileStream.hpp
+        include/memoryStream.hpp include/crc32.hpp include/slices.hpp
+        source/memoryStream.cpp source/fileStream.cpp
         include/expected.hpp
         include/util.hpp)
-set_target_properties(greenlake_lib PROPERTIES LINKER_LANGUAGE CXX)
-target_include_directories(greenlake_lib PRIVATE include)
-target_link_libraries(greenlake_lib PUBLIC kv)
-target_compile_options(greenlake_lib PRIVATE -fno-rtti -Wall -Wextra -Werror)
-target_clangformat_setup(greenlake_lib)
+set_target_properties(greenlake_stream PROPERTIES LINKER_LANGUAGE CXX)
+target_include_directories(greenlake_stream PRIVATE include)
+target_link_libraries(greenlake_stream PUBLIC kv)
+target_compile_options(greenlake_stream PRIVATE -fno-rtti -Wall -Wextra -Werror)
+target_clangformat_setup(greenlake_stream)
 
 set(CMAKE_CXX_STANDARD 17)
-add_executable(greenlake_db include/posixFileSystem.hpp source/main.cpp)
-target_include_directories(greenlake_db PRIVATE include)
-target_link_libraries(greenlake_db PRIVATE greenlake_lib)
-target_compile_options(greenlake_db PRIVATE -fno-rtti -Wall -Wextra -Werror)
-target_clangformat_setup(greenlake_db)
+add_executable(greenlake_example include/posixFileSystem.hpp source/main.cpp)
+target_include_directories(greenlake_example PRIVATE include)
+target_link_libraries(greenlake_example PRIVATE greenlake_stream)
+target_compile_options(greenlake_example PRIVATE -fno-rtti -Wall -Wextra -Werror)
+target_clangformat_setup(greenlake_example)
 
 if(CMAKE_BUILD_TYPE MATCHES "Debug")
     include(cmake/Sanitizers.cmake)
     myproject_enable_sanitizers(
-        greenlake_db
+        greenlake_example
         ON # asan
         ON # ub
         OFF # thread
@@ -62,7 +62,7 @@ add_subdirectory(test)
 # Brazil targets after this point
 
 # Setup a default target that runs when no target is specified.
-add_custom_target(default DEPENDS greenlake_db)
+add_custom_target(default DEPENDS greenlake_example)
 if (TARGET cmakeformat)
     add_dependencies(default cmakeformat)
 endif ()
@@ -75,6 +75,6 @@ add_custom_target(release
         COMMENT "Build and install the library, and run the unit tests."
         # TODO: execute tests
         # COMMAND "${CMAKE_COMMAND}" -E chdir "${CMAKE_BINARY_DIR}" "${CMAKE_CTEST_COMMAND}" --output-on-failure
-        COMMAND "${CMAKE_COMMAND}" --build "${CMAKE_BINARY_DIR}" --target greenlake_db
+        COMMAND "${CMAKE_COMMAND}" --build "${CMAKE_BINARY_DIR}" --target greenlake_example
         DEPENDS build-tests
         USES_TERMINAL)

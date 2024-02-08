@@ -37,7 +37,7 @@ namespace gg __attribute__((visibility("default"))) {
         ~OwnedRecord() = default;
     };
 
-    enum class DBErrorCode : std::uint8_t {
+    enum class StreamErrorCode : std::uint8_t {
         NoError,
         RecordNotFound,
         RecordDataCorrupted,
@@ -121,7 +121,7 @@ namespace gg __attribute__((visibility("default"))) {
 #define WEAK_FROM_THIS shared_from_this
 #endif
 
-    using DBError = GenericError<DBErrorCode>;
+    using StreamError = GenericError<StreamErrorCode>;
 
     class StreamInterface : public std::enable_shared_from_this<StreamInterface> {
       protected:
@@ -133,30 +133,30 @@ namespace gg __attribute__((visibility("default"))) {
         StreamInterface(StreamInterface &) = delete;
 
         /**
-         * Append data into the DB.
+         * Append data into the stream.
          *
          * @return the sequence number of the record appended.
          */
-        virtual expected<uint64_t, DBError> append(BorrowedSlice) = 0;
+        virtual expected<uint64_t, StreamError> append(BorrowedSlice) = 0;
 
         /**
-         * Append data into the DB.
+         * Append data into the stream.
          *
          * @return the sequence number of the record appended.
          */
-        virtual expected<uint64_t, DBError> append(OwnedSlice &&) = 0;
+        virtual expected<uint64_t, StreamError> append(OwnedSlice &&) = 0;
 
         /**
-         * Read a record from the DB by its sequence number.
+         * Read a record from the stream by its sequence number.
          * Throws exceptions if sequence number does not exist or if the data is corrupted (checksum fails).
          *
          * @param sequence_number the sequence number of the record to read.
          * @return the Record.
          */
-        [[nodiscard]] virtual expected<OwnedRecord, DBError> read(uint64_t sequence_number) const = 0;
+        [[nodiscard]] virtual expected<OwnedRecord, StreamError> read(uint64_t sequence_number) const = 0;
 
         /**
-         * Read a record from the DB by its sequence number with an optional hint to the storage engine for where to
+         * Read a record from the stream by its sequence number with an optional hint to the storage engine for where to
          * start looking for the record. Throws exceptions if sequence number does not exist or if the data is corrupted
          * (checksum fails).
          *
@@ -164,8 +164,8 @@ namespace gg __attribute__((visibility("default"))) {
          * @param suggested_start an optional hint to the storage engine for where to start looking for the record.
          * @return the Record.
          */
-        [[nodiscard]] virtual expected<OwnedRecord, DBError> read(uint64_t sequence_number,
-                                                                  uint64_t suggested_start) const = 0;
+        [[nodiscard]] virtual expected<OwnedRecord, StreamError> read(uint64_t sequence_number,
+                                                                      uint64_t suggested_start) const = 0;
 
         /**
          * Create an iterator identified by the chosen identifier. If an iterator already exists with the same
@@ -202,7 +202,7 @@ namespace gg __attribute__((visibility("default"))) {
 
     struct StreamOptions {
         size_t minimum_segment_size_bytes = 16 * 1024 * 1024; // 16MB minimum segment size before making a new segment
-        size_t maximum_db_size_bytes = 128 * 1024 * 1024;     // 128MB max db size
+        size_t maximum_size_bytes = 128 * 1024 * 1024;        // 128MB max stream size
         std::shared_ptr<FileSystemInterface> file_implementation = {};
         KVOptions kv_options = {
             .filesystem_implementation = file_implementation, .identifier = "kv", .compact_after = 128 * 1024};

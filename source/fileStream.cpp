@@ -1,4 +1,4 @@
-#include "fileDb.hpp"
+#include "fileStream.hpp"
 #include "crc32.hpp"
 #include <algorithm>
 #include <arpa/inet.h>
@@ -182,12 +182,12 @@ void FileSegment::append(BorrowedSlice d, int64_t timestamp_ms, uint64_t sequenc
     _highest_seq_num = std::max(_highest_seq_num.load(), sequence_number);
 }
 
-expected<OwnedRecord, DBError> FileSegment::read(uint64_t sequence_number, uint64_t suggested_start) const {
+expected<OwnedRecord, StreamError> FileSegment::read(uint64_t sequence_number, uint64_t suggested_start) const {
     return getRecord(sequence_number, suggested_start, suggested_start != 0);
 }
 
-expected<OwnedRecord, DBError> FileSegment::getRecord(uint64_t sequence_number, size_t offset,
-                                                      bool suggested_start) const {
+expected<OwnedRecord, StreamError> FileSegment::getRecord(uint64_t sequence_number, size_t offset,
+                                                          bool suggested_start) const {
     // We will try to find the record by reading the segment starting at the offset.
     // If a suggested starting position within the segment was suggested to us, we start from further into the file.
     // If any error occurs with the suggested starting point, we will restart from the beginning of the file.
@@ -201,24 +201,24 @@ expected<OwnedRecord, DBError> FileSegment::getRecord(uint64_t sequence_number, 
                 suggested_start = false;
                 continue;
             }
-            return DBError{DBErrorCode::ReadError, header_data_or.err().msg};
+            return StreamError{StreamErrorCode::ReadError, header_data_or.err().msg};
         }
         LogEntryHeader const *header = convertSliceToHeader(header_data_or.val());
 
         if (header->magic_and_version != MAGIC_AND_VERSION) {
-            return DBError{DBErrorCode::HeaderDataCorrupted, {}};
+            return StreamError{StreamErrorCode::HeaderDataCorrupted, {}};
         }
 
         auto expected_rel_seq_num = static_cast<int32_t>(sequence_number - _base_seq_num);
         if (header->relative_sequence_number > expected_rel_seq_num) {
-            return DBError{DBErrorCode::RecordNotFound, RecordNotFoundErrorStr};
+            return StreamError{StreamErrorCode::RecordNotFound, RecordNotFoundErrorStr};
         }
 
         // We found the one we want!
         if (header->relative_sequence_number == expected_rel_seq_num) {
             auto data_or = _f->read(offset + HEADER_SIZE, offset + HEADER_SIZE + header->payload_length_bytes);
             if (!data_or) {
-                return DBError{DBErrorCode::ReadError, header_data_or.err().msg};
+                return StreamError{StreamErrorCode::ReadError, header_data_or.err().msg};
             }
             auto data = std::move(data_or.val());
             auto data_len_swap = static_cast<int32_t>(_htonl(header->payload_length_bytes));
@@ -227,7 +227,7 @@ expected<OwnedRecord, DBError> FileSegment::getRecord(uint64_t sequence_number, 
                 static_cast<int64_t>(crc32::update(
                     crc32::update(crc32::update(0, &ts_swap, sizeof(int64_t)), &data_len_swap, sizeof(int32_t)),
                     data.data(), data.size()))) {
-                return DBError{DBErrorCode::RecordDataCorrupted, {}};
+                return StreamError{StreamErrorCode::RecordDataCorrupted, {}};
             }
 
             return OwnedRecord{
@@ -261,11 +261,11 @@ FileError FileStream::makeNextSegment() {
     return FileError{FileErrorCode::NoError, {}};
 }
 
-expected<uint64_t, DBError> FileStream::append(BorrowedSlice d) {
+expected<uint64_t, StreamError> FileStream::append(BorrowedSlice d) {
     auto record_size = d.size();
     {
         auto err = removeSegmentsIfNewRecordBeyondMaxSize(record_size);
-        if (err.code != DBErrorCode::NoError) {
+        if (err.code != StreamErrorCode::NoError) {
             return err;
         }
     }
@@ -273,7 +273,7 @@ expected<uint64_t, DBError> FileStream::append(BorrowedSlice d) {
     if (_segments.empty()) {
         auto err = makeNextSegment();
         if (err.code != FileErrorCode::NoError) {
-            return DBError{DBErrorCode::WriteError, err.msg};
+            return StreamError{StreamErrorCode::WriteError, err.msg};
         }
     }
 
@@ -281,7 +281,7 @@ expected<uint64_t, DBError> FileStream::append(BorrowedSlice d) {
     if (last_segment.totalSizeBytes() >= _opts.minimum_segment_size_bytes) {
         auto err = makeNextSegment();
         if (err.code != FileErrorCode::NoError) {
-            return DBError{DBErrorCode::WriteError, err.msg};
+            return StreamError{StreamErrorCode::WriteError, err.msg};
         }
     }
 
@@ -294,13 +294,13 @@ expected<uint64_t, DBError> FileStream::append(BorrowedSlice d) {
     return seq;
 }
 
-DBError FileStream::removeSegmentsIfNewRecordBeyondMaxSize(size_t record_size) {
-    if (record_size > _opts.maximum_db_size_bytes) {
-        return DBError{DBErrorCode::RecordTooLarge, {}};
+StreamError FileStream::removeSegmentsIfNewRecordBeyondMaxSize(size_t record_size) {
+    if (record_size > _opts.maximum_size_bytes) {
+        return StreamError{StreamErrorCode::RecordTooLarge, {}};
     }
 
     // Make room if we need more room
-    while (_current_size_bytes + record_size > _opts.maximum_db_size_bytes) {
+    while (_current_size_bytes + record_size > _opts.maximum_size_bytes) {
         auto &to_delete = _segments.front();
         _current_size_bytes -= to_delete.totalSizeBytes();
         to_delete.remove();
@@ -308,18 +308,18 @@ DBError FileStream::removeSegmentsIfNewRecordBeyondMaxSize(size_t record_size) {
         _segments.erase(_segments.begin());
         _first_sequence_number = _segments.front().getBaseSeqNum();
     }
-    return DBError{DBErrorCode::NoError, {}};
+    return StreamError{StreamErrorCode::NoError, {}};
 }
 
-expected<uint64_t, DBError> FileStream::append(OwnedSlice &&d) {
+expected<uint64_t, StreamError> FileStream::append(OwnedSlice &&d) {
     auto x = std::move(d);
     return append(BorrowedSlice(x.data(), x.size()));
 }
 
-[[nodiscard]] expected<OwnedRecord, DBError> FileStream::read(uint64_t sequence_number,
-                                                              uint64_t suggested_start) const {
+[[nodiscard]] expected<OwnedRecord, StreamError> FileStream::read(uint64_t sequence_number,
+                                                                  uint64_t suggested_start) const {
     if (sequence_number < _first_sequence_number || sequence_number >= _next_sequence_number) {
-        return DBError{DBErrorCode::RecordNotFound, RecordNotFoundErrorStr};
+        return StreamError{StreamErrorCode::RecordNotFound, RecordNotFoundErrorStr};
     }
 
     for (const auto &seg : _segments) {
@@ -328,7 +328,7 @@ expected<uint64_t, DBError> FileStream::append(OwnedSlice &&d) {
         }
     }
 
-    return DBError{DBErrorCode::RecordNotFound, RecordNotFoundErrorStr};
+    return StreamError{StreamErrorCode::RecordNotFound, RecordNotFoundErrorStr};
 }
 
 [[nodiscard]] Iterator FileStream::openOrCreateIterator(const std::string &identifier, IteratorOptions) {

@@ -1,4 +1,4 @@
-#include "memoryDb.hpp"
+#include "memoryStream.hpp"
 #include <algorithm>
 #include <iostream>
 
@@ -10,10 +10,10 @@ std::shared_ptr<StreamInterface> MemoryStream::openOrCreate(StreamOptions &&opts
     return std::shared_ptr<StreamInterface>(new MemoryStream(std::move(opts)));
 }
 
-expected<uint64_t, DBError> MemoryStream::append(BorrowedSlice d) {
+expected<uint64_t, StreamError> MemoryStream::append(BorrowedSlice d) {
     auto record_size = d.size();
     auto err = remove_records_if_new_record_beyond_max_size(record_size);
-    if (err.code != DBErrorCode::NoError) {
+    if (err.code != StreamErrorCode::NoError) {
         return err;
     }
 
@@ -23,16 +23,16 @@ expected<uint64_t, DBError> MemoryStream::append(BorrowedSlice d) {
     return seq;
 }
 
-DBError MemoryStream::remove_records_if_new_record_beyond_max_size(size_t record_size) {
-    if (record_size > _opts.maximum_db_size_bytes) {
-        return DBError{DBErrorCode::RecordTooLarge, {}};
+StreamError MemoryStream::remove_records_if_new_record_beyond_max_size(size_t record_size) {
+    if (record_size > _opts.maximum_size_bytes) {
+        return StreamError{StreamErrorCode::RecordTooLarge, {}};
     }
 
     // Make room if we need more room
-    if (_current_size_bytes + record_size > _opts.maximum_db_size_bytes) {
+    if (_current_size_bytes + record_size > _opts.maximum_size_bytes) {
         // TODO: Bail out early if we have enough space
         _records.remove_if([this, record_size](const OwnedRecord &r) {
-            if (_current_size_bytes + record_size > _opts.maximum_db_size_bytes) {
+            if (_current_size_bytes + record_size > _opts.maximum_size_bytes) {
                 _current_size_bytes -= r.data.size();
                 return true;
             }
@@ -41,13 +41,13 @@ DBError MemoryStream::remove_records_if_new_record_beyond_max_size(size_t record
         _first_sequence_number = _records.front().sequence_number;
     }
 
-    return DBError{DBErrorCode::NoError, {}};
+    return StreamError{StreamErrorCode::NoError, {}};
 }
 
-expected<uint64_t, DBError> MemoryStream::append(OwnedSlice &&d) {
+expected<uint64_t, StreamError> MemoryStream::append(OwnedSlice &&d) {
     auto record_size = d.size();
     auto err = remove_records_if_new_record_beyond_max_size(record_size);
-    if (err.code != DBErrorCode::NoError) {
+    if (err.code != StreamErrorCode::NoError) {
         return err;
     }
 
@@ -57,10 +57,10 @@ expected<uint64_t, DBError> MemoryStream::append(OwnedSlice &&d) {
     return seq;
 }
 
-[[nodiscard]] expected<OwnedRecord, DBError> MemoryStream::read(uint64_t sequence_number,
-                                                                [[maybe_unused]] uint64_t suggested_start) const {
+[[nodiscard]] expected<OwnedRecord, StreamError> MemoryStream::read(uint64_t sequence_number,
+                                                                    [[maybe_unused]] uint64_t suggested_start) const {
     if (sequence_number < _first_sequence_number) {
-        return DBError{DBErrorCode::RecordNotFound, RecordNotFoundErrorStr};
+        return StreamError{StreamErrorCode::RecordNotFound, RecordNotFoundErrorStr};
     }
     for (auto &r : _records) {
         if (r.sequence_number > sequence_number) {
@@ -77,7 +77,7 @@ expected<uint64_t, DBError> MemoryStream::append(OwnedSlice &&d) {
         }
     }
 
-    return DBError{DBErrorCode::RecordNotFound, RecordNotFoundErrorStr};
+    return StreamError{StreamErrorCode::RecordNotFound, RecordNotFoundErrorStr};
 }
 
 [[nodiscard]] Iterator MemoryStream::openOrCreateIterator(const std::string &identifier, IteratorOptions) {

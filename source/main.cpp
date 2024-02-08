@@ -6,8 +6,8 @@
 #include <filesystem>
 #include <iostream>
 
-#include "fileDb.hpp"
-#include "memoryDb.hpp"
+#include "fileStream.hpp"
+#include "memoryStream.hpp"
 #include "posixFileSystem.hpp"
 #include <sys/resource.h>
 
@@ -35,10 +35,10 @@ int main() {
 
         auto fs = std::make_shared<PosixFileSystem>(std::filesystem::current_path() / "stream1");
 
-        // auto s = MemoryStream::openOrCreate(StreamOptions{.maximum_db_size_bytes = 500 * 1024 * 1024});
+        // auto s = MemoryStream::openOrCreate(StreamOptions{.maximum_size_bytes = 500 * 1024 * 1024});
         auto s_or = FileStream::openOrCreate(StreamOptions{
             .minimum_segment_size_bytes = 1024 * 1024,
-            .maximum_db_size_bytes = 10 * 1024 * 1024,
+            .maximum_size_bytes = 10 * 1024 * 1024,
             .file_implementation = fs,
             .kv_options =
                 KVOptions{
@@ -56,7 +56,7 @@ int main() {
         std::cout << "loaded checkpoint: " << s->openOrCreateIterator("a", IteratorOptions{}).sequence_number
                   << std::endl;
 
-        expected<uint64_t, DBError> last_sequence_number{0};
+        expected<uint64_t, StreamError> last_sequence_number{0};
         for (int i = 0; i < NUM_RECORDS; i++) {
             last_sequence_number =
                 s->append(BorrowedSlice{reinterpret_cast<const uint8_t *>(data.data()), data.size()});

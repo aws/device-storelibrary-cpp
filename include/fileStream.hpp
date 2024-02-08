@@ -1,6 +1,6 @@
 #pragma once
-#include "db.hpp"
 #include "kv.hpp"
+#include "stream.hpp"
 #include <climits>
 #include <string>
 #include <vector>
@@ -37,7 +37,7 @@ class FileSegment {
 
     void append(BorrowedSlice d, int64_t timestamp_ms, uint64_t sequence_number);
 
-    expected<OwnedRecord, DBError> read(uint64_t sequence_number, uint64_t suggested_start) const;
+    expected<OwnedRecord, StreamError> read(uint64_t sequence_number, uint64_t suggested_start) const;
 
     void remove();
 
@@ -55,7 +55,7 @@ class FileSegment {
     std::atomic_uint64_t _total_bytes{0};
     std::string _segment_id;
 
-    expected<OwnedRecord, DBError> getRecord(uint64_t sequence_number, size_t offset, bool suggested_start) const;
+    expected<OwnedRecord, StreamError> getRecord(uint64_t sequence_number, size_t offset, bool suggested_start) const;
 
     static LogEntryHeader const *convertSliceToHeader(const OwnedSlice &);
 };
@@ -84,10 +84,10 @@ class __attribute__((visibility("default"))) FileStream : public StreamInterface
 
     explicit FileStream(StreamOptions &&o) : _opts(std::move(o)) {
         _iterators.reserve(1);
-        _segments.reserve(1 + ((_opts.maximum_db_size_bytes - 1) / _opts.minimum_segment_size_bytes));
+        _segments.reserve(1 + ((_opts.maximum_size_bytes - 1) / _opts.minimum_segment_size_bytes));
     }
 
-    [[nodiscard]] DBError removeSegmentsIfNewRecordBeyondMaxSize(size_t record_size);
+    [[nodiscard]] StreamError removeSegmentsIfNewRecordBeyondMaxSize(size_t record_size);
 
     [[nodiscard]] FileError makeNextSegment();
     [[nodiscard]] FileError loadExistingSegments();
@@ -95,14 +95,14 @@ class __attribute__((visibility("default"))) FileStream : public StreamInterface
   public:
     [[nodiscard]] static expected<std::shared_ptr<StreamInterface>, FileError> openOrCreate(StreamOptions &&);
 
-    expected<uint64_t, DBError> append(BorrowedSlice) override;
-    expected<uint64_t, DBError> append(OwnedSlice &&) override;
+    expected<uint64_t, StreamError> append(BorrowedSlice) override;
+    expected<uint64_t, StreamError> append(OwnedSlice &&) override;
 
-    [[nodiscard]] expected<OwnedRecord, DBError> read(uint64_t sequence_number) const override {
+    [[nodiscard]] expected<OwnedRecord, StreamError> read(uint64_t sequence_number) const override {
         return read(sequence_number, 0);
     };
-    [[nodiscard]] expected<OwnedRecord, DBError> read(uint64_t sequence_number,
-                                                      uint64_t suggested_start) const override;
+    [[nodiscard]] expected<OwnedRecord, StreamError> read(uint64_t sequence_number,
+                                                          uint64_t suggested_start) const override;
 
     [[nodiscard]] Iterator openOrCreateIterator(const std::string &identifier, IteratorOptions) override;
     void deleteIterator(const std::string &identifier) override;
