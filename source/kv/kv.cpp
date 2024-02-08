@@ -38,7 +38,8 @@ KVError KV::initialize() {
             if (header_or.err().code == KVErrorCodes::EndOfFile) {
                 return KVError{KVErrorCodes::NoError, {}};
             }
-            return KVError{KVErrorCodes::ReadError, "Incomplete header read. " + header_or.err().msg};
+            // TODO: Handle corrupted header. eg. truncate file
+            return header_or.err();
         }
         _byte_position += sizeof(KVHeader);
 
@@ -53,7 +54,7 @@ KVError KV::initialize() {
         _byte_position += header_or.val().key_length;
 
         if (header_or.val().flags & DELETED_FLAG) {
-            removeKey(key_or.val());
+            [[maybe_unused]] auto _ = removeKey(key_or.val());
             continue;
         }
 
@@ -99,7 +100,7 @@ expected<KVHeader, KVError> KV::readHeaderFrom(uint32_t begin) const {
     return ret;
 }
 
-expected<std::string, KVError> KV::readKeyFrom(uint32_t begin, uint16_t key_length) const {
+expected<std::string, KVError> KV::readKeyFrom(uint32_t begin, key_length_type key_length) const {
     auto key_or = _f->read(begin + sizeof(KVHeader), begin + sizeof(KVHeader) + key_length);
     if (!key_or) {
         return fileErrorToKVError(key_or.err());
@@ -117,8 +118,8 @@ expected<OwnedSlice, KVError> KV::readValueFrom(const uint32_t begin) const {
     return readValueFrom(begin, header.key_length, header.value_length);
 }
 
-expected<OwnedSlice, KVError> KV::readValueFrom(const uint32_t begin, uint16_t key_length,
-                                                uint16_t value_length) const {
+expected<OwnedSlice, KVError> KV::readValueFrom(const uint32_t begin, key_length_type key_length,
+                                                value_length_type value_length) const {
     auto value_or =
         _f->read(begin + sizeof(KVHeader) + key_length, begin + sizeof(KVHeader) + key_length + value_length);
     if (!value_or) {
@@ -153,16 +154,17 @@ KVError KV::put(const std::string &key, BorrowedSlice data) {
     if (key.empty()) {
         return KVError{KVErrorCodes::InvalidArguments, "Key cannot be empty"};
     }
-    if (key.length() > UINT16_MAX) {
-        return KVError{KVErrorCodes::InvalidArguments, "Key length cannot exceed " + std::to_string(UINT16_MAX)};
+    if (key.length() > KEY_LENGTH_MAX) {
+        return KVError{KVErrorCodes::InvalidArguments, "Key length cannot exceed " + std::to_string(KEY_LENGTH_MAX)};
     }
-    if (data.size() > UINT32_MAX) {
-        return KVError{KVErrorCodes::InvalidArguments, "Value length cannot exceed " + std::to_string(UINT32_MAX)};
+    if (data.size() > VALUE_LENGTH_MAX) {
+        return KVError{KVErrorCodes::InvalidArguments,
+                       "Value length cannot exceed " + std::to_string(VALUE_LENGTH_MAX)};
     }
 
     std::lock_guard<std::mutex> lock(_lock);
-    auto key_len = static_cast<uint16_t>(key.length());
-    auto value_len = static_cast<uint32_t>(data.size());
+    auto key_len = static_cast<key_length_type>(key.length());
+    auto value_len = static_cast<value_length_type>(data.size());
     uint8_t flags = 0;
     auto header = KVHeader{
         .magic_and_version = MAGIC_AND_VERSION,
@@ -273,24 +275,27 @@ KVError KV::compactNoLock() {
     return KVError{KVErrorCodes::NoError, {}};
 }
 
-void KV::removeKey(const std::string &key) {
+bool KV::removeKey(const std::string &key) {
     for (size_t i = 0; i < _key_pointers.size(); i++) {
         if (_key_pointers[i].first == key) {
             auto it = _key_pointers.begin();
             std::advance(it, i);
             _key_pointers.erase(it);
-            break;
+            return true;
         }
     }
+    return false;
 }
 
 KVError KV::remove(const std::string &key) {
     std::lock_guard<std::mutex> lock(_lock);
 
-    removeKey(key);
+    if (!removeKey(key)) {
+        return KVError{KVErrorCodes::KeyNotFound, {}};
+    }
 
-    uint16_t key_len = key.size();
-    uint32_t value_len = 0;
+    key_length_type key_len = key.size();
+    value_length_type value_len = 0;
     uint8_t flags = DELETED_FLAG;
     auto header = KVHeader{
         .magic_and_version = MAGIC_AND_VERSION,
