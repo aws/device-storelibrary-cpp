@@ -28,6 +28,8 @@ namespace gg __attribute__((visibility("default"))) {
 
         virtual void flush() = 0;
 
+        virtual FileError truncate(size_t) = 0;
+
         FileLike(FileLike &) = delete;
 
         FileLike &operator=(FileLike &) = delete;

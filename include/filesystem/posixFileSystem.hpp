@@ -2,6 +2,7 @@
 #include "common/expected.hpp"
 #include "filesystem.hpp"
 #include <filesystem>
+#include <unistd.h>
 
 namespace aws {
 namespace gg __attribute__((visibility("default"))) {
@@ -65,6 +66,14 @@ namespace gg __attribute__((visibility("default"))) {
         };
 
         void flush() override { fflush(_f); }
+
+        FileError truncate(size_t max) override {
+            if (ftruncate(fileno(_f), max) != 0) {
+                // TODO: error code mapping
+                return {FileErrorCode::Unknown, std::strerror(errno)};
+            }
+            return {FileErrorCode::NoError, {}};
+        }
     };
 
     class PosixFileSystem : public FileSystemInterface {

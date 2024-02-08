@@ -57,26 +57,26 @@ static_assert(sizeof(LogEntryHeader) == HEADER_SIZE, "Header size must be 32 byt
 
 static constexpr const char *const RecordNotFoundErrorStr = "Record not found";
 
-expected<std::shared_ptr<StreamInterface>, FileError> FileStream::openOrCreate(StreamOptions &&opts) {
+expected<std::shared_ptr<StreamInterface>, StreamError> FileStream::openOrCreate(StreamOptions &&opts) {
     auto stream = std::shared_ptr<FileStream>(new FileStream(std::move(opts)));
     auto err = stream->loadExistingSegments();
-    if (err.code != FileErrorCode::NoError) {
+    if (err.code != StreamErrorCode::NoError) {
         return err;
     }
     return std::shared_ptr<StreamInterface>(stream);
 }
 
-FileError FileStream::loadExistingSegments() {
+StreamError FileStream::loadExistingSegments() {
     auto kv_err_or = kv::KV::openOrCreate(std::move(_opts.kv_options));
     if (!kv_err_or) {
         // TODO: Better error mapping
-        return FileError{FileErrorCode::Unknown, kv_err_or.err().msg};
+        return StreamError{StreamErrorCode::ReadError, kv_err_or.err().msg};
     }
     _kv_store = std::move(kv_err_or.val());
 
     auto files_or = _opts.file_implementation->list();
     if (!files_or) {
-        return files_or.err();
+        return StreamError{StreamErrorCode::ReadError, files_or.err().msg};
     }
 
     auto files = std::move(files_or.val());
@@ -85,8 +85,8 @@ FileError FileStream::loadExistingSegments() {
         if (idx != std::string::npos) {
             auto base = std::stoull(std::string{f.substr(0, idx)});
             FileSegment segment{base, _opts.file_implementation};
-            auto err = segment.open();
-            if (err.code != FileErrorCode::NoError) {
+            auto err = segment.open(_opts.full_corruption_check_on_open);
+            if (err.code != StreamErrorCode::NoError) {
                 return err;
             }
             _segments.push_back(std::move(segment));
@@ -106,7 +106,7 @@ FileError FileStream::loadExistingSegments() {
         _current_size_bytes = size;
     }
 
-    return FileError{FileErrorCode::NoError, {}};
+    return StreamError{StreamErrorCode::NoError, {}};
 }
 
 FileSegment::FileSegment(uint64_t base, std::shared_ptr<FileSystemInterface> interface)
@@ -117,7 +117,7 @@ FileSegment::FileSegment(uint64_t base, std::shared_ptr<FileSystemInterface> int
     _segment_id = oss.str();
 }
 
-FileError FileSegment::open() {
+StreamError FileSegment::open(bool full_corruption_check_on_open) {
     auto file_or = _file_implementation->open(_segment_id);
     if (file_or) {
         _f = std::move(file_or.val());
@@ -129,17 +129,26 @@ FileError FileSegment::open() {
         const auto header_data_or = _f->read(offset, offset + HEADER_SIZE);
         if (!header_data_or) {
             if (header_data_or.err().code == FileErrorCode::EndOfFile) {
-                return FileError{FileErrorCode::NoError, {}};
+                return StreamError{StreamErrorCode::NoError, {}};
             }
-            return header_data_or.err();
+            return StreamError{StreamErrorCode::ReadError, header_data_or.err().msg};
         }
         LogEntryHeader const *header = convertSliceToHeader(header_data_or.val());
 
-        // TODO: Do something if corrupted
         if (header->magic_and_version != MAGIC_AND_VERSION) {
-            return FileError{FileErrorCode::Unknown, "Magic bytes and version does not match expected value"};
+            // TODO: More error handling, logging, etc. We're potentially throwing away data here
+            _f->truncate(offset);
+            return StreamError{StreamErrorCode::HeaderDataCorrupted,
+                               "Magic bytes and version does not match expected value"};
         }
-        // TODO: Add option to check the CRC of the data too
+        if (full_corruption_check_on_open) {
+            auto value_or = read(header->relative_sequence_number + _base_seq_num, offset);
+            if (!value_or) {
+                // TODO: More error handling, logging, etc. We're potentially throwing away data here
+                _f->truncate(offset);
+                return value_or.err();
+            }
+        }
 
         offset += HEADER_SIZE;
         offset += header->payload_length_bytes;
@@ -249,16 +258,16 @@ void FileSegment::remove() {
     _file_implementation->remove(_segment_id);
 }
 
-FileError FileStream::makeNextSegment() {
+StreamError FileStream::makeNextSegment() {
     FileSegment segment{_next_sequence_number, _opts.file_implementation};
 
-    auto err = segment.open();
-    if (err.code != FileErrorCode::NoError) {
+    auto err = segment.open(_opts.full_corruption_check_on_open);
+    if (err.code != StreamErrorCode::NoError) {
         return err;
     }
 
     _segments.push_back(std::move(segment));
-    return FileError{FileErrorCode::NoError, {}};
+    return StreamError{StreamErrorCode::NoError, {}};
 }
 
 expected<uint64_t, StreamError> FileStream::append(BorrowedSlice d) {
@@ -272,16 +281,16 @@ expected<uint64_t, StreamError> FileStream::append(BorrowedSlice d) {
 
     if (_segments.empty()) {
         auto err = makeNextSegment();
-        if (err.code != FileErrorCode::NoError) {
-            return StreamError{StreamErrorCode::WriteError, err.msg};
+        if (err.code != StreamErrorCode::NoError) {
+            return err;
         }
     }
 
     auto const &last_segment = _segments.back();
     if (last_segment.totalSizeBytes() >= _opts.minimum_segment_size_bytes) {
         auto err = makeNextSegment();
-        if (err.code != FileErrorCode::NoError) {
-            return StreamError{StreamErrorCode::WriteError, err.msg};
+        if (err.code != StreamErrorCode::NoError) {
+            return err;
         }
     }
 

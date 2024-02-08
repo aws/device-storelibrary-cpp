@@ -31,13 +31,13 @@ class FileSegment {
 
     ~FileSegment() = default;
 
-    FileError open();
+    [[nodiscard]] StreamError open(bool full_corruption_check_on_open);
 
     bool operator<(const FileSegment &other) const { return _base_seq_num < other._base_seq_num; }
 
     void append(BorrowedSlice d, int64_t timestamp_ms, uint64_t sequence_number);
 
-    expected<OwnedRecord, StreamError> read(uint64_t sequence_number, uint64_t suggested_start) const;
+    [[nodiscard]] expected<OwnedRecord, StreamError> read(uint64_t sequence_number, uint64_t suggested_start) const;
 
     void remove();
 
@@ -89,11 +89,11 @@ class __attribute__((visibility("default"))) FileStream : public StreamInterface
 
     [[nodiscard]] StreamError removeSegmentsIfNewRecordBeyondMaxSize(size_t record_size);
 
-    [[nodiscard]] FileError makeNextSegment();
-    [[nodiscard]] FileError loadExistingSegments();
+    [[nodiscard]] StreamError makeNextSegment();
+    [[nodiscard]] StreamError loadExistingSegments();
 
   public:
-    [[nodiscard]] static expected<std::shared_ptr<StreamInterface>, FileError> openOrCreate(StreamOptions &&);
+    [[nodiscard]] static expected<std::shared_ptr<StreamInterface>, StreamError> openOrCreate(StreamOptions &&);
 
     expected<uint64_t, StreamError> append(BorrowedSlice) override;
     expected<uint64_t, StreamError> append(OwnedSlice &&) override;

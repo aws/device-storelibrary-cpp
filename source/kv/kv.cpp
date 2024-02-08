@@ -38,7 +38,8 @@ KVError KV::initialize() {
             if (header_or.err().code == KVErrorCodes::EndOfFile) {
                 return KVError{KVErrorCodes::NoError, {}};
             }
-            // TODO: Handle corrupted header. eg. truncate file
+            // TODO: More error handling, logging, etc. We're potentially throwing away data here
+            _f->truncate(_byte_position);
             return header_or.err();
         }
         _byte_position += sizeof(KVHeader);
