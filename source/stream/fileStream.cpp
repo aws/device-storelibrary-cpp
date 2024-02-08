@@ -1,5 +1,5 @@
-#include "fileStream.hpp"
-#include "crc32.hpp"
+#include "stream/fileStream.hpp"
+#include "common/crc32.hpp"
 #include <algorithm>
 #include <arpa/inet.h>
 #include <iomanip>

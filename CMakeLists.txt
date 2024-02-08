@@ -14,27 +14,27 @@ endif()
 
 include(cmake/ClangFormat.cmake)
 
-add_library(kv include/kv.hpp include/expected.hpp include/crc32.hpp include/filesystem.hpp include/slices.hpp
-        include/util.hpp
-        source/kv.cpp)
-set_target_properties(kv PROPERTIES LINKER_LANGUAGE CXX)
-target_include_directories(kv PRIVATE include)
-target_compile_options(kv PRIVATE -fno-rtti -fno-exceptions -Wall -Wextra -Werror)
-target_clangformat_setup(kv)
+add_library(greenlake_kv include/kv/kv.hpp include/common/expected.hpp include/common/crc32.hpp include/filesystem/filesystem.hpp include/common/slices.hpp
+        include/common/util.hpp
+        source/kv/kv.cpp)
+set_target_properties(greenlake_kv PROPERTIES LINKER_LANGUAGE CXX)
+target_include_directories(greenlake_kv PRIVATE include)
+target_compile_options(greenlake_kv PRIVATE -fno-rtti -fno-exceptions -Wall -Wextra -Werror)
+target_clangformat_setup(greenlake_kv)
 
-add_library(greenlake_stream include/stream.hpp include/fileStream.hpp
-        include/memoryStream.hpp include/crc32.hpp include/slices.hpp
-        source/memoryStream.cpp source/fileStream.cpp
-        include/expected.hpp
-        include/util.hpp)
+add_library(greenlake_stream include/stream/stream.hpp include/stream/fileStream.hpp
+        include/stream/memoryStream.hpp include/common/crc32.hpp include/common/slices.hpp
+        source/stream/memoryStream.cpp source/stream/fileStream.cpp
+        include/common/expected.hpp
+        include/common/util.hpp)
 set_target_properties(greenlake_stream PROPERTIES LINKER_LANGUAGE CXX)
 target_include_directories(greenlake_stream PRIVATE include)
-target_link_libraries(greenlake_stream PUBLIC kv)
+target_link_libraries(greenlake_stream PUBLIC greenlake_kv)
 target_compile_options(greenlake_stream PRIVATE -fno-rtti -Wall -Wextra -Werror)
 target_clangformat_setup(greenlake_stream)
 
 set(CMAKE_CXX_STANDARD 17)
-add_executable(greenlake_example include/posixFileSystem.hpp source/main.cpp)
+add_executable(greenlake_example include/filesystem/posixFileSystem.hpp source/main.cpp)
 target_include_directories(greenlake_example PRIVATE include)
 target_link_libraries(greenlake_example PRIVATE greenlake_stream)
 target_compile_options(greenlake_example PRIVATE -fno-rtti -Wall -Wextra -Werror)

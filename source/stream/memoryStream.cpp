@@ -1,4 +1,4 @@
-#include "memoryStream.hpp"
+#include "stream/memoryStream.hpp"
 #include <algorithm>
 #include <iostream>
 

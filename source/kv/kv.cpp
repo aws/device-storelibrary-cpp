@@ -1,5 +1,5 @@
-#include "kv.hpp"
-#include "crc32.hpp"
+#include "kv/kv.hpp"
+#include "common/crc32.hpp"
 
 namespace aws {
 namespace gg {

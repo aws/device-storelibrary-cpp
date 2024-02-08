@@ -1,8 +1,8 @@
 #pragma once
 
-#include "expected.hpp"
-#include "slices.hpp"
-#include "util.hpp"
+#include "common/expected.hpp"
+#include "common/slices.hpp"
+#include "common/util.hpp"
 #include <cstdint>
 #include <string>
 #include <vector>

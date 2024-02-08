@@ -1,10 +1,10 @@
 #pragma once
 
-#include "expected.hpp"
-#include "filesystem.hpp"
-#include "kv.hpp"
-#include "slices.hpp"
-#include "util.hpp"
+#include "common/expected.hpp"
+#include "common/slices.hpp"
+#include "common/util.hpp"
+#include "filesystem/filesystem.hpp"
+#include "kv/kv.hpp"
 #include <atomic>
 #include <chrono>
 #include <cstdint>

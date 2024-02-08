@@ -6,9 +6,9 @@
 #include <filesystem>
 #include <iostream>
 
-#include "fileStream.hpp"
-#include "memoryStream.hpp"
-#include "posixFileSystem.hpp"
+#include "filesystem/posixFileSystem.hpp"
+#include "stream/fileStream.hpp"
+#include "stream/memoryStream.hpp"
 #include <sys/resource.h>
 
 void do_memory() {

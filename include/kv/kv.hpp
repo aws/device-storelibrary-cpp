@@ -5,8 +5,8 @@
 #include <utility>
 #include <vector>
 
-#include "filesystem.hpp"
-#include "slices.hpp"
+#include "common/slices.hpp"
+#include "filesystem/filesystem.hpp"
 
 namespace aws {
 namespace gg __attribute__((visibility("default"))) {
