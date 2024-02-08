@@ -32,7 +32,7 @@ namespace kv __attribute__((visibility("default"))) {
 
     constexpr uint8_t VERSION = 0x01;
     constexpr uint8_t MAGIC = 0xB0;
-    constexpr uint8_t MAGIC_AND_VERSION = static_cast<const uint8_t>(MAGIC << 4 | VERSION);
+    constexpr uint8_t MAGIC_AND_VERSION = static_cast<uint8_t>(MAGIC << 4 | VERSION);
 
     using value_length_type = uint32_t;
     using key_length_type = uint16_t;

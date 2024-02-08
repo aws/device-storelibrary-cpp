@@ -1,7 +1,6 @@
 #include "stream/fileStream.hpp"
 #include "common/crc32.hpp"
 #include <algorithm>
-#include <arpa/inet.h>
 #include <iomanip>
 #include <sstream>
 #include <string>
@@ -11,9 +10,11 @@ namespace aws {
 namespace gg {
 static constexpr const int UINT64_MAX_DECIMAL_COUNT = 19;
 
+#define IS_LITTLE_ENDIAN (*(uint16_t *)"\0\1" >> 8)
+
 // NOLINTBEGIN
-constexpr auto _htonll(std::uint64_t h) {
-    if (htonl(0xFFFF0000) != 0xFFFF0000) {
+auto _htonll(std::uint64_t h) {
+    if (IS_LITTLE_ENDIAN) {
         static_assert(CHAR_BIT == 8, "Char must be 8 bits");
         constexpr auto shift_bytes1{8};
         constexpr auto shift_bytes2{16};
@@ -25,16 +26,16 @@ constexpr auto _htonll(std::uint64_t h) {
     return h;
 }
 
-constexpr auto _ntohll(std::uint64_t h) { return _htonll(h); }
+auto _ntohll(std::uint64_t h) { return _htonll(h); }
 
-constexpr auto _htonl(std::uint32_t h) {
-    if (htonl(0xFFFF0000) != 0xFFFF0000) {
+auto _htonl(std::uint32_t h) {
+    if (IS_LITTLE_ENDIAN) {
         h = (((h & 0xff000000u) >> 24) | ((h & 0x00ff0000u) >> 8) | ((h & 0x0000ff00u) << 8) |
              ((h & 0x000000ffu) << 24));
     }
     return h;
 }
-constexpr auto _ntohl(std::uint32_t h) { return _htonl(h); }
+auto _ntohl(std::uint32_t h) { return _htonl(h); }
 // NOLINTEND
 
 constexpr size_t HEADER_SIZE = 32;
@@ -44,7 +45,7 @@ constexpr int32_t MAGIC_AND_VERSION = MAGIC_BYTES << 8 | VERSION;
 
 #pragma pack(push, 4)
 struct LogEntryHeader {
-    int32_t magic_and_version = _htonl(MAGIC_AND_VERSION);
+    int32_t magic_and_version = static_cast<int32_t>(_htonl(MAGIC_AND_VERSION));
     int32_t relative_sequence_number = 0;
     int32_t byte_position = 0;
     int64_t crc = 0;
