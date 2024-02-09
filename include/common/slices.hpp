@@ -28,7 +28,7 @@ namespace gg __attribute__((visibility("default"))) {
 
     class OwnedSlice : private std::unique_ptr<uint8_t[]> {
       private:
-        size_t _size;
+        size_t _size{0};
 
       public:
         OwnedSlice() = default;
@@ -47,7 +47,7 @@ namespace gg __attribute__((visibility("default"))) {
 
         OwnedSlice(OwnedSlice &&) = default;
         OwnedSlice(OwnedSlice &) = delete;
-        OwnedSlice operator=(OwnedSlice &) = delete;
+        OwnedSlice &operator=(OwnedSlice &) = delete;
         OwnedSlice &operator=(OwnedSlice &&) = default;
 
         ~OwnedSlice() = default;

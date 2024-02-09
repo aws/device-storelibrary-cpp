@@ -20,21 +20,14 @@
 namespace aws {
 namespace gg __attribute__((visibility("default"))) {
     struct OwnedRecord {
-        OwnedSlice data;
-        int64_t timestamp;
-        uint64_t sequence_number;
-        uint64_t offset;
+        OwnedSlice data{};
+        int64_t timestamp{};
+        uint64_t sequence_number{};
+        uint64_t offset{};
 
         OwnedRecord() = default;
         OwnedRecord(OwnedSlice &&data, int64_t timestamp, uint64_t sequence_number, uint64_t offset)
             : data(std::move(data)), timestamp(timestamp), sequence_number(sequence_number), offset(offset){};
-
-        OwnedRecord(OwnedRecord &&o) = default;
-        OwnedRecord &operator=(OwnedRecord &&) = default;
-        OwnedRecord(OwnedRecord &) = delete;
-        OwnedRecord operator=(OwnedRecord &) = delete;
-
-        ~OwnedRecord() = default;
     };
 
     enum class StreamErrorCode : std::uint8_t {
@@ -82,8 +75,8 @@ namespace gg __attribute__((visibility("default"))) {
         StreamError checkpoint() const;
 
       public:
-        explicit Iterator(std::weak_ptr<StreamInterface> s, const std::string &id, uint64_t seq)
-            : _stream(std::move(s)), _id(id), sequence_number(seq){};
+        explicit Iterator(std::weak_ptr<StreamInterface> s, std::string id, uint64_t seq)
+            : _stream(std::move(s)), _id(std::move(id)), sequence_number(seq){};
 
         Iterator(Iterator &) = delete;
 

@@ -16,7 +16,7 @@ namespace gg __attribute__((visibility("default"))) {
         explicit PosixFileLike(std::filesystem::path &&path) : _path(std::move(path)){};
         PosixFileLike(PosixFileLike &&) = default;
         PosixFileLike(PosixFileLike &) = delete;
-        PosixFileLike operator=(PosixFileLike &) = delete;
+        PosixFileLike &operator=(PosixFileLike &) = delete;
         PosixFileLike &operator=(PosixFileLike &&) = default;
 
         ~PosixFileLike() override {
