@@ -1,19 +1,18 @@
+#include "filesystem/posixFileSystem.hpp"
+#include "kv/kv.hpp"
+#include "test_utils.hpp"
 #include <catch2/catch_test_macros.hpp>
 #include <memory>
-#include <filesystem>
-#include <string>
-#include "kv/kv.hpp"
-#include "filesystem/posixFileSystem.hpp"
+#include <string_view>
 
 using namespace aws::gg;
 using namespace aws::gg::kv;
-using namespace std::string_literals;
 
 SCENARIO("I can create a KV map", "[kv]") {
     GIVEN("I create an empty KV map") {
-        std::filesystem::remove_all(std::filesystem::current_path() / "test-kv-map");
+        auto temp_dir = TempDir();
         auto kv_or = KV::openOrCreate(KVOptions{
-            .filesystem_implementation = std::make_shared<PosixFileSystem>(std::filesystem::current_path() / "test-kv-map"),
+            .filesystem_implementation = std::make_shared<PosixFileSystem>(temp_dir.path()),
             .identifier = "test-kv-map",
             .compact_after = 0,
         });
@@ -21,8 +20,9 @@ SCENARIO("I can create a KV map", "[kv]") {
 
         auto kv = std::move(kv_or.val());
 
-        auto key = "key"s;
-        auto value = "value"s;
+        const std::string &key = GENERATE(take(10, random(1, 512)));
+        const std::string &value = GENERATE(take(2, random(1, 1 * 1024 * 1024)));
+
         WHEN("I add a value") {
             auto e = kv->put(key, BorrowedSlice{value});
             REQUIRE(e.code == KVErrorCodes::NoError);
@@ -30,7 +30,7 @@ SCENARIO("I can create a KV map", "[kv]") {
             THEN("I can get the value back") {
                 auto v_or = kv->get(key);
                 REQUIRE(v_or);
-                REQUIRE(v_or.val().string() == value);
+                REQUIRE(std::string_view{v_or.val().char_data(), v_or.val().size()} == value);
             }
         }
     }

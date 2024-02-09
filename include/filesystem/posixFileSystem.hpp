@@ -3,6 +3,7 @@
 #include "filesystem.hpp"
 #include <filesystem>
 #include <unistd.h>
+#include <utility>
 
 namespace aws {
 namespace gg __attribute__((visibility("default"))) {
@@ -81,7 +82,7 @@ namespace gg __attribute__((visibility("default"))) {
         std::filesystem::path _base_path;
 
       public:
-        explicit PosixFileSystem(std::filesystem::path &&base_path) : _base_path(std::move(base_path)) {
+        explicit PosixFileSystem(std::filesystem::path base_path) : _base_path(std::move(base_path)) {
             std::filesystem::create_directories(_base_path);
         };
 

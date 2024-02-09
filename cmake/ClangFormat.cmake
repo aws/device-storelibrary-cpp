@@ -30,11 +30,7 @@ function(prefix_clangformat_setup prefix)
             COMMENT "Formatting ${prefix} with ${CLANGFORMAT_EXECUTABLE} ..."
         )
 
-        if(TARGET clangformat)
-            add_dependencies(clangformat ${prefix}_clangformat)
-        else()
-            add_custom_target(clangformat DEPENDS ${prefix}_clangformat)
-        endif()
+        add_dependencies(${prefix} ${prefix}_clangformat)
     endif()
 endfunction()
 

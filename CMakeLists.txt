@@ -64,15 +64,10 @@ add_custom_target(default DEPENDS greenlake_example)
 if (TARGET cmakeformat)
     add_dependencies(default cmakeformat)
 endif ()
-if (TARGET clangformat)
-    add_dependencies(default clangformat)
-endif ()
 
 # Setup the 'release' target (which is run on Package Builder).
 add_custom_target(release
         COMMENT "Build and install the library, and run the unit tests."
-        # TODO: execute tests
-        # COMMAND "${CMAKE_COMMAND}" -E chdir "${CMAKE_BINARY_DIR}" "${CMAKE_CTEST_COMMAND}" --output-on-failure
-        COMMAND "${CMAKE_COMMAND}" --build "${CMAKE_BINARY_DIR}" --target greenlake_example
+        COMMAND "${CMAKE_COMMAND}" -E chdir "${CMAKE_BINARY_DIR}/test" "./tests" * --durations yes
         DEPENDS tests
         USES_TERMINAL)

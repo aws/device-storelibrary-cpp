@@ -19,9 +19,11 @@ namespace gg __attribute__((visibility("default"))) {
 
         [[nodiscard]] const uint8_t *data() const { return _data; };
 
+        [[nodiscard]] const char *char_data() const { return reinterpret_cast<const char *>(_data); };
+
         [[nodiscard]] size_t size() const { return _size; };
 
-        [[nodiscard]] std::string string() const { return {reinterpret_cast<const char *>(_data), _size}; };
+        [[nodiscard]] std::string string() const { return {char_data(), _size}; };
     };
 
     class OwnedSlice : private std::unique_ptr<uint8_t[]> {
@@ -52,9 +54,11 @@ namespace gg __attribute__((visibility("default"))) {
 
         [[nodiscard]] uint8_t *data() const { return get(); };
 
+        [[nodiscard]] const char *char_data() const { return reinterpret_cast<const char *>(get()); };
+
         [[nodiscard]] size_t size() const { return _size; };
 
-        [[nodiscard]] std::string string() const { return {reinterpret_cast<const char *>(get()), _size}; };
+        [[nodiscard]] std::string string() const { return {char_data(), _size}; };
     };
 } // namespace gg
 } // namespace aws
