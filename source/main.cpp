@@ -86,15 +86,16 @@ int main() {
             std::cerr << last_record_or.err().msg << std::endl;
         }
 
-        try {
-            for (auto r : s->openOrCreateIterator("a", IteratorOptions{})) {
-                // Do something with the record....
-                // std::cout << r.sequence_number << std::endl;
+        for (auto r : s->openOrCreateIterator("a", IteratorOptions{})) {
+            // Do something with the record....
+            // std::cout << r.sequence_number << std::endl;
 
-                r.checkpoint();
+            if (r) {
+                r.val().checkpoint();
+            } else {
+                std::cout << r.err().msg << std::endl;
+                break;
             }
-        } catch (const std::exception &e) {
-            std::cout << e.what() << std::endl;
         }
 
         std::cout << "last checkpoint: " << s->openOrCreateIterator("a", IteratorOptions{}).sequence_number

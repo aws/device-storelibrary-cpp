@@ -30,14 +30,14 @@ add_library(greenlake_stream include/stream/stream.hpp include/stream/fileStream
         include/common/util.hpp)
 set_target_properties(greenlake_stream PROPERTIES LINKER_LANGUAGE CXX)
 target_link_libraries(greenlake_stream PUBLIC greenlake_kv)
-target_compile_options(greenlake_stream PRIVATE -fno-rtti -Wall -Wextra -Werror)
+target_compile_options(greenlake_stream PRIVATE -fno-exceptions -fno-rtti -Wall -Wextra -Werror)
 target_clangformat_setup(greenlake_stream)
 target_clangtidy_setup(greenlake_stream)
 
 set(CMAKE_CXX_STANDARD 17)
 add_executable(greenlake_example include/filesystem/posixFileSystem.hpp source/main.cpp)
 target_link_libraries(greenlake_example PRIVATE greenlake_stream)
-target_compile_options(greenlake_example PRIVATE -fno-rtti -Wall -Wextra -Werror)
+target_compile_options(greenlake_example PRIVATE -fno-exceptions -fno-rtti -Wall -Wextra -Werror)
 target_clangformat_setup(greenlake_example)
 target_clangtidy_setup(greenlake_example)
 

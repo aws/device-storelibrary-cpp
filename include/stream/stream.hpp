@@ -45,6 +45,7 @@ namespace gg __attribute__((visibility("default"))) {
         RecordTooLarge,
         ReadError,
         WriteError,
+        StreamClosed,
         Unknown,
     };
 
@@ -57,6 +58,7 @@ namespace gg __attribute__((visibility("default"))) {
         std::function<void(void)> _checkpoint;
 
       public:
+        CheckpointableOwnedRecord() = default;
         CheckpointableOwnedRecord(OwnedRecord &&o, std::function<void(void)> &&checkpoint)
             : OwnedRecord(std::move(o)), _checkpoint(std::move(checkpoint)){};
         CheckpointableOwnedRecord(CheckpointableOwnedRecord &) = delete;
@@ -69,15 +71,15 @@ namespace gg __attribute__((visibility("default"))) {
         void checkpoint() const { _checkpoint(); }
     };
 
-    // Ensure non-copyable (or if copied, copy is a duplication rather than a new
-    // independent iterator)
+    using StreamError = GenericError<StreamErrorCode>;
+
     class Iterator {
       private:
         std::weak_ptr<StreamInterface> _stream;
         std::string _id;
         uint64_t _offset = 0;
 
-        void checkpoint() const;
+        StreamError checkpoint() const;
 
       public:
         explicit Iterator(std::weak_ptr<StreamInterface> s, const std::string &id, uint64_t seq)
@@ -103,7 +105,7 @@ namespace gg __attribute__((visibility("default"))) {
             return *this;
         }
 
-        CheckpointableOwnedRecord operator*();
+        expected<CheckpointableOwnedRecord, StreamError> operator*();
 
         [[nodiscard]] Iterator &&begin() { return std::move(*this); }
 
@@ -120,8 +122,6 @@ namespace gg __attribute__((visibility("default"))) {
 #else
 #define WEAK_FROM_THIS shared_from_this
 #endif
-
-    using StreamError = GenericError<StreamErrorCode>;
 
     class StreamInterface : public std::enable_shared_from_this<StreamInterface> {
       protected:
@@ -209,27 +209,26 @@ namespace gg __attribute__((visibility("default"))) {
             .filesystem_implementation = file_implementation, .identifier = "kv", .compact_after = 128 * 1024};
     };
 
-    inline CheckpointableOwnedRecord Iterator::operator*() {
+    inline expected<CheckpointableOwnedRecord, StreamError> Iterator::operator*() {
         if (auto stream = _stream.lock()) {
             auto record_or = stream->read(sequence_number, _offset);
             if (!record_or) {
-                // TODO: No throw
-                throw std::runtime_error(record_or.err().msg);
+                return std::move(record_or.err());
             }
             auto x = std::move(record_or.val());
             timestamp = x.timestamp;
             _offset = x.offset + x.data.size();
-            return {std::move(x), [this] { checkpoint(); }};
+            return CheckpointableOwnedRecord{std::move(x), [this] { checkpoint(); }};
         }
-        throw std::runtime_error("Unable to read from destroyed stream");
+        return StreamError{StreamErrorCode::StreamClosed, "Unable to read from destroyed stream"};
     }
 
-    inline void Iterator::checkpoint() const {
+    inline StreamError Iterator::checkpoint() const {
         if (auto stream = _stream.lock()) {
             stream->setCheckpoint(_id, sequence_number);
-            return;
+            return StreamError{StreamErrorCode::NoError, {}};
         }
-        throw std::runtime_error("Unable to checkpoint in destroyed stream");
+        return StreamError{StreamErrorCode::StreamClosed, "Unable to read from destroyed stream"};
     }
 
     [[nodiscard]] inline int64_t timestamp() {
