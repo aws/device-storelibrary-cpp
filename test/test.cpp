@@ -53,7 +53,7 @@ SCENARIO("I can create a KV map", "[kv]") {
                 AND_WHEN("I update the value") {
                     e = kv->put(key, BorrowedSlice{new_value.data(), new_value.size()});
                     REQUIRE(e.code == KVErrorCodes::NoError);
-                    THEN("I get thr new value back") {
+                    THEN("I get the new value back") {
                         v_or = kv->get(key);
                         REQUIRE(v_or);
                         REQUIRE(std::string_view{v_or.val().char_data(), v_or.val().size()} == new_value);
