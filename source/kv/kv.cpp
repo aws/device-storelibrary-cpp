@@ -124,7 +124,19 @@ expected<OwnedSlice, KVError> KV::readValueFrom(const uint32_t begin) const {
     }
     auto header = header_or.val();
 
-    return readValueFrom(begin, header.key_length, header.value_length);
+    auto value_or = readValueFrom(begin, header.key_length, header.value_length);
+    if (!value_or) {
+        return value_or;
+    }
+    auto crc = crc32_of(BorrowedSlice{&header.flags, sizeof(header.flags)},
+                        BorrowedSlice{&header.key_length, sizeof(header.key_length)},
+                        BorrowedSlice{&header.value_length, sizeof(header.value_length)},
+                        BorrowedSlice{value_or.val().data(), value_or.val().size()});
+
+    if (crc != header.crc32) {
+        return KVError{KVErrorCodes::DataCorrupted, "CRC mismatch"};
+    }
+    return value_or;
 }
 
 expected<OwnedSlice, KVError> KV::readValueFrom(const uint32_t begin, key_length_type key_length,
@@ -134,14 +146,14 @@ expected<OwnedSlice, KVError> KV::readValueFrom(const uint32_t begin, key_length
     if (!value_or) {
         return fileErrorToKVError(value_or.err());
     }
-    // TODO: Check CRC
     return std::move(value_or.val());
 }
 
 expected<std::vector<std::string>, KVError> KV::listKeys() const {
     std::lock_guard<std::mutex> lock(_lock);
 
-    std::vector<std::string> keys{_key_pointers.size()};
+    std::vector<std::string> keys{};
+    keys.reserve(_key_pointers.size());
     for (const auto &point : _key_pointers) {
         keys.emplace_back(point.first);
     }
@@ -175,14 +187,15 @@ KVError KV::put(const std::string &key, BorrowedSlice data) {
     auto key_len = static_cast<key_length_type>(key.length());
     auto value_len = static_cast<value_length_type>(data.size());
     uint8_t flags = 0;
+
+    auto crc = crc32_of(BorrowedSlice{&flags, sizeof(flags)}, BorrowedSlice{&key_len, sizeof(key_len)},
+                        BorrowedSlice{&value_len, sizeof(value_len)}, BorrowedSlice{data.data(), data.size()});
+
     auto header = KVHeader{
         .magic_and_version = MAGIC_AND_VERSION,
         .flags = flags,
         .key_length = key_len,
-        .crc32 = crc32::update(
-            crc32::update(crc32::update(crc32::update(0, &flags, sizeof(flags)), &key_len, sizeof(key_len)), &value_len,
-                          sizeof(value_len)),
-            data.data(), data.size()),
+        .crc32 = crc,
         .value_length = value_len,
     };
     _f->append(

@@ -35,7 +35,7 @@ namespace __attribute__((visibility("default"))) crc32 {
         0xBDBDF21CU, 0xCABAC28AU, 0x53B39330U, 0x24B4A3A6U, 0xBAD03605U, 0xCDD70693U, 0x54DE5729U, 0x23D967BFU,
         0xB3667A2EU, 0xC4614AB8U, 0x5D681B02U, 0x2A6F2B94U, 0xB40BBE37U, 0xC30C8EA1U, 0x5A05DF1BU, 0x2D02EF8DU};
 
-    [[nodiscard]] static uint32_t update(uint32_t initial_value, const void *buf, size_t len) {
+    [[nodiscard]] static inline uint32_t update(uint32_t initial_value, const void *buf, size_t len) {
         uint32_t c = initial_value ^ 0xFFFFFFFF;
         const auto *u = static_cast<const uint8_t *>(buf);
         for (size_t i = 0; i < len; ++i) {
