@@ -4,6 +4,7 @@
 namespace aws {
 namespace gg {
 namespace kv {
+using namespace detail;
 constexpr static uint8_t DELETED_FLAG = 0x01;
 
 expected<std::shared_ptr<KV>, KVError> KV::openOrCreate(KVOptions &&opts) {
