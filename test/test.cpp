@@ -11,11 +11,40 @@ using namespace aws::gg::kv;
 using namespace std::string_view_literals;
 using namespace std::string_literals;
 
+class Logger : public logging::Logger {
+    void log(logging::LogLevel level, const std::string &msg) const override {
+        switch (level) {
+        case logging::LogLevel::Disabled:
+            break;
+
+        case logging::LogLevel::Trace:
+            break;
+        case logging::LogLevel::Debug:
+            break;
+        case logging::LogLevel::Info: {
+            INFO(msg);
+            break;
+        }
+        case logging::LogLevel::Warning: {
+            WARN(msg);
+            break;
+        }
+        case logging::LogLevel::Error: {
+            WARN(msg);
+            break;
+        }
+        }
+    }
+};
+
+static const auto logger = std::make_shared<Logger>();
+
 SCENARIO("I can create a KV map", "[kv]") {
     GIVEN("I create an empty KV map") {
         auto temp_dir = TempDir();
         auto kv_or = KV::openOrCreate(KVOptions{
             .filesystem_implementation = std::make_shared<PosixFileSystem>(temp_dir.path()),
+            .logger = logger,
             .identifier = "test-kv-map",
             .compact_after = 0,
         });
@@ -38,7 +67,7 @@ SCENARIO("I can create a KV map", "[kv]") {
         REQUIRE(e.code == KVErrorCodes::NoError);
 
         const std::string &key = GENERATE(take(10, random(1, 512)));
-        const std::string &value = GENERATE(take(2, random(1, 1 * 1024 * 1024)));
+        const std::string &value = GENERATE(take(1, random(1, 1 * 1024 * 1024)));
         const std::string_view new_value = "new value"sv;
 
         WHEN("I add a value") {
@@ -66,6 +95,7 @@ SCENARIO("I can create a KV map", "[kv]") {
 
                 kv_or = KV::openOrCreate(KVOptions{
                     .filesystem_implementation = std::make_shared<PosixFileSystem>(temp_dir.path()),
+                    .logger = logger,
                     .identifier = "test-kv-map",
                     .compact_after = 0,
                 });

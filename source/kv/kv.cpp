@@ -47,6 +47,11 @@ KVError KV::initialize() {
                 return KVError{KVErrorCodes::NoError, {}};
             }
             // TODO: More error handling, logging, etc. We're potentially throwing away data here
+            if (_opts.logger && _opts.logger->level >= logging::LogLevel::Warning) {
+                using namespace std::string_literals;
+                _opts.logger->log(logging::LogLevel::Warning, "Truncating "s + _opts.identifier + " to a length of "s +
+                                                                  std::to_string(_byte_position));
+            }
             _f->truncate(_byte_position);
             return header_or.err();
         }

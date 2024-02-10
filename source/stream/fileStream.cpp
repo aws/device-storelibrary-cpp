@@ -85,7 +85,7 @@ StreamError FileStream::loadExistingSegments() {
         auto idx = f.rfind(".log");
         if (idx != std::string::npos) {
             auto base = std::stoull(std::string{f.substr(0, idx)});
-            FileSegment segment{base, _opts.file_implementation};
+            FileSegment segment{base, _opts.file_implementation, _opts.logger};
             auto err = segment.open(_opts.full_corruption_check_on_open);
             if (err.code != StreamErrorCode::NoError) {
                 return err;
@@ -110,8 +110,10 @@ StreamError FileStream::loadExistingSegments() {
     return StreamError{StreamErrorCode::NoError, {}};
 }
 
-FileSegment::FileSegment(uint64_t base, std::shared_ptr<FileSystemInterface> interface)
-    : _file_implementation(std::move(interface)), _base_seq_num(base), _highest_seq_num(base) {
+FileSegment::FileSegment(uint64_t base, std::shared_ptr<FileSystemInterface> interface,
+                         std::shared_ptr<logging::Logger> logger)
+    : _file_implementation(std::move(interface)), _logger(std::move(logger)), _base_seq_num(base),
+      _highest_seq_num(base) {
     std::ostringstream oss;
     oss << std::setw(UINT64_MAX_DECIMAL_COUNT) << std::setfill('0') << _base_seq_num << ".log";
 
@@ -138,14 +140,29 @@ StreamError FileSegment::open(bool full_corruption_check_on_open) {
 
         if (header->magic_and_version != MAGIC_AND_VERSION) {
             // TODO: More error handling, logging, etc. We're potentially throwing away data here
+            if (_logger && _logger->level >= logging::LogLevel::Warning) {
+                using namespace std::string_literals;
+                _logger->log(logging::LogLevel::Warning,
+                             "Truncating "s + _segment_id + " to a length of "s + std::to_string(offset));
+            }
             _f->truncate(offset);
             return StreamError{StreamErrorCode::HeaderDataCorrupted,
                                "Magic bytes and version does not match expected value"};
         }
         if (full_corruption_check_on_open) {
-            auto value_or = read(header->relative_sequence_number + _base_seq_num, offset);
+            auto value_or =
+                read(header->relative_sequence_number + _base_seq_num, ReadOptions{
+                                                                           .check_for_corruption = true,
+                                                                           .may_return_later_records = false,
+                                                                           .suggested_start = offset,
+                                                                       });
             if (!value_or) {
                 // TODO: More error handling, logging, etc. We're potentially throwing away data here
+                if (_logger && _logger->level >= logging::LogLevel::Warning) {
+                    using namespace std::string_literals;
+                    _logger->log(logging::LogLevel::Warning,
+                                 "Truncating "s + _segment_id + " to a length of "s + std::to_string(offset));
+                }
                 _f->truncate(offset);
                 return value_or.err();
             }
@@ -154,7 +171,7 @@ StreamError FileSegment::open(bool full_corruption_check_on_open) {
         offset += HEADER_SIZE;
         offset += header->payload_length_bytes;
         _total_bytes += header->payload_length_bytes + HEADER_SIZE;
-        _highest_seq_num = std::max(_highest_seq_num.load(), _base_seq_num + header->relative_sequence_number);
+        _highest_seq_num = std::max(_highest_seq_num, _base_seq_num + header->relative_sequence_number);
     }
 }
 
@@ -173,9 +190,11 @@ LogEntryHeader const *FileSegment::convertSliceToHeader(const OwnedSlice &data) 
 void FileSegment::append(BorrowedSlice d, int64_t timestamp_ms, uint64_t sequence_number) {
     auto ts = static_cast<int64_t>(_htonll(timestamp_ms));
     auto data_len_swap = static_cast<int32_t>(_htonl(d.size()));
+    auto byte_position = static_cast<int32_t>(_htonl(_total_bytes));
+    _total_bytes += d.size() + sizeof(LogEntryHeader);
     auto header = LogEntryHeader{
         .relative_sequence_number = static_cast<int32_t>(_htonl((sequence_number - _base_seq_num))),
-        .byte_position = static_cast<int32_t>(_htonl(_total_bytes.fetch_add(d.size() + sizeof(LogEntryHeader)))),
+        .byte_position = byte_position,
         .crc = static_cast<int64_t>(_htonll(
             crc32::update(crc32::update(crc32::update(0, &ts, sizeof(int64_t)), &data_len_swap, sizeof(int32_t)),
                           d.data(), d.size()))),
@@ -189,19 +208,17 @@ void FileSegment::append(BorrowedSlice d, int64_t timestamp_ms, uint64_t sequenc
                       sizeof(header)});
     _f->append(d);
 
-    _highest_seq_num = std::max(_highest_seq_num.load(), sequence_number);
+    _highest_seq_num = std::max(_highest_seq_num, sequence_number);
 }
 
-expected<OwnedRecord, StreamError> FileSegment::read(uint64_t sequence_number, uint64_t suggested_start) const {
-    return getRecord(sequence_number, suggested_start, suggested_start != 0);
-}
-
-expected<OwnedRecord, StreamError> FileSegment::getRecord(uint64_t sequence_number, size_t offset,
-                                                          bool suggested_start) const {
+expected<OwnedRecord, StreamError> FileSegment::read(uint64_t sequence_number, const ReadOptions &read_options) const {
     // We will try to find the record by reading the segment starting at the offset.
     // If a suggested starting position within the segment was suggested to us, we start from further into the file.
     // If any error occurs with the suggested starting point, we will restart from the beginning of the file.
     // Any failures during reading without a suggested started point are raised immediately.
+
+    auto offset = read_options.suggested_start;
+    auto suggested_start = offset != 0;
 
     while (true) {
         auto header_data_or = _f->read(offset, offset + HEADER_SIZE);
@@ -210,6 +227,9 @@ expected<OwnedRecord, StreamError> FileSegment::getRecord(uint64_t sequence_numb
                 offset = 0;
                 suggested_start = false;
                 continue;
+            }
+            if (header_data_or.err().code == FileErrorCode::EndOfFile) {
+                return StreamError{StreamErrorCode::RecordNotFound, RecordNotFoundErrorStr};
             }
             return StreamError{StreamErrorCode::ReadError, header_data_or.err().msg};
         }
@@ -220,12 +240,15 @@ expected<OwnedRecord, StreamError> FileSegment::getRecord(uint64_t sequence_numb
         }
 
         auto expected_rel_seq_num = static_cast<int32_t>(sequence_number - _base_seq_num);
-        if (header->relative_sequence_number > expected_rel_seq_num) {
+
+        // If the record we read is after the one we wanted, and we're not allowed to return later records, we must fail
+        if (header->relative_sequence_number > expected_rel_seq_num && !read_options.may_return_later_records) {
             return StreamError{StreamErrorCode::RecordNotFound, RecordNotFoundErrorStr};
         }
 
-        // We found the one we want!
-        if (header->relative_sequence_number == expected_rel_seq_num) {
+        // We found the one we want, or the next available sequence number was acceptable to us
+        if (header->relative_sequence_number == expected_rel_seq_num ||
+            (header->relative_sequence_number > expected_rel_seq_num && read_options.may_return_later_records)) {
             auto data_or = _f->read(offset + HEADER_SIZE, offset + HEADER_SIZE + header->payload_length_bytes);
             if (!data_or) {
                 return StreamError{StreamErrorCode::ReadError, header_data_or.err().msg};
@@ -233,10 +256,12 @@ expected<OwnedRecord, StreamError> FileSegment::getRecord(uint64_t sequence_numb
             auto data = std::move(data_or.val());
             auto data_len_swap = static_cast<int32_t>(_htonl(header->payload_length_bytes));
             auto ts_swap = static_cast<int64_t>(_htonll(header->timestamp));
-            if (header->crc !=
-                static_cast<int64_t>(crc32::update(
-                    crc32::update(crc32::update(0, &ts_swap, sizeof(int64_t)), &data_len_swap, sizeof(int32_t)),
-                    data.data(), data.size()))) {
+
+            if (read_options.check_for_corruption &&
+                header->crc !=
+                    static_cast<int64_t>(crc32::update(
+                        crc32::update(crc32::update(0, &ts_swap, sizeof(int64_t)), &data_len_swap, sizeof(int32_t)),
+                        data.data(), data.size()))) {
                 return StreamError{StreamErrorCode::RecordDataCorrupted, {}};
             }
 
@@ -260,7 +285,7 @@ void FileSegment::remove() {
 }
 
 StreamError FileStream::makeNextSegment() {
-    FileSegment segment{_next_sequence_number, _opts.file_implementation};
+    FileSegment segment{_next_sequence_number, _opts.file_implementation, _opts.logger};
 
     auto err = segment.open(_opts.full_corruption_check_on_open);
     if (err.code != StreamErrorCode::NoError) {
@@ -295,7 +320,8 @@ expected<uint64_t, StreamError> FileStream::append(BorrowedSlice d) {
         }
     }
 
-    auto seq = _next_sequence_number++;
+    auto seq = _next_sequence_number;
+    _next_sequence_number++;
     auto timestamp = aws::gg::timestamp();
 
     _segments.back().append(d, timestamp, seq);
@@ -327,14 +353,32 @@ expected<uint64_t, StreamError> FileStream::append(OwnedSlice &&d) {
 }
 
 [[nodiscard]] expected<OwnedRecord, StreamError> FileStream::read(uint64_t sequence_number,
-                                                                  uint64_t suggested_start) const {
+                                                                  const ReadOptions &read_options) const {
     if (sequence_number < _first_sequence_number || sequence_number >= _next_sequence_number) {
         return StreamError{StreamErrorCode::RecordNotFound, RecordNotFoundErrorStr};
     }
 
+    // Initially we will try to find exactly the requested record by sequence number.
+    // If we cannot find it and the user has elected to allow later records to be returned,
+    // we will try to find the next available record.
+    // We will continue to the next available record if any record is not found, data, or header corruption.
+    bool find_exact = true;
     for (const auto &seg : _segments) {
-        if (sequence_number >= seg.getBaseSeqNum() && sequence_number <= seg.getHighestSeqNum()) {
-            return seg.read(sequence_number, suggested_start);
+        bool have_exact_segment = sequence_number >= seg.getBaseSeqNum() && sequence_number <= seg.getHighestSeqNum();
+
+        if (have_exact_segment || !find_exact) {
+            auto val_or = seg.read(sequence_number, read_options);
+
+            if (val_or) {
+                return val_or;
+            } else if ((val_or.err().code == StreamErrorCode::RecordNotFound ||
+                        val_or.err().code == StreamErrorCode::RecordDataCorrupted ||
+                        val_or.err().code == StreamErrorCode::HeaderDataCorrupted) &&
+                       read_options.may_return_later_records) {
+                // Fallback to the next available record in the next segment (if any)
+                find_exact = false;
+                continue;
+            }
         }
     }
 
@@ -389,10 +433,7 @@ PersistentIterator::PersistentIterator(std::string id, uint64_t start, std::shar
 void PersistentIterator::setCheckpoint(uint64_t sequence_number) {
     // TODO: something with the error
     _sequence_number = sequence_number;
-    [[maybe_unused]] auto _ = _store->put(
-        _id, BorrowedSlice{reinterpret_cast<const uint8_t *>( // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
-                               &sequence_number),
-                           sizeof(uint64_t)});
+    [[maybe_unused]] auto _ = _store->put(_id, BorrowedSlice{&sequence_number, sizeof(uint64_t)});
 }
 
 void PersistentIterator::remove() {

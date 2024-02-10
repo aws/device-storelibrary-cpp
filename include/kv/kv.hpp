@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "common/crc32.hpp"
+#include "common/logging.hpp"
 #include "common/slices.hpp"
 #include "filesystem/filesystem.hpp"
 
@@ -53,7 +54,8 @@ namespace kv __attribute__((visibility("default"))) {
     using KVError = GenericError<KVErrorCodes>;
 
     struct KVOptions {
-        std::shared_ptr<FileSystemInterface> filesystem_implementation;
+        const std::shared_ptr<FileSystemInterface> filesystem_implementation;
+        const std::shared_ptr<logging::Logger> logger;
         std::string identifier;
         uint32_t compact_after;
     };

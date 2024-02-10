@@ -14,9 +14,10 @@ endif()
 
 include(cmake/ClangFormat.cmake)
 
-add_library(greenlake_kv include/kv/kv.hpp include/common/expected.hpp include/common/crc32.hpp include/filesystem/filesystem.hpp include/common/slices.hpp
-        include/common/util.hpp
-        source/kv/kv.cpp)
+add_library(greenlake_kv include/kv/kv.hpp include/common/expected.hpp include/common/crc32.hpp
+        include/filesystem/filesystem.hpp include/common/slices.hpp
+        include/common/util.hpp source/kv/kv.cpp
+        include/common/logging.hpp)
 set_target_properties(greenlake_kv PROPERTIES LINKER_LANGUAGE CXX)
 target_include_directories(greenlake_kv PUBLIC include)
 target_compile_options(greenlake_kv PRIVATE -fno-rtti -fno-exceptions -Wall -Wextra -Werror)
@@ -27,7 +28,8 @@ add_library(greenlake_stream include/stream/stream.hpp include/stream/fileStream
         include/stream/memoryStream.hpp include/common/crc32.hpp include/common/slices.hpp
         source/stream/memoryStream.cpp source/stream/fileStream.cpp
         include/common/expected.hpp
-        include/common/util.hpp)
+        include/common/util.hpp
+        include/common/logging.hpp)
 set_target_properties(greenlake_stream PROPERTIES LINKER_LANGUAGE CXX)
 target_link_libraries(greenlake_stream PUBLIC greenlake_kv)
 target_compile_options(greenlake_stream PRIVATE -fno-exceptions -fno-rtti -Wall -Wextra -Werror)

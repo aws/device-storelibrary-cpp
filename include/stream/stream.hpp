@@ -1,11 +1,11 @@
 #pragma once
 
 #include "common/expected.hpp"
+#include "common/logging.hpp"
 #include "common/slices.hpp"
 #include "common/util.hpp"
 #include "filesystem/filesystem.hpp"
 #include "kv/kv.hpp"
-#include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <cstdlib>
@@ -110,6 +110,12 @@ namespace gg __attribute__((visibility("default"))) {
         bool operator!=(const int) const { return true; }
     };
 
+    struct ReadOptions {
+        bool check_for_corruption{true};
+        bool may_return_later_records{false};
+        std::uint64_t suggested_start{0};
+    };
+
 #if __cplusplus >= 201703L
 #define WEAK_FROM_THIS weak_from_this
 #else
@@ -118,9 +124,9 @@ namespace gg __attribute__((visibility("default"))) {
 
     class StreamInterface : public std::enable_shared_from_this<StreamInterface> {
       protected:
-        uint64_t _first_sequence_number = 0;
-        std::atomic_uint64_t _next_sequence_number = {0};
-        std::atomic_uint64_t _current_size_bytes = {0};
+        std::uint64_t _first_sequence_number{0};
+        std::uint64_t _next_sequence_number{0};
+        std::uint64_t _current_size_bytes{0};
 
       public:
         StreamInterface(StreamInterface &) = delete;
@@ -146,19 +152,8 @@ namespace gg __attribute__((visibility("default"))) {
          * @param sequence_number the sequence number of the record to read.
          * @return the Record.
          */
-        [[nodiscard]] virtual expected<OwnedRecord, StreamError> read(uint64_t sequence_number) const = 0;
-
-        /**
-         * Read a record from the stream by its sequence number with an optional hint to the storage engine for where to
-         * start looking for the record. Throws exceptions if sequence number does not exist or if the data is corrupted
-         * (checksum fails).
-         *
-         * @param sequence_number the sequence number of the record to read.
-         * @param suggested_start an optional hint to the storage engine for where to start looking for the record.
-         * @return the Record.
-         */
         [[nodiscard]] virtual expected<OwnedRecord, StreamError> read(uint64_t sequence_number,
-                                                                      uint64_t suggested_start) const = 0;
+                                                                      const ReadOptions &) const = 0;
 
         /**
          * Create an iterator identified by the chosen identifier. If an iterator already exists with the same
@@ -197,20 +192,26 @@ namespace gg __attribute__((visibility("default"))) {
         size_t minimum_segment_size_bytes = 16 * 1024 * 1024; // 16MB minimum segment size before making a new segment
         size_t maximum_size_bytes = 128 * 1024 * 1024;        // 128MB max stream size
         bool full_corruption_check_on_open = false;
-        std::shared_ptr<FileSystemInterface> file_implementation = {};
-        kv::KVOptions kv_options = {
-            .filesystem_implementation = file_implementation, .identifier = "kv", .compact_after = 128 * 1024};
+        const std::shared_ptr<FileSystemInterface> file_implementation{};
+        const std::shared_ptr<logging::Logger> logger{};
+        kv::KVOptions kv_options = {.filesystem_implementation = file_implementation,
+                                    .logger = logger,
+                                    .identifier = "kv",
+                                    .compact_after = 128 * 1024};
     };
 
     inline expected<CheckpointableOwnedRecord, StreamError> Iterator::operator*() {
         if (auto stream = _stream.lock()) {
-            auto record_or = stream->read(sequence_number, _offset);
+            auto record_or = stream->read(sequence_number, ReadOptions{.check_for_corruption = true,
+                                                                       .may_return_later_records = true,
+                                                                       .suggested_start = _offset});
             if (!record_or) {
                 return std::move(record_or.err());
             }
             auto x = std::move(record_or.val());
             timestamp = x.timestamp;
             _offset = x.offset + x.data.size();
+            sequence_number = x.sequence_number;
             return CheckpointableOwnedRecord{std::move(x), [this] { checkpoint(); }};
         }
         return StreamError{StreamErrorCode::StreamClosed, "Unable to read from destroyed stream"};

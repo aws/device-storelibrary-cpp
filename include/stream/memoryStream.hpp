@@ -21,11 +21,8 @@ namespace gg __attribute__((visibility("default"))) {
         expected<uint64_t, StreamError> append(BorrowedSlice) override;
         expected<uint64_t, StreamError> append(OwnedSlice &&) override;
 
-        [[nodiscard]] expected<OwnedRecord, StreamError> read(uint64_t sequence_number) const override {
-            return read(sequence_number, 0);
-        };
         [[nodiscard]] expected<OwnedRecord, StreamError> read(uint64_t sequence_number,
-                                                              uint64_t suggested_start) const override;
+                                                              const ReadOptions &) const override;
 
         [[nodiscard]] Iterator openOrCreateIterator(const std::string &identifier, IteratorOptions) override;
         void deleteIterator(const std::string &identifier) override;

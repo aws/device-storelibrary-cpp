@@ -58,7 +58,7 @@ expected<uint64_t, StreamError> MemoryStream::append(OwnedSlice &&d) {
 }
 
 [[nodiscard]] expected<OwnedRecord, StreamError> MemoryStream::read(uint64_t sequence_number,
-                                                                    [[maybe_unused]] uint64_t suggested_start) const {
+                                                                    [[maybe_unused]] const ReadOptions &) const {
     if (sequence_number < _first_sequence_number) {
         return StreamError{StreamErrorCode::RecordNotFound, RecordNotFoundErrorStr};
     }

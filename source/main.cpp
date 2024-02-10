@@ -18,6 +18,16 @@ void do_memory() {
     printf("resident size max: %lu KB\n", (rusage.ru_maxrss) / 1024);
 }
 
+class MyLogger : public aws::gg::logging::Logger {
+    void log(aws::gg::logging::LogLevel level, const std::string &msg) const override {
+        if (level >= aws::gg::logging::LogLevel::Warning) {
+            std::cerr << level << " " << msg << std::endl;
+        } else {
+            std::cout << level << " " << msg << std::endl;
+        }
+    }
+};
+
 int main() {
     srand(time(nullptr));
     auto data = std::array<char, 128>{};
@@ -52,14 +62,17 @@ int main() {
         }
      */
 
+        auto logger = std::make_shared<MyLogger>();
         // auto s = MemoryStream::openOrCreate(StreamOptions{.maximum_size_bytes = 500 * 1024 * 1024});
         auto s_or = FileStream::openOrCreate(StreamOptions{
             .minimum_segment_size_bytes = 1024 * 1024,
             .maximum_size_bytes = 10 * 1024 * 1024,
             .file_implementation = fs,
+            .logger = logger,
             .kv_options =
                 KVOptions{
                     .filesystem_implementation = fs,
+                    .logger = logger,
                     .identifier = "m",
                     .compact_after = 512 * 1024,
                 },
@@ -78,7 +91,7 @@ int main() {
             last_sequence_number = s->append(BorrowedSlice{data.data(), data.size()});
         }
 
-        auto last_record_or = s->read(last_sequence_number.val());
+        auto last_record_or = s->read(last_sequence_number.val(), ReadOptions{});
         if (last_record_or) {
             std::cout << last_record_or.val().data.string() << std::endl;
         } else {
@@ -86,10 +99,9 @@ int main() {
         }
 
         for (auto r : s->openOrCreateIterator("a", IteratorOptions{})) {
-            // Do something with the record....
-            // std::cout << r.sequence_number << std::endl;
-
             if (r) {
+                // Do something with the record....
+                std::cout << r.val().sequence_number << std::endl;
                 r.val().checkpoint();
             } else {
                 std::cout << r.err().msg << std::endl;
