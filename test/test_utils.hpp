@@ -10,6 +10,7 @@
 #include <memory>
 #include <random>
 #include <string>
+#include <variant>
 
 namespace {
 
@@ -89,10 +90,12 @@ template <typename X, typename Y> struct RemoveMembership<X Y::*> {
     using type = X;
 };
 
+struct CallRealMethod {};
+
 class SpyFileSystem : public aws::gg::FileSystemInterface {
   private:
     std::shared_ptr<aws::gg::FileSystemInterface> _real;
-    std::list<std::pair<std::string, std::any>> _mocks{};
+    std::list<std::pair<std::string, std::variant<CallRealMethod, std::any>>> _mocks{};
 
   public:
     using OpenType = std::function<RemoveMembership<decltype(&aws::gg::FileSystemInterface::open)>::type>;
@@ -107,8 +110,10 @@ class SpyFileSystem : public aws::gg::FileSystemInterface {
         if (!_mocks.empty() && _mocks.front().first == "open") {
             auto mock = _mocks.front();
             _mocks.pop_front();
-            auto f = std::any_cast<OpenType>(mock.second);
-            return f(identifier);
+            if (std::holds_alternative<std::any>(mock.second)) {
+                auto f = std::any_cast<OpenType>(std::get<std::any>(mock.second));
+                return f(identifier);
+            }
         }
         return SpyFileLike::create(_real->open(identifier));
     };
@@ -117,8 +122,10 @@ class SpyFileSystem : public aws::gg::FileSystemInterface {
         if (!_mocks.empty() && _mocks.front().first == "exists") {
             auto mock = _mocks.front();
             _mocks.pop_front();
-            auto f = std::any_cast<ExistsType>(mock.second);
-            return f(identifier);
+            if (std::holds_alternative<std::any>(mock.second)) {
+                auto f = std::any_cast<ExistsType>(std::get<std::any>(mock.second));
+                return f(identifier);
+            }
         }
         return _real->exists(identifier);
     };
@@ -127,8 +134,10 @@ class SpyFileSystem : public aws::gg::FileSystemInterface {
         if (!_mocks.empty() && _mocks.front().first == "rename") {
             auto mock = _mocks.front();
             _mocks.pop_front();
-            auto f = std::any_cast<RenameType>(mock.second);
-            return f(old_id, new_id);
+            if (std::holds_alternative<std::any>(mock.second)) {
+                auto f = std::any_cast<RenameType>(std::get<std::any>(mock.second));
+                return f(old_id, new_id);
+            }
         }
         return _real->rename(old_id, new_id);
     };
@@ -137,8 +146,10 @@ class SpyFileSystem : public aws::gg::FileSystemInterface {
         if (!_mocks.empty() && _mocks.front().first == "remove") {
             auto mock = _mocks.front();
             _mocks.pop_front();
-            auto f = std::any_cast<RemoveType>(mock.second);
-            return f(id);
+            if (std::holds_alternative<std::any>(mock.second)) {
+                auto f = std::any_cast<RemoveType>(std::get<std::any>(mock.second));
+                return f(id);
+            }
         }
         return _real->remove(id);
     };
@@ -147,13 +158,20 @@ class SpyFileSystem : public aws::gg::FileSystemInterface {
         if (!_mocks.empty() && _mocks.front().first == "list") {
             auto mock = _mocks.front();
             _mocks.pop_front();
-            auto f = std::any_cast<ListType>(mock.second);
-            return f();
+            if (std::holds_alternative<std::any>(mock.second)) {
+                auto f = std::any_cast<ListType>(std::get<std::any>(mock.second));
+                return f();
+            }
         }
         return _real->list();
     };
 
     template <typename ret, typename... args> auto when(const std::string &method, std::function<ret(args...)> f) {
+        _mocks.push_back({method, f});
+        return this;
+    }
+
+    auto when(const std::string &method, CallRealMethod f) {
         _mocks.push_back({method, f});
         return this;
     }
