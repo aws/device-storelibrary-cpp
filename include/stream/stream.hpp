@@ -144,8 +144,7 @@ namespace gg __attribute__((visibility("default"))) {
         virtual expected<uint64_t, StreamError> append(OwnedSlice &&) = 0;
 
         /**
-         * Read a record from the stream by its sequence number.
-         * Throws exceptions if sequence number does not exist or if the data is corrupted (checksum fails).
+         * Read a record from the stream by its sequence number or an error.
          *
          * @param sequence_number the sequence number of the record to read.
          * @return the Record.

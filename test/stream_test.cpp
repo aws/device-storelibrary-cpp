@@ -66,6 +66,8 @@ SCENARIO("I can create a stream", "[stream]") {
     WHEN("I append values") {
         auto seq_or = stream->append(BorrowedSlice{value});
         REQUIRE(seq_or);
+        seq_or = stream->append(BorrowedSlice{value});
+        REQUIRE(seq_or);
 
         auto it = stream->openOrCreateIterator("ita", IteratorOptions{});
         REQUIRE(it.sequence_number == 0);
@@ -76,8 +78,19 @@ SCENARIO("I can create a stream", "[stream]") {
         ++it;
         REQUIRE(it.sequence_number == 1);
         v_or = *it;
+        REQUIRE(v_or);
+        v_or.val().checkpoint();
+
+        it = stream->openOrCreateIterator("ita", IteratorOptions{});
+        REQUIRE(it.sequence_number == 1);
+
+        ++it;
+        REQUIRE(it.sequence_number == 2);
+        v_or = *it;
         REQUIRE(!v_or);
         REQUIRE(v_or.err().code == StreamErrorCode::RecordNotFound);
+
+        stream->deleteIterator("ita");
 
         AND_WHEN("I close and reopen the stream") {
             stream = nullptr;
