@@ -63,7 +63,7 @@ SCENARIO("I cannot create a stream", "[stream]") {
                  return FileError{FileErrorCode::InsufficientPermissions, {}};
              }})
         ->when("list", SpyFileSystem::ListType{[]() {
-                   return std::vector<std::string>{"a.log", "b.log", "1.log"};
+                   return std::vector<std::string>{"a.log", "b.log", "1.log", "2.log"};
                }});
 
     auto stream_or = open_stream(fs);
@@ -75,7 +75,7 @@ SCENARIO("I cannot create a stream", "[stream]") {
 
     auto stream = std::move(stream_or.val());
     REQUIRE(stream->firstSequenceNumber() == 1);
-    REQUIRE(stream->highestSequenceNumber() == 1);
+    REQUIRE(stream->highestSequenceNumber() == 2);
 }
 
 SCENARIO("I can create a stream", "[stream]") {
@@ -92,6 +92,8 @@ SCENARIO("I can create a stream", "[stream]") {
         REQUIRE(seq_or);
         seq_or = stream->append(BorrowedSlice{value});
         REQUIRE(seq_or);
+        seq_or = stream->append(BorrowedSlice{value});
+        REQUIRE(seq_or);
 
         auto it = stream->openOrCreateIterator("ita", IteratorOptions{});
         REQUIRE(it.sequence_number == 0);
@@ -105,11 +107,30 @@ SCENARIO("I can create a stream", "[stream]") {
         REQUIRE(v_or);
         v_or.val().checkpoint();
 
+        // New iterator starts at 0
+        auto other_it = stream->openOrCreateIterator("other", IteratorOptions{});
+        REQUIRE(other_it.sequence_number == 0);
+        // Reopening the existing iterator does not move it forward
+        other_it = stream->openOrCreateIterator("other", IteratorOptions{});
+        REQUIRE(other_it.sequence_number == 0);
+
         it = stream->openOrCreateIterator("ita", IteratorOptions{});
-        REQUIRE(it.sequence_number == 1);
+        // Pointing at the first unread record which is 2 because we checkpointed after we read 1.
+        REQUIRE(it.sequence_number == 2);
+
+        // Close and reopen stream from FS. Verify that our iterator is where we left it.
+        stream.reset();
+        stream_or = open_stream(fs);
+        REQUIRE(stream_or);
+        stream = std::move(stream_or.val());
+
+        it = stream->openOrCreateIterator("ita", IteratorOptions{});
+        REQUIRE(it.sequence_number == 2);
+        other_it = stream->openOrCreateIterator("other", IteratorOptions{});
+        REQUIRE(other_it.sequence_number == 0);
 
         ++it;
-        REQUIRE(it.sequence_number == 2);
+        REQUIRE(it.sequence_number == 3);
         v_or = *it;
         REQUIRE(!v_or);
         REQUIRE(v_or.err().code == StreamErrorCode::RecordNotFound);

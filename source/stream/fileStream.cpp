@@ -223,9 +223,11 @@ PersistentIterator::PersistentIterator(std::string id, uint64_t start, std::shar
 }
 
 void PersistentIterator::setCheckpoint(uint64_t sequence_number) {
+    _sequence_number = sequence_number + 1; // Set the sequence number to the next in line, so that we
+                                            // point to where we'd want to resume reading (ie. the first unread record).
+
     // TODO: something with the error
-    _sequence_number = sequence_number;
-    [[maybe_unused]] auto _ = _store->put(_id, BorrowedSlice{&sequence_number, sizeof(uint64_t)});
+    [[maybe_unused]] auto _ = _store->put(_id, BorrowedSlice{&_sequence_number, sizeof(uint64_t)});
 }
 
 void PersistentIterator::remove() {
