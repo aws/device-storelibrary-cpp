@@ -43,6 +43,7 @@ static auto open_stream(std::shared_ptr<FileSystemInterface> fs) {
     return FileStream::openOrCreate(StreamOptions{
         .minimum_segment_size_bytes = 1024 * 1024,
         .maximum_size_bytes = 10 * 1024 * 1024,
+        .full_corruption_check_on_open = true,
         .file_implementation = fs,
         .logger = logger,
         .kv_options =
