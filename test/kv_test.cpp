@@ -48,10 +48,53 @@ static auto open_kv(const std::string &path) {
     });
 }
 
+SCENARIO("I cannot create a KV map with invalid inputs", "kv") {
+    auto kv_or = KV::openOrCreate(KVOptions{
+        .filesystem_implementation{},
+        .identifier{"test-kv-map"},
+    });
+    REQUIRE(!kv_or);
+    REQUIRE(kv_or.err().code == KVErrorCodes::InvalidArguments);
+
+    auto temp_dir = TempDir();
+    kv_or = KV::openOrCreate(KVOptions{
+        .filesystem_implementation{std::make_shared<SpyFileSystem>(std::make_shared<PosixFileSystem>(temp_dir.path()))},
+        .identifier{}});
+    REQUIRE(!kv_or);
+    REQUIRE(kv_or.err().code == KVErrorCodes::InvalidArguments);
+}
+
+SCENARIO("I cannot put invalid inputs to the map", "[kv]") {
+    auto temp_dir = TempDir();
+    auto kv_or = open_kv(temp_dir.path());
+    REQUIRE(kv_or);
+    auto kv = std::move(kv_or.val());
+
+    {
+        auto e = kv->put("", BorrowedSlice{""});
+        REQUIRE(e.code == KVErrorCodes::InvalidArguments);
+        REQUIRE(e.msg.find("empty") != std::string::npos);
+    }
+
+    {
+        std::string key{};
+        key.resize(UINT32_MAX);
+        auto e = kv->put(key, BorrowedSlice{""});
+        REQUIRE(e.code == KVErrorCodes::InvalidArguments);
+        REQUIRE(e.msg.find("Key length") != std::string::npos);
+    }
+
+    {
+        std::string key{};
+        auto e = kv->put("a", BorrowedSlice{key.data(), UINT64_MAX});
+        REQUIRE(e.code == KVErrorCodes::InvalidArguments);
+        REQUIRE(e.msg.find("Value length") != std::string::npos);
+    }
+}
+
 SCENARIO("I can create a KV map", "[kv]") {
     GIVEN("I create an empty KV map") {
         auto temp_dir = TempDir();
-
         auto kv_or = open_kv(temp_dir.path());
         REQUIRE(kv_or);
 
