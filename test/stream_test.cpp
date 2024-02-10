@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 #include <string_view>
+#include <vector>
 
 using namespace aws::gg;
 using namespace std::string_view_literals;
@@ -54,9 +55,32 @@ static auto open_stream(std::shared_ptr<FileSystemInterface> fs) {
     });
 }
 
+SCENARIO("I cannot create a stream", "[stream]") {
+    auto temp_dir = TempDir();
+    auto fs = std::make_shared<SpyFileSystem>(std::make_shared<PosixFileSystem>(temp_dir.path()));
+
+    fs->when("open", SpyFileSystem::OpenType{[](const std::string &s) {
+                 return FileError{FileErrorCode::InsufficientPermissions, {}};
+             }})
+        ->when("list", SpyFileSystem::ListType{[]() {
+                   return std::vector<std::string>{"a.log", "b.log", "1.log"};
+               }});
+
+    auto stream_or = open_stream(fs);
+    REQUIRE(!stream_or);
+    REQUIRE(stream_or.err().code == StreamErrorCode::ReadError);
+
+    stream_or = open_stream(fs);
+    REQUIRE(stream_or);
+
+    auto stream = std::move(stream_or.val());
+    REQUIRE(stream->firstSequenceNumber() == 1);
+    REQUIRE(stream->highestSequenceNumber() == 1);
+}
+
 SCENARIO("I can create a stream", "[stream]") {
     auto temp_dir = TempDir();
-    auto fs = std::make_shared<PosixFileSystem>(temp_dir.path());
+    auto fs = std::make_shared<SpyFileSystem>(std::make_shared<PosixFileSystem>(temp_dir.path()));
     auto stream_or = open_stream(fs);
     REQUIRE(stream_or);
     auto stream = std::move(stream_or.val());

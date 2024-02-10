@@ -39,15 +39,20 @@ class Logger : public logging::Logger {
 
 static const auto logger = std::make_shared<Logger>();
 
+static auto open_kv(const std::string &path) {
+    return KV::openOrCreate(KVOptions{
+        .filesystem_implementation = std::make_shared<SpyFileSystem>(std::make_shared<PosixFileSystem>(path)),
+        .logger = logger,
+        .identifier = "test-kv-map",
+        .compact_after = 0,
+    });
+}
+
 SCENARIO("I can create a KV map", "[kv]") {
     GIVEN("I create an empty KV map") {
         auto temp_dir = TempDir();
-        auto kv_or = KV::openOrCreate(KVOptions{
-            .filesystem_implementation = std::make_shared<PosixFileSystem>(temp_dir.path()),
-            .logger = logger,
-            .identifier = "test-kv-map",
-            .compact_after = 0,
-        });
+
+        auto kv_or = open_kv(temp_dir.path());
         REQUIRE(kv_or);
 
         auto kv = std::move(kv_or.val());
@@ -93,12 +98,7 @@ SCENARIO("I can create a KV map", "[kv]") {
                         AND_WHEN("I close the KV and open it again") {
                             kv.reset();
 
-                            kv_or = KV::openOrCreate(KVOptions{
-                                .filesystem_implementation = std::make_shared<PosixFileSystem>(temp_dir.path()),
-                                .logger = logger,
-                                .identifier = "test-kv-map",
-                                .compact_after = 0,
-                            });
+                            kv_or = open_kv(temp_dir.path());
                             REQUIRE(kv_or);
 
                             kv = std::move(kv_or.val());

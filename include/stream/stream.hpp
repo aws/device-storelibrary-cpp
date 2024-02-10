@@ -39,6 +39,7 @@ namespace gg __attribute__((visibility("default"))) {
         ReadError,
         WriteError,
         StreamClosed,
+        InvalidArguments,
         Unknown,
     };
 
@@ -127,6 +128,9 @@ namespace gg __attribute__((visibility("default"))) {
         std::uint64_t _current_size_bytes{0};
 
       public:
+        std::uint64_t firstSequenceNumber() { return _first_sequence_number; };
+        std::uint64_t highestSequenceNumber() { return _next_sequence_number - 1; };
+        std::uint64_t currentSizeBytes() { return _current_size_bytes; };
         StreamInterface(StreamInterface &) = delete;
 
         /**

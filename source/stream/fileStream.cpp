@@ -14,11 +14,20 @@ expected<std::shared_ptr<StreamInterface>, StreamError> FileStream::openOrCreate
     return std::shared_ptr<StreamInterface>(stream);
 }
 
+static constexpr int BASE_10 = 10;
+
 StreamError FileStream::loadExistingSegments() {
     auto kv_err_or = kv::KV::openOrCreate(std::move(_opts.kv_options));
     if (!kv_err_or) {
         // TODO: Better error mapping
-        return StreamError{StreamErrorCode::ReadError, kv_err_or.err().msg};
+        switch (kv_err_or.err().code) {
+        case kv::KVErrorCodes::InvalidArguments:
+            return StreamError{StreamErrorCode::InvalidArguments, kv_err_or.err().msg};
+        case kv::KVErrorCodes::ReadError:
+            return StreamError{StreamErrorCode::ReadError, kv_err_or.err().msg};
+        default:
+            return StreamError{StreamErrorCode::WriteError, kv_err_or.err().msg};
+        }
     }
     _kv_store = std::move(kv_err_or.val());
 
@@ -31,7 +40,13 @@ StreamError FileStream::loadExistingSegments() {
     for (const auto &f : files) {
         auto idx = f.rfind(".log");
         if (idx != std::string::npos) {
-            auto base = std::stoull(std::string{f.substr(0, idx)});
+            char *end_ptr = nullptr;
+            errno = 0;
+            auto base = strtoull(f.c_str(), &end_ptr, BASE_10);
+            // Ignore files whose names are not parsable as u64.
+            if ((base == 0 && end_ptr == f.c_str()) || errno != 0) {
+                continue;
+            }
             FileSegment segment{base, _opts.file_implementation, _opts.logger};
             auto err = segment.open(_opts.full_corruption_check_on_open);
             if (err.code != StreamErrorCode::NoError) {
