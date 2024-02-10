@@ -86,14 +86,12 @@ namespace gg __attribute__((visibility("default"))) {
 
         Iterator &operator=(Iterator &&) = default;
 
-        uint32_t flags = 0;
         int64_t timestamp = 0;
         uint64_t sequence_number = 0;
 
         // mutate in place and return this
         Iterator &operator++() {
             ++sequence_number;
-            flags = 0;
             timestamp = 0;
             return *this;
         }

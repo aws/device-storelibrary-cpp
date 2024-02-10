@@ -7,6 +7,8 @@
 
 namespace aws {
 namespace gg {
+static constexpr const char *const RecordNotFoundErrorStr = "Record not found";
+
 struct LogEntryHeader;
 class FileSegment {
   public:
@@ -86,8 +88,7 @@ class __attribute__((visibility("default"))) FileStream : public StreamInterface
     expected<uint64_t, StreamError> append(BorrowedSlice) override;
     expected<uint64_t, StreamError> append(OwnedSlice &&) override;
 
-    [[nodiscard]] expected<OwnedRecord, StreamError> read(uint64_t sequence_number,
-                                                          const ReadOptions &read_options) const override;
+    [[nodiscard]] expected<OwnedRecord, StreamError> read(uint64_t, const ReadOptions &) const override;
 
     [[nodiscard]] Iterator openOrCreateIterator(const std::string &identifier, IteratorOptions) override;
     void deleteIterator(const std::string &identifier) override;

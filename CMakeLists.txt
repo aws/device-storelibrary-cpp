@@ -29,7 +29,8 @@ add_library(greenlake_stream include/stream/stream.hpp include/stream/fileStream
         source/stream/memoryStream.cpp source/stream/fileStream.cpp
         include/common/expected.hpp
         include/common/util.hpp
-        include/common/logging.hpp)
+        include/common/logging.hpp
+        source/stream/fileSegment.cpp)
 set_target_properties(greenlake_stream PROPERTIES LINKER_LANGUAGE CXX)
 target_link_libraries(greenlake_stream PUBLIC greenlake_kv)
 target_compile_options(greenlake_stream PRIVATE -fno-exceptions -fno-rtti -Wall -Wextra -Werror)

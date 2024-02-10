@@ -1,4 +1,6 @@
 #pragma once
+#include <cstddef>
+#include <cstdint>
 
 namespace __attribute__((visibility("default"))) crc32 {
     static constexpr const uint32_t table[256] = {

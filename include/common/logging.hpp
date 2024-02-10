@@ -31,6 +31,9 @@ namespace logging __attribute__((visibility("default"))) {
         case LogLevel::Error:
             return "Error"s;
         }
+
+        // Unreachable, but makes gcc happy
+        return ""s;
     }
 
     inline std::ostream &operator<<(std::ostream &out, LogLevel level) {

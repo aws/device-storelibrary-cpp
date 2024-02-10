@@ -19,11 +19,14 @@ void do_memory() {
 }
 
 class MyLogger : public aws::gg::logging::Logger {
-    void log(aws::gg::logging::LogLevel level, const std::string &msg) const override {
-        if (level >= aws::gg::logging::LogLevel::Warning) {
-            std::cerr << level << " " << msg << std::endl;
+    void log(aws::gg::logging::LogLevel l, const std::string &msg) const override {
+        if (l < level) {
+            return;
+        }
+        if (l >= aws::gg::logging::LogLevel::Warning) {
+            std::cerr << l << " " << msg << std::endl;
         } else {
-            std::cout << level << " " << msg << std::endl;
+            std::cout << l << " " << msg << std::endl;
         }
     }
 };
@@ -101,7 +104,7 @@ int main() {
         for (auto r : s->openOrCreateIterator("a", IteratorOptions{})) {
             if (r) {
                 // Do something with the record....
-                std::cout << r.val().sequence_number << std::endl;
+                // std::cout << r.val().sequence_number << std::endl;
                 r.val().checkpoint();
             } else {
                 std::cout << r.err().msg << std::endl;
