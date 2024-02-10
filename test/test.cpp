@@ -86,41 +86,43 @@ SCENARIO("I can create a KV map", "[kv]") {
                         v_or = kv->get(key);
                         REQUIRE(v_or);
                         REQUIRE(std::string_view{v_or.val().char_data(), v_or.val().size()} == new_value);
-                    }
-                }
-            }
 
-            AND_WHEN("I close the KV and open it again") {
-                kv.reset();
-
-                kv_or = KV::openOrCreate(KVOptions{
-                    .filesystem_implementation = std::make_shared<PosixFileSystem>(temp_dir.path()),
-                    .logger = logger,
-                    .identifier = "test-kv-map",
-                    .compact_after = 0,
-                });
-                REQUIRE(kv_or);
-
-                kv = std::move(kv_or.val());
-
-                THEN("I can get the value back") {
-                    auto v_or = kv->get(key);
-                    REQUIRE(v_or);
-                    REQUIRE(std::string_view{v_or.val().char_data(), v_or.val().size()} == value);
-
-                    AND_WHEN("I remove the key") {
-                        e = kv->remove(key);
+                        e = kv->put(key, BorrowedSlice{value});
                         REQUIRE(e.code == KVErrorCodes::NoError);
 
-                        THEN("I can't get the value back") {
-                            v_or = kv->get(key);
-                            REQUIRE(!v_or);
-                            REQUIRE(v_or.err().code == KVErrorCodes::KeyNotFound);
+                        AND_WHEN("I close the KV and open it again") {
+                            kv.reset();
+
+                            kv_or = KV::openOrCreate(KVOptions{
+                                .filesystem_implementation = std::make_shared<PosixFileSystem>(temp_dir.path()),
+                                .logger = logger,
+                                .identifier = "test-kv-map",
+                                .compact_after = 0,
+                            });
+                            REQUIRE(kv_or);
+
+                            kv = std::move(kv_or.val());
+
+                            THEN("I can get the value back") {
+                                v_or = kv->get(key);
+                                REQUIRE(v_or);
+                                REQUIRE(std::string_view{v_or.val().char_data(), v_or.val().size()} == value);
+
+                                AND_WHEN("I remove the key") {
+                                    e = kv->remove(key);
+                                    REQUIRE(e.code == KVErrorCodes::NoError);
+
+                                    THEN("I can't get the value back") {
+                                        v_or = kv->get(key);
+                                        REQUIRE(!v_or);
+                                        REQUIRE(v_or.err().code == KVErrorCodes::KeyNotFound);
+
+                                        e = kv->remove("non-existent-key");
+                                        REQUIRE(e.code == KVErrorCodes::KeyNotFound);
+                                    }
+                                }
+                            }
                         }
-                    }
-                    AND_WHEN("I remove a key that does not exist") {
-                        e = kv->remove("non-existent-key");
-                        REQUIRE(e.code == KVErrorCodes::KeyNotFound);
                     }
                 }
             }
