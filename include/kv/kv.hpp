@@ -70,37 +70,37 @@ namespace kv __attribute__((visibility("default"))) {
         std::uint32_t _added_bytes{0};
         mutable std::mutex _lock{};
 
-        [[nodiscard]] expected<detail::KVHeader, KVError> readHeaderFrom(uint32_t) const;
+        [[nodiscard]] expected<detail::KVHeader, KVError> readHeaderFrom(uint32_t) const noexcept;
 
-        [[nodiscard]] expected<std::string, KVError> readKeyFrom(uint32_t, detail::key_length_type) const;
+        [[nodiscard]] expected<std::string, KVError> readKeyFrom(uint32_t, detail::key_length_type) const noexcept;
 
         [[nodiscard]] expected<OwnedSlice, KVError> readValueFrom(uint32_t, detail::key_length_type,
-                                                                  detail::value_length_type) const;
+                                                                  detail::value_length_type) const noexcept;
 
-        [[nodiscard]] expected<OwnedSlice, KVError> readValueFrom(uint32_t) const;
+        [[nodiscard]] expected<OwnedSlice, KVError> readValueFrom(uint32_t) const noexcept;
 
-        [[nodiscard]] KVError readWrite(std::pair<std::string, uint32_t> &, FileLike &);
+        [[nodiscard]] KVError readWrite(std::pair<std::string, uint32_t> &, FileLike &) noexcept;
 
-        KV(KVOptions &&opts) : _opts(std::move(opts)), _shadow_name(_opts.identifier + "s") {}
+        KV(KVOptions &&opts) noexcept : _opts(std::move(opts)), _shadow_name(_opts.identifier + "s") {}
 
-        [[nodiscard]] KVError initialize();
+        [[nodiscard]] KVError initialize() noexcept;
 
-        [[nodiscard]] KVError compactNoLock();
+        [[nodiscard]] KVError compactNoLock() noexcept;
 
-        [[nodiscard]] bool removeKey(const std::string &key);
+        [[nodiscard]] bool removeKey(const std::string &key) noexcept;
 
       public:
-        [[nodiscard]] static expected<std::shared_ptr<KV>, KVError> openOrCreate(KVOptions &&);
+        [[nodiscard]] static expected<std::shared_ptr<KV>, KVError> openOrCreate(KVOptions &&) noexcept;
 
-        [[nodiscard]] expected<OwnedSlice, KVError> get(const std::string &) const;
+        [[nodiscard]] expected<OwnedSlice, KVError> get(const std::string &) const noexcept;
 
-        [[nodiscard]] KVError put(const std::string &, BorrowedSlice);
+        [[nodiscard]] KVError put(const std::string &, BorrowedSlice) noexcept;
 
-        [[nodiscard]] KVError remove(const std::string &);
+        [[nodiscard]] KVError remove(const std::string &) noexcept;
 
-        [[nodiscard]] expected<std::vector<std::string>, KVError> listKeys() const;
+        [[nodiscard]] expected<std::vector<std::string>, KVError> listKeys() const noexcept;
 
-        [[nodiscard]] KVError compact() {
+        [[nodiscard]] KVError compact() noexcept {
             std::lock_guard<std::mutex> lock(_lock);
             return compactNoLock();
         }

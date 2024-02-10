@@ -106,7 +106,8 @@ class SpyFileSystem : public aws::gg::FileSystemInterface {
 
     SpyFileSystem(std::shared_ptr<aws::gg::FileSystemInterface> real) : _real(std::move(real)) {}
 
-    aws::gg::expected<std::unique_ptr<aws::gg::FileLike>, aws::gg::FileError> open(const std::string &identifier) {
+    aws::gg::expected<std::unique_ptr<aws::gg::FileLike>, aws::gg::FileError>
+    open(const std::string &identifier) override {
         if (!_mocks.empty() && _mocks.front().first == "open") {
             auto mock = _mocks.front();
             _mocks.pop_front();
@@ -118,7 +119,7 @@ class SpyFileSystem : public aws::gg::FileSystemInterface {
         return SpyFileLike::create(_real->open(identifier));
     };
 
-    bool exists(const std::string &identifier) {
+    bool exists(const std::string &identifier) override {
         if (!_mocks.empty() && _mocks.front().first == "exists") {
             auto mock = _mocks.front();
             _mocks.pop_front();
@@ -130,7 +131,7 @@ class SpyFileSystem : public aws::gg::FileSystemInterface {
         return _real->exists(identifier);
     };
 
-    aws::gg::FileError rename(const std::string &old_id, const std::string &new_id) {
+    aws::gg::FileError rename(const std::string &old_id, const std::string &new_id) override {
         if (!_mocks.empty() && _mocks.front().first == "rename") {
             auto mock = _mocks.front();
             _mocks.pop_front();
@@ -142,7 +143,7 @@ class SpyFileSystem : public aws::gg::FileSystemInterface {
         return _real->rename(old_id, new_id);
     };
 
-    aws::gg::FileError remove(const std::string &id) {
+    aws::gg::FileError remove(const std::string &id) override {
         if (!_mocks.empty() && _mocks.front().first == "remove") {
             auto mock = _mocks.front();
             _mocks.pop_front();
@@ -154,7 +155,7 @@ class SpyFileSystem : public aws::gg::FileSystemInterface {
         return _real->remove(id);
     };
 
-    aws::gg::expected<std::vector<std::string>, aws::gg::FileError> list() {
+    aws::gg::expected<std::vector<std::string>, aws::gg::FileError> list() override {
         if (!_mocks.empty() && _mocks.front().first == "list") {
             auto mock = _mocks.front();
             _mocks.pop_front();
@@ -167,12 +168,12 @@ class SpyFileSystem : public aws::gg::FileSystemInterface {
     };
 
     template <typename ret, typename... args> auto when(const std::string &method, std::function<ret(args...)> f) {
-        _mocks.push_back({method, f});
+        _mocks.emplace_back(method, f);
         return this;
     }
 
     auto when(const std::string &method, CallRealMethod f) {
-        _mocks.push_back({method, f});
+        _mocks.emplace_back(method, f);
         return this;
     }
 };
