@@ -20,7 +20,11 @@ add_library(greenlake_kv include/kv/kv.hpp include/common/expected.hpp include/c
         include/common/logging.hpp)
 set_target_properties(greenlake_kv PROPERTIES LINKER_LANGUAGE CXX)
 target_include_directories(greenlake_kv PUBLIC include)
-target_compile_options(greenlake_kv PRIVATE -fno-rtti -fno-exceptions -Wall -Wextra -Werror)
+target_compile_options(greenlake_kv PRIVATE -fno-exceptions -Wall -Wextra -Werror)
+if(NOT CMAKE_BUILD_TYPE MATCHES "Debug")
+    # Keep RTTI in debug for UBSan
+    target_compile_options(greenlake_kv PRIVATE -fno-rtti)
+endif ()
 target_clangformat_setup(greenlake_kv)
 target_clangtidy_setup(greenlake_kv)
 
@@ -33,14 +37,22 @@ add_library(greenlake_stream include/stream/stream.hpp include/stream/fileStream
         source/stream/fileSegment.cpp)
 set_target_properties(greenlake_stream PROPERTIES LINKER_LANGUAGE CXX)
 target_link_libraries(greenlake_stream PUBLIC greenlake_kv)
-target_compile_options(greenlake_stream PRIVATE -fno-exceptions -fno-rtti -Wall -Wextra -Werror)
+target_compile_options(greenlake_stream PRIVATE -fno-exceptions -Wall -Wextra -Werror)
+if(NOT CMAKE_BUILD_TYPE MATCHES "Debug")
+    # Keep RTTI in debug for UBSan
+    target_compile_options(greenlake_stream PRIVATE -fno-rtti)
+endif ()
 target_clangformat_setup(greenlake_stream)
 target_clangtidy_setup(greenlake_stream)
 
 set(CMAKE_CXX_STANDARD 17)
 add_executable(greenlake_example include/filesystem/posixFileSystem.hpp source/main.cpp)
 target_link_libraries(greenlake_example PRIVATE greenlake_stream)
-target_compile_options(greenlake_example PRIVATE -fno-exceptions -fno-rtti -Wall -Wextra -Werror)
+target_compile_options(greenlake_example PRIVATE -fno-exceptions -Wall -Wextra -Werror)
+if(NOT CMAKE_BUILD_TYPE MATCHES "Debug")
+    # Keep RTTI in debug for UBSan
+    target_compile_options(greenlake_example PRIVATE -fno-rtti)
+endif ()
 target_clangformat_setup(greenlake_example)
 target_clangtidy_setup(greenlake_example)
 
