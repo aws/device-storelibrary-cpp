@@ -23,6 +23,44 @@ expected<std::shared_ptr<KV>, KVError> KV::openOrCreate(KVOptions &&opts) {
     return kv;
 }
 
+static std::string string(const KVErrorCodes e) {
+    using namespace std::string_literals;
+    switch (e) {
+    case KVErrorCodes::NoError:
+        return "NoError"s;
+    case KVErrorCodes::KeyNotFound:
+        return "KeyNotFound"s;
+    case KVErrorCodes::ReadError:
+        return "ReadError"s;
+    case KVErrorCodes::WriteError:
+        return "WriteError"s;
+    case KVErrorCodes::HeaderCorrupted:
+        return "HeaderCorrupted"s;
+    case KVErrorCodes::DataCorrupted:
+        return "DataCorrupted"s;
+    case KVErrorCodes::EndOfFile:
+        return "EndOfFile"s;
+    case KVErrorCodes::InvalidArguments:
+        return "InvalidArguments"s;
+    case KVErrorCodes::Unknown:
+        return "Unknown"s;
+    }
+}
+
+void KV::truncateAndLog(uint64_t truncate, const KVError &err) const noexcept {
+    if (_opts.logger && _opts.logger->level >= logging::LogLevel::Warning) {
+        using namespace std::string_literals;
+        auto message = "Truncating "s + _opts.identifier + " to a length of "s + std::to_string(truncate);
+        if (!err.msg.empty()) {
+            message += " because "s + err.msg;
+        } else {
+            message += " because "s + string(err.code);
+        }
+        _opts.logger->log(logging::LogLevel::Warning, message);
+    }
+    _f->truncate(truncate);
+}
+
 KVError KV::initialize() {
     std::lock_guard<std::mutex> lock(_lock);
 
@@ -44,32 +82,51 @@ KVError KV::initialize() {
         auto header_or = readHeaderFrom(beginning_pointer);
         if (!header_or) {
             if (header_or.err().code == KVErrorCodes::EndOfFile) {
+                // If we reached the end of the file, there could have been extra data at the end, but less
+                // than what we were hoping to read. Truncate the file now so that everything before this point
+                // is known valid and everything after is gone.
+                _f->truncate(beginning_pointer);
                 return KVError{KVErrorCodes::NoError, {}};
             }
-            // TODO: More error handling, logging, etc. We're potentially throwing away data here
-            if (_opts.logger && _opts.logger->level >= logging::LogLevel::Warning) {
-                using namespace std::string_literals;
-                _opts.logger->log(logging::LogLevel::Warning, "Truncating "s + _opts.identifier + " to a length of "s +
-                                                                  std::to_string(_byte_position));
-            }
-            _f->truncate(_byte_position);
-            return header_or.err();
+
+            truncateAndLog(beginning_pointer, header_or.err());
+            continue;
         }
         _byte_position += sizeof(KVHeader);
 
-        if (header_or.val().key_length == 0) {
+        if (header_or.val().key_length == 0 && header_or.val().value_length == 0) {
             continue;
         }
 
         auto key_or = readKeyFrom(beginning_pointer, header_or.val().key_length);
         if (!key_or) {
-            return KVError{KVErrorCodes::ReadError, "Incomplete key read. " + key_or.err().msg};
+            truncateAndLog(beginning_pointer, header_or.err());
+            continue;
         }
         _byte_position += header_or.val().key_length;
 
         if (header_or.val().flags & DELETED_FLAG) {
             [[maybe_unused]] auto _ = removeKey(key_or.val());
             continue;
+        }
+
+        if (_opts.full_corruption_check_on_open) {
+            const auto header = header_or.val();
+            auto value_or = readValueFrom(beginning_pointer, header.key_length, header.value_length);
+
+            if (!value_or) {
+                truncateAndLog(beginning_pointer, value_or.err());
+                continue;
+            }
+
+            auto crc = crc32_of(BorrowedSlice{&header.flags, sizeof(header.flags)},
+                                BorrowedSlice{&header.key_length, sizeof(header.key_length)},
+                                BorrowedSlice{&header.value_length, sizeof(header.value_length)},
+                                BorrowedSlice{value_or.val().data(), value_or.val().size()});
+            if (crc != header.crc32) {
+                truncateAndLog(beginning_pointer, KVError{KVErrorCodes::DataCorrupted, {}});
+                continue;
+            }
         }
 
         _byte_position += header_or.val().value_length;

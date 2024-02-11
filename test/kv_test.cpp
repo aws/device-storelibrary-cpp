@@ -41,6 +41,7 @@ static const auto logger = std::make_shared<Logger>();
 
 static auto open_kv(const std::string &path) {
     return KV::openOrCreate(KVOptions{
+        .full_corruption_check_on_open = true,
         .filesystem_implementation = std::make_shared<SpyFileSystem>(std::make_shared<PosixFileSystem>(path)),
         .logger = logger,
         .identifier = "test-kv-map",

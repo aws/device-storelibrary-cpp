@@ -57,6 +57,32 @@ struct LogEntryHeader {
 
 static_assert(sizeof(LogEntryHeader) == HEADER_SIZE, "Header size must be 32 bytes!");
 
+static std::string string(const StreamErrorCode e) {
+    using namespace std::string_literals;
+    switch (e) {
+    case StreamErrorCode::NoError:
+        return "NoError"s;
+    case StreamErrorCode::RecordNotFound:
+        return "RecordNotFound"s;
+    case StreamErrorCode::RecordDataCorrupted:
+        return "RecordDataCorrupted"s;
+    case StreamErrorCode::HeaderDataCorrupted:
+        return "HeaderDataCorrupted"s;
+    case StreamErrorCode::RecordTooLarge:
+        return "RecordTooLarge"s;
+    case StreamErrorCode::ReadError:
+        return "ReadError"s;
+    case StreamErrorCode::WriteError:
+        return "WriteError"s;
+    case StreamErrorCode::StreamClosed:
+        return "StreamClosed"s;
+    case StreamErrorCode::InvalidArguments:
+        return "InvalidArguments"s;
+    case StreamErrorCode::Unknown:
+        return "Unknown"s;
+    }
+}
+
 FileSegment::FileSegment(uint64_t base, std::shared_ptr<FileSystemInterface> interface,
                          std::shared_ptr<logging::Logger> logger)
     : _file_implementation(std::move(interface)), _logger(std::move(logger)), _base_seq_num(base),
@@ -65,6 +91,20 @@ FileSegment::FileSegment(uint64_t base, std::shared_ptr<FileSystemInterface> int
     oss << std::setw(UINT64_MAX_DECIMAL_COUNT) << std::setfill('0') << _base_seq_num << ".log";
 
     _segment_id = oss.str();
+}
+
+void FileSegment::truncateAndLog(uint64_t truncate, const StreamError &err) const noexcept {
+    if (_logger && _logger->level >= logging::LogLevel::Warning) {
+        using namespace std::string_literals;
+        auto message = "Truncating "s + _segment_id + " to a length of "s + std::to_string(truncate);
+        if (!err.msg.empty()) {
+            message += " because "s + err.msg;
+        } else {
+            message += " because "s + string(err.code);
+        }
+        _logger->log(logging::LogLevel::Warning, message);
+    }
+    _f->truncate(truncate);
 }
 
 StreamError FileSegment::open(bool full_corruption_check_on_open) {
@@ -79,22 +119,21 @@ StreamError FileSegment::open(bool full_corruption_check_on_open) {
         const auto header_data_or = _f->read(offset, offset + HEADER_SIZE);
         if (!header_data_or) {
             if (header_data_or.err().code == FileErrorCode::EndOfFile) {
+                // If we reached the end of the file, there could have been extra data at the end, but less
+                // than what we were hoping to read. Truncate the file now so that everything before this point
+                // is known valid and everything after is gone.
+                _f->truncate(offset);
                 return StreamError{StreamErrorCode::NoError, {}};
             }
-            return StreamError{StreamErrorCode::ReadError, header_data_or.err().msg};
+
+            truncateAndLog(offset, StreamError{StreamErrorCode::ReadError, header_data_or.err().msg});
+            continue;
         }
         LogEntryHeader const *header = convertSliceToHeader(header_data_or.val());
 
         if (header->magic_and_version != MAGIC_AND_VERSION) {
-            // TODO: More error handling, logging, etc. We're potentially throwing away data here
-            if (_logger && _logger->level >= logging::LogLevel::Warning) {
-                using namespace std::string_literals;
-                _logger->log(logging::LogLevel::Warning,
-                             "Truncating "s + _segment_id + " to a length of "s + std::to_string(offset));
-            }
-            _f->truncate(offset);
-            return StreamError{StreamErrorCode::HeaderDataCorrupted,
-                               "Magic bytes and version does not match expected value"};
+            truncateAndLog(offset, StreamError{StreamErrorCode::HeaderDataCorrupted, {}});
+            continue;
         }
         if (full_corruption_check_on_open) {
             auto value_or =
@@ -104,14 +143,8 @@ StreamError FileSegment::open(bool full_corruption_check_on_open) {
                                                                            .suggested_start = offset,
                                                                        });
             if (!value_or) {
-                // TODO: More error handling, logging, etc. We're potentially throwing away data here
-                if (_logger && _logger->level >= logging::LogLevel::Warning) {
-                    using namespace std::string_literals;
-                    _logger->log(logging::LogLevel::Warning,
-                                 "Truncating "s + _segment_id + " to a length of "s + std::to_string(offset));
-                }
-                _f->truncate(offset);
-                return value_or.err();
+                truncateAndLog(offset, value_or.err());
+                continue;
             }
         }
 

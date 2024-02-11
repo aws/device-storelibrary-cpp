@@ -54,6 +54,7 @@ namespace kv __attribute__((visibility("default"))) {
     using KVError = GenericError<KVErrorCodes>;
 
     struct KVOptions {
+        bool full_corruption_check_on_open{false};
         const std::shared_ptr<FileSystemInterface> filesystem_implementation;
         const std::shared_ptr<logging::Logger> logger;
         std::string identifier;
@@ -88,6 +89,8 @@ namespace kv __attribute__((visibility("default"))) {
         [[nodiscard]] KVError compactNoLock() noexcept;
 
         [[nodiscard]] bool removeKey(const std::string &key) noexcept;
+
+        void truncateAndLog(uint64_t truncate, const KVError &) const noexcept;
 
       public:
         [[nodiscard]] static expected<std::shared_ptr<KV>, KVError> openOrCreate(KVOptions &&) noexcept;

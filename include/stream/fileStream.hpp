@@ -50,6 +50,8 @@ class FileSegment {
     std::string _segment_id;
 
     static LogEntryHeader const *convertSliceToHeader(const OwnedSlice &) noexcept;
+
+    void truncateAndLog(uint64_t truncate, const StreamError &err) const;
 };
 
 class PersistentIterator {

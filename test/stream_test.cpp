@@ -48,6 +48,7 @@ static auto open_stream(std::shared_ptr<FileSystemInterface> fs) {
         .logger = logger,
         .kv_options =
             kv::KVOptions{
+                .full_corruption_check_on_open = true,
                 .filesystem_implementation = fs,
                 .logger = logger,
                 .identifier = "m",
