@@ -79,6 +79,39 @@ SCENARIO("I cannot create a stream", "[stream]") {
     REQUIRE(stream->highestSequenceNumber() == 2);
 }
 
+SCENARIO("Stream validates data length", "[stream]") {
+    auto temp_dir = TempDir();
+    auto fs = std::make_shared<SpyFileSystem>(std::make_shared<PosixFileSystem>(temp_dir.path()));
+    auto stream_or = open_stream(fs);
+    REQUIRE(stream_or);
+    auto stream = std::move(stream_or.val());
+
+    std::string value{};
+    auto seq_or = stream->append(BorrowedSlice{value.data(), UINT32_MAX});
+    REQUIRE(!seq_or);
+    REQUIRE(seq_or.err().code == StreamErrorCode::RecordTooLarge);
+}
+
+SCENARIO("Stream deletes oldest data when full", "[stream]") {
+    auto temp_dir = TempDir();
+    auto fs = std::make_shared<SpyFileSystem>(std::make_shared<PosixFileSystem>(temp_dir.path()));
+    auto stream_or = open_stream(fs);
+    REQUIRE(stream_or);
+    auto stream = std::move(stream_or.val());
+
+    OwnedSlice data{1 * 1024 * 1024};
+
+    for (int i = 0; i < 30; i++) {
+        auto seq_or = stream->append(BorrowedSlice{data.data(), data.size()});
+        REQUIRE(seq_or);
+    }
+
+    // Check that it rolled over by look at the first sequence number and the total size now.
+    REQUIRE(stream->firstSequenceNumber() > 0);
+    REQUIRE(stream->highestSequenceNumber() - stream->firstSequenceNumber() == 9);
+    REQUIRE(stream->currentSizeBytes() < 10 * 1024 * 1024);
+}
+
 SCENARIO("I can create a stream", "[stream]") {
     auto temp_dir = TempDir();
     auto fs = std::make_shared<SpyFileSystem>(std::make_shared<PosixFileSystem>(temp_dir.path()));
