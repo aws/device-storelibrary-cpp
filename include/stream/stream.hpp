@@ -21,14 +21,14 @@
 namespace aws {
 namespace gg __attribute__((visibility("default"))) {
     struct OwnedRecord {
+        uint32_t offset{};
         OwnedSlice data{};
         int64_t timestamp{};
         uint64_t sequence_number{};
-        uint64_t offset{};
 
         OwnedRecord() = default;
-        OwnedRecord(OwnedSlice &&data, int64_t timestamp, uint64_t sequence_number, uint64_t offset) noexcept
-            : data(std::move(data)), timestamp(timestamp), sequence_number(sequence_number), offset(offset){};
+        OwnedRecord(OwnedSlice &&data, int64_t timestamp, uint64_t sequence_number, uint32_t offset) noexcept
+            : offset(offset), data(std::move(data)), timestamp(timestamp), sequence_number(sequence_number){};
     };
 
     enum class StreamErrorCode : std::uint8_t {
@@ -72,7 +72,7 @@ namespace gg __attribute__((visibility("default"))) {
       private:
         std::weak_ptr<StreamInterface> _stream;
         std::string _id;
-        uint64_t _offset = 0;
+        uint32_t _offset = 0;
 
         StreamError checkpoint() const noexcept;
 
@@ -113,7 +113,7 @@ namespace gg __attribute__((visibility("default"))) {
     struct ReadOptions {
         bool check_for_corruption{true};
         bool may_return_later_records{false};
-        std::uint64_t suggested_start{0};
+        std::uint32_t suggested_start{0};
     };
 
 #if __cplusplus >= 201703L

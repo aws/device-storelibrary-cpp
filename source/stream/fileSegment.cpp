@@ -39,7 +39,7 @@ auto _htonl(std::uint32_t h) {
 auto _ntohl(std::uint32_t h) { return _htonl(h); }
 // NOLINTEND
 
-constexpr auto HEADER_SIZE = 32;
+constexpr uint8_t HEADER_SIZE = 32;
 constexpr int32_t MAGIC_BYTES = 0xAAAAAA;
 constexpr uint8_t VERSION = 0x01;
 constexpr int32_t MAGIC_AND_VERSION = MAGIC_BYTES << 8 | VERSION;
