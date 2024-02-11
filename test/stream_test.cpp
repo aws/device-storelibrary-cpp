@@ -108,7 +108,8 @@ SCENARIO("Stream deletes oldest data when full", "[stream]") {
 
     // Check that it rolled over by look at the first sequence number and the total size now.
     REQUIRE(stream->firstSequenceNumber() > 0);
-    REQUIRE(stream->highestSequenceNumber() - stream->firstSequenceNumber() == 9);
+    // Stream can fit 9 records since each record is 1MB and there is 32B overhead per record
+    REQUIRE(stream->highestSequenceNumber() - stream->firstSequenceNumber() + 1 == 9);
     REQUIRE(stream->currentSizeBytes() < 10 * 1024 * 1024);
 }
 

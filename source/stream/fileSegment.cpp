@@ -134,7 +134,7 @@ LogEntryHeader const *FileSegment::convertSliceToHeader(const OwnedSlice &data) 
     return header;
 }
 
-void FileSegment::append(BorrowedSlice d, int64_t timestamp_ms, uint64_t sequence_number) {
+expected<uint64_t, FileError> FileSegment::append(BorrowedSlice d, int64_t timestamp_ms, uint64_t sequence_number) {
     auto ts = static_cast<int64_t>(_htonll(timestamp_ms));
     auto data_len_swap = static_cast<int32_t>(_htonl(d.size()));
     auto byte_position = static_cast<int32_t>(_htonl(_total_bytes));
@@ -156,6 +156,7 @@ void FileSegment::append(BorrowedSlice d, int64_t timestamp_ms, uint64_t sequenc
     _f->append(d);
 
     _highest_seq_num = std::max(_highest_seq_num, sequence_number);
+    return d.size() + sizeof(LogEntryHeader);
 }
 
 expected<OwnedRecord, StreamError> FileSegment::read(uint64_t sequence_number, const ReadOptions &read_options) const {

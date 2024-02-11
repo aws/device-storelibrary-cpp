@@ -26,7 +26,8 @@ class FileSegment {
 
     bool operator<(const FileSegment &other) const noexcept { return _base_seq_num < other._base_seq_num; }
 
-    void append(BorrowedSlice d, int64_t timestamp_ms, uint64_t sequence_number) noexcept;
+    [[nodiscard]] expected<uint64_t, FileError> append(BorrowedSlice d, int64_t timestamp_ms,
+                                                       uint64_t sequence_number) noexcept;
 
     [[nodiscard]] expected<OwnedRecord, StreamError> read(uint64_t sequence_number, const ReadOptions &) const noexcept;
 

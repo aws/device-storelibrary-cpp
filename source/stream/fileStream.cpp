@@ -112,8 +112,11 @@ expected<uint64_t, StreamError> FileStream::append(BorrowedSlice d) {
     _next_sequence_number++;
     auto timestamp = aws::gg::timestamp();
 
-    _segments.back().append(d, timestamp, seq);
-    _current_size_bytes += record_size;
+    auto e = _segments.back().append(d, timestamp, seq);
+    if (!e) {
+        return StreamError{StreamErrorCode::WriteError, e.err().msg};
+    }
+    _current_size_bytes += e.val();
 
     return seq;
 }
