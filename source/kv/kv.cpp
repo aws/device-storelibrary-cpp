@@ -45,6 +45,8 @@ static std::string string(const KVErrorCodes e) {
     case KVErrorCodes::Unknown:
         return "Unknown"s;
     }
+    // Unreachable.
+    return {};
 }
 
 void KV::truncateAndLog(uint64_t truncate, const KVError &err) const noexcept {

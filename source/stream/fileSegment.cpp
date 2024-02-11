@@ -81,6 +81,8 @@ static std::string string(const StreamErrorCode e) {
     case StreamErrorCode::Unknown:
         return "Unknown"s;
     }
+    // Unreachable.
+    return {};
 }
 
 FileSegment::FileSegment(uint64_t base, std::shared_ptr<FileSystemInterface> interface,
