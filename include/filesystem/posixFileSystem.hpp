@@ -2,6 +2,7 @@
 #include "common/expected.hpp"
 #include "filesystem.hpp"
 #include <filesystem>
+#include <mutex>
 #include <unistd.h>
 #include <utility>
 
@@ -9,15 +10,16 @@ namespace aws {
 namespace gg __attribute__((visibility("default"))) {
 
     class PosixFileLike : public FileLike {
+        std::mutex _read_lock{};
         std::filesystem::path _path;
         FILE *_f = nullptr;
 
       public:
         explicit PosixFileLike(std::filesystem::path &&path) : _path(std::move(path)){};
-        PosixFileLike(PosixFileLike &&) = default;
+        PosixFileLike(PosixFileLike &&) = delete;
         PosixFileLike(PosixFileLike &) = delete;
         PosixFileLike &operator=(PosixFileLike &) = delete;
-        PosixFileLike &operator=(PosixFileLike &&) = default;
+        PosixFileLike &operator=(PosixFileLike &&) = delete;
 
         ~PosixFileLike() override {
             if (_f) {
@@ -41,6 +43,7 @@ namespace gg __attribute__((visibility("default"))) {
                 return FileError{FileErrorCode::InvalidArguments, "Beginning and end should not be equal"};
             }
 
+            std::lock_guard<std::mutex> lock(_read_lock);
             clearerr(_f);
             auto d = OwnedSlice{(end - begin)};
             if (std::fseek(_f, begin, SEEK_SET) != 0) {

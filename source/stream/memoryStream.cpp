@@ -82,7 +82,7 @@ expected<uint64_t, StreamError> MemoryStream::append(OwnedSlice &&d) {
 
 [[nodiscard]] Iterator MemoryStream::openOrCreateIterator(const std::string &identifier, IteratorOptions) {
     return Iterator{WEAK_FROM_THIS(), identifier,
-                    _iterators.count(identifier) ? _iterators[identifier] : _first_sequence_number};
+                    _iterators.count(identifier) ? _iterators[identifier] : _first_sequence_number.load()};
 }
 
 void MemoryStream::deleteIterator(const std::string &identifier) { _iterators.erase(identifier); }

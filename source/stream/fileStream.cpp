@@ -85,37 +85,32 @@ StreamError FileStream::makeNextSegment() {
 }
 
 expected<uint64_t, StreamError> FileStream::append(BorrowedSlice d) {
-    auto record_size = d.size();
-    {
-        auto err = removeSegmentsIfNewRecordBeyondMaxSize(record_size);
+    std::lock_guard<std::mutex> lock(_segments_lock);
+
+    auto err = removeSegmentsIfNewRecordBeyondMaxSize(d.size());
+    if (err.code != StreamErrorCode::NoError) {
+        return err;
+    }
+
+    // Check if we need a new segment because we don't have any, or the last segment is getting too big.
+    if (_segments.empty() || _segments.back().totalSizeBytes() >= _opts.minimum_segment_size_bytes) {
+        err = makeNextSegment();
         if (err.code != StreamErrorCode::NoError) {
             return err;
         }
     }
 
-    if (_segments.empty()) {
-        auto err = makeNextSegment();
-        if (err.code != StreamErrorCode::NoError) {
-            return err;
-        }
-    }
+    // Now append the record into the last segment
+    auto &seg = _segments.back();
+    auto seq = _next_sequence_number.fetch_add(1);
 
-    auto const &last_segment = _segments.back();
-    if (last_segment.totalSizeBytes() >= _opts.minimum_segment_size_bytes) {
-        auto err = makeNextSegment();
-        if (err.code != StreamErrorCode::NoError) {
-            return err;
-        }
-    }
-
-    auto seq = _next_sequence_number;
-    _next_sequence_number++;
-    auto timestamp = aws::gg::timestamp();
-
-    auto e = _segments.back().append(d, timestamp, seq);
+    auto e = seg.append(d, aws::gg::timestamp(), seq);
     if (!e) {
         return StreamError{StreamErrorCode::WriteError, e.err().msg};
     }
+    // Only increment the size if successful. On failure, we expect the segment to not keep any partially written
+    // data. There could be partly written data if the application dies before truncating, but we'll find that
+    // when we startup again later.
     _current_size_bytes += e.val();
 
     return seq;
@@ -148,6 +143,8 @@ expected<uint64_t, StreamError> FileStream::append(OwnedSlice &&d) {
     if (sequence_number < _first_sequence_number || sequence_number >= _next_sequence_number) {
         return StreamError{StreamErrorCode::RecordNotFound, RecordNotFoundErrorStr};
     }
+
+    std::lock_guard<std::mutex> lock(_segments_lock); // Ideally this would be a shared_mutex so we can read in parallel
 
     auto read_options = provided_options;
 
@@ -183,13 +180,14 @@ expected<uint64_t, StreamError> FileStream::append(OwnedSlice &&d) {
 [[nodiscard]] Iterator FileStream::openOrCreateIterator(const std::string &identifier, IteratorOptions) {
     for (const auto &iter : _iterators) {
         if (iter.getIdentifier() == identifier) {
-            return Iterator{WEAK_FROM_THIS(), identifier, std::max(_first_sequence_number, iter.getSequenceNumber())};
+            return Iterator{WEAK_FROM_THIS(), identifier,
+                            std::max(_first_sequence_number.load(), iter.getSequenceNumber())};
         }
     }
 
     _iterators.emplace_back(identifier, _first_sequence_number, _kv_store);
     return Iterator{WEAK_FROM_THIS(), identifier,
-                    std::max(_first_sequence_number, _iterators.back().getSequenceNumber())};
+                    std::max(_first_sequence_number.load(), _iterators.back().getSequenceNumber())};
 }
 
 void FileStream::deleteIterator(const std::string &identifier) {

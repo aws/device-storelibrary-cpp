@@ -2,6 +2,7 @@
 #include "kv/kv.hpp"
 #include "stream.hpp"
 #include <climits>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -68,6 +69,7 @@ class PersistentIterator {
 
 class __attribute__((visibility("default"))) FileStream : public StreamInterface {
   private:
+    mutable std::mutex _segments_lock{}; // TODO: would like this to be a shared_mutex, but that is c++17.
     StreamOptions _opts;
     std::shared_ptr<kv::KV> _kv_store{};
     std::vector<PersistentIterator> _iterators{};

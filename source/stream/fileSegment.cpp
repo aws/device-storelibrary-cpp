@@ -138,7 +138,6 @@ expected<uint64_t, FileError> FileSegment::append(BorrowedSlice d, int64_t times
     auto ts = static_cast<int64_t>(_htonll(timestamp_ms));
     auto data_len_swap = static_cast<int32_t>(_htonl(d.size()));
     auto byte_position = static_cast<int32_t>(_htonl(_total_bytes));
-    _total_bytes += d.size() + sizeof(LogEntryHeader);
     auto header = LogEntryHeader{
         .relative_sequence_number = static_cast<int32_t>(_htonl((sequence_number - _base_seq_num))),
         .byte_position = byte_position,
@@ -149,13 +148,24 @@ expected<uint64_t, FileError> FileSegment::append(BorrowedSlice d, int64_t times
         .payload_length_bytes = static_cast<int32_t>(_htonl(d.size())),
     };
 
-    // TODO: Handle errors and rollback changes to internal state if required (eg. _total_bytes)
-    _f->append(
+    // If an error happens when appending, truncate the file to the current size so that we don't have any
+    // partial data in the file, and then return the error.
+    auto e = _f->append(
         BorrowedSlice{reinterpret_cast<const uint8_t *>(&header), // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
                       sizeof(header)});
-    _f->append(d);
+    if (e.code != FileErrorCode::NoError) {
+        _f->truncate(_total_bytes);
+        return e;
+    }
+    e = _f->append(d);
+    if (e.code != FileErrorCode::NoError) {
+        _f->truncate(_total_bytes);
+        return e;
+    }
 
     _highest_seq_num = std::max(_highest_seq_num, sequence_number);
+    _total_bytes += d.size() + sizeof(LogEntryHeader);
+
     return d.size() + sizeof(LogEntryHeader);
 }
 

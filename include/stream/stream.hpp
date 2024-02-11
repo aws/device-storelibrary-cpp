@@ -6,6 +6,7 @@
 #include "common/util.hpp"
 #include "filesystem/filesystem.hpp"
 #include "kv/kv.hpp"
+#include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <cstdlib>
@@ -123,9 +124,9 @@ namespace gg __attribute__((visibility("default"))) {
 
     class StreamInterface : public std::enable_shared_from_this<StreamInterface> {
       protected:
-        std::uint64_t _first_sequence_number{0};
-        std::uint64_t _next_sequence_number{0};
-        std::uint64_t _current_size_bytes{0};
+        std::atomic_uint64_t _first_sequence_number{0};
+        std::atomic_uint64_t _next_sequence_number{0};
+        std::atomic_uint64_t _current_size_bytes{0};
 
       public:
         std::uint64_t firstSequenceNumber() const noexcept { return _first_sequence_number; };
