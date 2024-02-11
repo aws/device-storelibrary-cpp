@@ -38,7 +38,7 @@ class FileSegment {
 
     std::uint64_t getHighestSeqNum() const noexcept { return _highest_seq_num; }
 
-    std::uint64_t totalSizeBytes() const noexcept { return _total_bytes; }
+    std::uint32_t totalSizeBytes() const noexcept { return _total_bytes; }
 
   private:
     std::unique_ptr<FileLike> _f;
@@ -46,12 +46,12 @@ class FileSegment {
     std::shared_ptr<logging::Logger> _logger;
     std::uint64_t _base_seq_num{1};
     std::uint64_t _highest_seq_num{0};
-    std::uint64_t _total_bytes{0};
+    std::uint32_t _total_bytes{0};
     std::string _segment_id;
 
     static LogEntryHeader const *convertSliceToHeader(const OwnedSlice &) noexcept;
 
-    void truncateAndLog(uint64_t truncate, const StreamError &err) const;
+    void truncateAndLog(uint32_t truncate, const StreamError &err) const;
 };
 
 class PersistentIterator {
@@ -82,7 +82,7 @@ class __attribute__((visibility("default"))) FileStream : public StreamInterface
         _segments.reserve(1 + ((_opts.maximum_size_bytes - 1) / _opts.minimum_segment_size_bytes));
     }
 
-    [[nodiscard]] StreamError removeSegmentsIfNewRecordBeyondMaxSize(size_t record_size) noexcept;
+    [[nodiscard]] StreamError removeSegmentsIfNewRecordBeyondMaxSize(uint32_t record_size) noexcept;
 
     [[nodiscard]] StreamError makeNextSegment() noexcept;
     [[nodiscard]] StreamError loadExistingSegments() noexcept;

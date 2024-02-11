@@ -45,4 +45,12 @@ namespace __attribute__((visibility("default"))) crc32 {
         }
         return c ^ 0xFFFFFFFF;
     }
+
+    template <typename... Args> static inline uint32_t crc32_of(Args && ...args) {
+        uint32_t crc{0};
+        for (auto arg : {args...}) {
+            crc = update(crc, arg.data(), arg.size());
+        }
+        return crc;
+    }
 }; // namespace crc32

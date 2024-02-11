@@ -23,7 +23,7 @@ expected<uint64_t, StreamError> MemoryStream::append(BorrowedSlice d) {
     return seq;
 }
 
-StreamError MemoryStream::remove_records_if_new_record_beyond_max_size(size_t record_size) {
+StreamError MemoryStream::remove_records_if_new_record_beyond_max_size(uint32_t record_size) {
     if (record_size > _opts.maximum_size_bytes) {
         return StreamError{StreamErrorCode::RecordTooLarge, {}};
     }

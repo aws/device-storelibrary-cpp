@@ -49,7 +49,7 @@ static std::string string(const KVErrorCodes e) {
     return {};
 }
 
-void KV::truncateAndLog(uint64_t truncate, const KVError &err) const noexcept {
+void KV::truncateAndLog(uint32_t truncate, const KVError &err) const noexcept {
     if (_opts.logger && _opts.logger->level >= logging::LogLevel::Warning) {
         using namespace std::string_literals;
         auto message = "Truncating "s + _opts.identifier + " to a length of "s + std::to_string(truncate);
@@ -121,10 +121,10 @@ KVError KV::initialize() {
                 continue;
             }
 
-            auto crc = crc32_of(BorrowedSlice{&header.flags, sizeof(header.flags)},
-                                BorrowedSlice{&header.key_length, sizeof(header.key_length)},
-                                BorrowedSlice{&header.value_length, sizeof(header.value_length)},
-                                BorrowedSlice{value_or.val().data(), value_or.val().size()});
+            auto crc = crc32::crc32_of(BorrowedSlice{&header.flags, sizeof(header.flags)},
+                                       BorrowedSlice{&header.key_length, sizeof(header.key_length)},
+                                       BorrowedSlice{&header.value_length, sizeof(header.value_length)},
+                                       BorrowedSlice{value_or.val().data(), value_or.val().size()});
             if (crc != header.crc32) {
                 truncateAndLog(beginning_pointer, KVError{KVErrorCodes::DataCorrupted, {}});
                 continue;
@@ -192,10 +192,10 @@ expected<OwnedSlice, KVError> KV::readValueFrom(const uint32_t begin) const {
     if (!value_or) {
         return value_or;
     }
-    auto crc = crc32_of(BorrowedSlice{&header.flags, sizeof(header.flags)},
-                        BorrowedSlice{&header.key_length, sizeof(header.key_length)},
-                        BorrowedSlice{&header.value_length, sizeof(header.value_length)},
-                        BorrowedSlice{value_or.val().data(), value_or.val().size()});
+    auto crc = crc32::crc32_of(BorrowedSlice{&header.flags, sizeof(header.flags)},
+                               BorrowedSlice{&header.key_length, sizeof(header.key_length)},
+                               BorrowedSlice{&header.value_length, sizeof(header.value_length)},
+                               BorrowedSlice{value_or.val().data(), value_or.val().size()});
 
     if (crc != header.crc32) {
         return KVError{KVErrorCodes::DataCorrupted, "CRC mismatch"};
@@ -239,10 +239,10 @@ KVError KV::put(const std::string &key, BorrowedSlice data) {
     if (key.empty()) {
         return KVError{KVErrorCodes::InvalidArguments, "Key cannot be empty"};
     }
-    if (key.length() > KEY_LENGTH_MAX) {
+    if (key.length() >= KEY_LENGTH_MAX) {
         return KVError{KVErrorCodes::InvalidArguments, "Key length cannot exceed " + std::to_string(KEY_LENGTH_MAX)};
     }
-    if (data.size() > VALUE_LENGTH_MAX) {
+    if (data.size() >= VALUE_LENGTH_MAX) {
         return KVError{KVErrorCodes::InvalidArguments,
                        "Value length cannot exceed " + std::to_string(VALUE_LENGTH_MAX)};
     }
@@ -252,8 +252,8 @@ KVError KV::put(const std::string &key, BorrowedSlice data) {
     auto value_len = static_cast<value_length_type>(data.size());
     uint8_t flags = 0;
 
-    auto crc = crc32_of(BorrowedSlice{&flags, sizeof(flags)}, BorrowedSlice{&key_len, sizeof(key_len)},
-                        BorrowedSlice{&value_len, sizeof(value_len)}, BorrowedSlice{data.data(), data.size()});
+    auto crc = crc32::crc32_of(BorrowedSlice{&flags, sizeof(flags)}, BorrowedSlice{&key_len, sizeof(key_len)},
+                               BorrowedSlice{&value_len, sizeof(value_len)}, BorrowedSlice{data.data(), data.size()});
 
     auto header = KVHeader{
         .magic_and_version = MAGIC_AND_VERSION,
@@ -383,12 +383,14 @@ KVError KV::remove(const std::string &key) {
     key_length_type key_len = key.size();
     value_length_type value_len = 0;
     uint8_t flags = DELETED_FLAG;
+
+    auto crc = crc32::crc32_of(BorrowedSlice{&flags, sizeof(flags)}, BorrowedSlice{&key_len, sizeof(key_len)},
+                               BorrowedSlice{&value_len, sizeof(value_len)});
     auto header = KVHeader{
         .magic_and_version = MAGIC_AND_VERSION,
         .flags = flags,
         .key_length = key_len,
-        .crc32 = crc32::update(crc32::update(crc32::update(0, &flags, sizeof(flags)), &key_len, sizeof(key_len)),
-                               &value_len, sizeof(value_len)),
+        .crc32 = crc,
         .value_length = value_len,
     };
     _f->append(

@@ -75,7 +75,7 @@ class SpyFileLike : public aws::gg::FileLike {
 
     SpyFileLike(std::unique_ptr<aws::gg::FileLike> f) : _real(std::move(f)) {}
 
-    aws::gg::expected<aws::gg::OwnedSlice, aws::gg::FileError> read(size_t begin, size_t end) override {
+    aws::gg::expected<aws::gg::OwnedSlice, aws::gg::FileError> read(uint32_t begin, uint32_t end) override {
         return _real->read(begin, end);
     }
 
@@ -83,7 +83,7 @@ class SpyFileLike : public aws::gg::FileLike {
 
     void flush() override { return _real->flush(); }
 
-    aws::gg::FileError truncate(size_t s) override { return _real->truncate(s); }
+    aws::gg::FileError truncate(uint32_t s) override { return _real->truncate(s); }
 };
 
 template <typename> struct RemoveMembership {};

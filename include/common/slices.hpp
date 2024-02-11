@@ -8,12 +8,12 @@ namespace gg __attribute__((visibility("default"))) {
     class BorrowedSlice {
       private:
         const uint8_t *_data;
-        const size_t _size;
+        const uint32_t _size;
 
       public:
-        BorrowedSlice(const uint8_t *data, const size_t size) : _data(data), _size(size){};
-        BorrowedSlice(const void *data, const size_t size) : _data(static_cast<const uint8_t *>(data)), _size(size){};
-        BorrowedSlice(const char *data, const size_t size)
+        BorrowedSlice(const uint8_t *data, const uint32_t size) : _data(data), _size(size){};
+        BorrowedSlice(const void *data, const uint32_t size) : _data(static_cast<const uint8_t *>(data)), _size(size){};
+        BorrowedSlice(const char *data, const uint32_t size)
             : _data(reinterpret_cast<const uint8_t *>(data)), _size(size){};
         explicit BorrowedSlice(const std::string &s)
             : _data(reinterpret_cast<const uint8_t *>(s.data())), _size(s.length()){};
@@ -22,14 +22,14 @@ namespace gg __attribute__((visibility("default"))) {
 
         [[nodiscard]] const char *char_data() const { return reinterpret_cast<const char *>(_data); };
 
-        [[nodiscard]] size_t size() const { return _size; };
+        [[nodiscard]] uint32_t size() const { return _size; };
 
         [[nodiscard]] std::string string() const { return {char_data(), _size}; };
     };
 
     class OwnedSlice : private std::unique_ptr<uint8_t[]> {
       private:
-        size_t _size{0};
+        uint32_t _size{0};
 
       public:
         OwnedSlice() = default;
@@ -39,12 +39,12 @@ namespace gg __attribute__((visibility("default"))) {
             swap(mem);
         }
 
-        explicit OwnedSlice(size_t size) : _size(size) {
+        explicit OwnedSlice(uint32_t size) : _size(size) {
             std::unique_ptr<uint8_t[]> mem{new (std::nothrow) uint8_t[_size]};
             swap(mem);
         }
 
-        OwnedSlice(uint8_t d[], const size_t size) : _size(size) { reset(d); };
+        OwnedSlice(uint8_t d[], const uint32_t size) : _size(size) { reset(d); };
 
         OwnedSlice(OwnedSlice &&) = default;
         OwnedSlice(OwnedSlice &) = delete;
@@ -57,7 +57,7 @@ namespace gg __attribute__((visibility("default"))) {
 
         [[nodiscard]] const char *char_data() const { return reinterpret_cast<const char *>(get()); };
 
-        [[nodiscard]] size_t size() const { return _size; };
+        [[nodiscard]] uint32_t size() const { return _size; };
 
         [[nodiscard]] std::string string() const { return {char_data(), _size}; };
     };

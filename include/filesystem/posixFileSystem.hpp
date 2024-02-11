@@ -36,7 +36,7 @@ namespace gg __attribute__((visibility("default"))) {
             return FileError{FileErrorCode::NoError, {}};
         }
 
-        expected<OwnedSlice, FileError> read(size_t begin, size_t end) override {
+        expected<OwnedSlice, FileError> read(uint32_t begin, uint32_t end) override {
             if (end < begin) {
                 return FileError{FileErrorCode::InvalidArguments, "End must be after the beginning"};
             } else if (end == begin) {
@@ -71,7 +71,7 @@ namespace gg __attribute__((visibility("default"))) {
 
         void flush() override { fflush(_f); }
 
-        FileError truncate(size_t max) override {
+        FileError truncate(uint32_t max) override {
             if (ftruncate(fileno(_f), max) != 0) {
                 // TODO: error code mapping
                 return {FileErrorCode::Unknown, std::strerror(errno)};

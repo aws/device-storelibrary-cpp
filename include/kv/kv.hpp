@@ -14,14 +14,6 @@ namespace aws {
 namespace gg {
 namespace kv __attribute__((visibility("default"))) {
     namespace detail {
-    template <typename... Args> static inline uint32_t crc32_of(Args &&...args) {
-        uint32_t crc{0};
-        for (auto arg : {args...}) {
-            crc = crc32::update(crc, arg.data(), arg.size());
-        }
-        return crc;
-    }
-
     constexpr uint8_t VERSION = 0x01;
     constexpr uint8_t MAGIC = 0xB0;
     constexpr uint8_t MAGIC_AND_VERSION = static_cast<uint8_t>(MAGIC << 4 | VERSION);
@@ -90,7 +82,7 @@ namespace kv __attribute__((visibility("default"))) {
 
         [[nodiscard]] bool removeKey(const std::string &key) noexcept;
 
-        void truncateAndLog(uint64_t truncate, const KVError &) const noexcept;
+        void truncateAndLog(uint32_t truncate, const KVError &) const noexcept;
 
       public:
         [[nodiscard]] static expected<std::shared_ptr<KV>, KVError> openOrCreate(KVOptions &&) noexcept;

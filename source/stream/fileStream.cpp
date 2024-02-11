@@ -116,7 +116,7 @@ expected<uint64_t, StreamError> FileStream::append(BorrowedSlice d) {
     return seq;
 }
 
-StreamError FileStream::removeSegmentsIfNewRecordBeyondMaxSize(size_t record_size) {
+StreamError FileStream::removeSegmentsIfNewRecordBeyondMaxSize(uint32_t record_size) {
     if (record_size > _opts.maximum_size_bytes) {
         return StreamError{StreamErrorCode::RecordTooLarge, {}};
     }
@@ -204,7 +204,6 @@ void FileStream::deleteIterator(const std::string &identifier) {
 }
 
 void FileStream::setCheckpoint(const std::string &identifier, uint64_t sequence_number) {
-    // TODO: if no identifier in map
     for (auto &iter : _iterators) {
         if (iter.getIdentifier() == identifier) {
             iter.setCheckpoint(sequence_number);

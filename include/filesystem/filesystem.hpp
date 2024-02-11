@@ -22,13 +22,13 @@ namespace gg __attribute__((visibility("default"))) {
 
     class FileLike {
       public:
-        virtual expected<OwnedSlice, FileError> read(size_t begin, size_t end) = 0;
+        virtual expected<OwnedSlice, FileError> read(uint32_t begin, uint32_t end) = 0;
 
         virtual FileError append(BorrowedSlice data) = 0;
 
         virtual void flush() = 0;
 
-        virtual FileError truncate(size_t) = 0;
+        virtual FileError truncate(uint32_t) = 0;
 
         FileLike(FileLike &) = delete;
 

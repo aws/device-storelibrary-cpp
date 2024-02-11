@@ -13,7 +13,7 @@ namespace gg __attribute__((visibility("default"))) {
 
         explicit MemoryStream(StreamOptions &&o) noexcept : _opts(std::move(o)) {}
 
-        StreamError remove_records_if_new_record_beyond_max_size(size_t record_size) noexcept;
+        StreamError remove_records_if_new_record_beyond_max_size(uint32_t record_size) noexcept;
 
       public:
         static std::shared_ptr<StreamInterface> openOrCreate(StreamOptions &&) noexcept;

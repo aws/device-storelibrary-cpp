@@ -87,7 +87,7 @@ SCENARIO("I cannot put invalid inputs to the map", "[kv]") {
 
     {
         std::string key{};
-        auto e = kv->put("a", BorrowedSlice{key.data(), UINT64_MAX});
+        auto e = kv->put("a", BorrowedSlice{key.data(), UINT32_MAX});
         REQUIRE(e.code == KVErrorCodes::InvalidArguments);
         REQUIRE(e.msg.find("Value length") != std::string::npos);
     }
@@ -129,7 +129,7 @@ SCENARIO("I can create a KV map", "[kv]") {
                 REQUIRE(std::string_view{v_or.val().char_data(), v_or.val().size()} == value);
 
                 AND_WHEN("I update the value") {
-                    e = kv->put(key, BorrowedSlice{new_value.data(), new_value.size()});
+                    e = kv->put(key, BorrowedSlice{new_value.data(), static_cast<uint32_t>(new_value.size())});
                     REQUIRE(e.code == KVErrorCodes::NoError);
                     THEN("I get the new value back") {
                         v_or = kv->get(key);

@@ -39,7 +39,7 @@ auto _htonl(std::uint32_t h) {
 auto _ntohl(std::uint32_t h) { return _htonl(h); }
 // NOLINTEND
 
-constexpr size_t HEADER_SIZE = 32;
+constexpr auto HEADER_SIZE = 32;
 constexpr int32_t MAGIC_BYTES = 0xAAAAAA;
 constexpr uint8_t VERSION = 0x01;
 constexpr int32_t MAGIC_AND_VERSION = MAGIC_BYTES << 8 | VERSION;
@@ -95,7 +95,7 @@ FileSegment::FileSegment(uint64_t base, std::shared_ptr<FileSystemInterface> int
     _segment_id = oss.str();
 }
 
-void FileSegment::truncateAndLog(uint64_t truncate, const StreamError &err) const noexcept {
+void FileSegment::truncateAndLog(uint32_t truncate, const StreamError &err) const noexcept {
     if (_logger && _logger->level >= logging::LogLevel::Warning) {
         using namespace std::string_literals;
         auto message = "Truncating "s + _segment_id + " to a length of "s + std::to_string(truncate);
@@ -115,7 +115,7 @@ StreamError FileSegment::open(bool full_corruption_check_on_open) {
         _f = std::move(file_or.val());
     }
 
-    size_t offset = 0;
+    uint32_t offset = 0;
 
     while (true) {
         const auto header_data_or = _f->read(offset, offset + HEADER_SIZE);
@@ -173,12 +173,13 @@ expected<uint64_t, FileError> FileSegment::append(BorrowedSlice d, int64_t times
     auto ts = static_cast<int64_t>(_htonll(timestamp_ms));
     auto data_len_swap = static_cast<int32_t>(_htonl(d.size()));
     auto byte_position = static_cast<int32_t>(_htonl(_total_bytes));
+
+    auto crc = static_cast<int64_t>(_htonll(
+        crc32::crc32_of(BorrowedSlice{&ts, sizeof(ts)}, BorrowedSlice{&data_len_swap, sizeof(data_len_swap)}, d)));
     auto header = LogEntryHeader{
-        .relative_sequence_number = static_cast<int32_t>(_htonl((sequence_number - _base_seq_num))),
+        .relative_sequence_number = static_cast<int32_t>(_htonl(static_cast<int32_t>(sequence_number - _base_seq_num))),
         .byte_position = byte_position,
-        .crc = static_cast<int64_t>(_htonll(
-            crc32::update(crc32::update(crc32::update(0, &ts, sizeof(int64_t)), &data_len_swap, sizeof(int32_t)),
-                          d.data(), d.size()))),
+        .crc = crc,
         .timestamp = ts,
         .payload_length_bytes = static_cast<int32_t>(_htonl(d.size())),
     };
@@ -252,9 +253,9 @@ expected<OwnedRecord, StreamError> FileSegment::read(uint64_t sequence_number, c
 
             if (read_options.check_for_corruption &&
                 header->crc !=
-                    static_cast<int64_t>(crc32::update(
-                        crc32::update(crc32::update(0, &ts_swap, sizeof(int64_t)), &data_len_swap, sizeof(int32_t)),
-                        data.data(), data.size()))) {
+                    static_cast<int64_t>(crc32::crc32_of(BorrowedSlice{&ts_swap, sizeof(ts_swap)},
+                                                         BorrowedSlice{&data_len_swap, sizeof(data_len_swap)},
+                                                         BorrowedSlice{data.data(), data.size()}))) {
                 return StreamError{StreamErrorCode::RecordDataCorrupted, {}};
             }
 

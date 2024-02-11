@@ -192,8 +192,8 @@ namespace gg __attribute__((visibility("default"))) {
     };
 
     struct StreamOptions {
-        size_t minimum_segment_size_bytes = 16 * 1024 * 1024; // 16MB minimum segment size before making a new segment
-        size_t maximum_size_bytes = 128 * 1024 * 1024;        // 128MB max stream size
+        uint32_t minimum_segment_size_bytes = 16 * 1024 * 1024; // 16MB minimum segment size before making a new segment
+        uint32_t maximum_size_bytes = 128 * 1024 * 1024;        // 128MB max stream size
         bool full_corruption_check_on_open = false;
         const std::shared_ptr<FileSystemInterface> file_implementation{};
         const std::shared_ptr<logging::Logger> logger{};
