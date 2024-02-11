@@ -134,6 +134,7 @@ SCENARIO("I can create a stream", "[stream]") {
         auto v_or = *it;
         REQUIRE(v_or);
         REQUIRE(std::string_view{v_or.val().data.char_data(), v_or.val().data.size()} == value);
+        v_or.val().checkpoint();
 
         ++it;
         REQUIRE(it.sequence_number == 1);
