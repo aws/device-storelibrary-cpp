@@ -10,6 +10,15 @@
 namespace aws {
 namespace gg __attribute__((visibility("default"))) {
 
+    static inline void sync(int fileno) {
+        // Only sync data if available on this OS. Otherwise, just fsync.
+#if _POSIX_SYNCHRONIZED_IO > 0
+        fdatasync(fileno);
+#else
+        fsync(fileno);
+#endif
+    }
+
     class PosixFileLike : public FileLike {
         std::mutex _read_lock{};
         std::filesystem::path _path;
@@ -78,7 +87,7 @@ namespace gg __attribute__((visibility("default"))) {
             return {FileErrorCode::Unknown, std::strerror(errno)};
         }
 
-        void sync() override { fsync(fileno(_f)); }
+        void sync() override { aws::gg::sync(fileno(_f)); }
 
         FileError truncate(uint32_t max) override {
             if (ftruncate(fileno(_f), max) != 0) {
@@ -172,7 +181,7 @@ namespace gg __attribute__((visibility("default"))) {
 
         FileError flush() override { return FileError{FileErrorCode::NoError, {}}; }
 
-        void sync() override { fsync(_f); }
+        void sync() override { aws::gg::sync(_f); }
 
         FileError truncate(uint32_t max) override {
             if (ftruncate(_f, max) != 0) {
