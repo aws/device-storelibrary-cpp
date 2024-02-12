@@ -72,6 +72,7 @@ namespace gg __attribute__((visibility("default"))) {
         };
 
         FileError append(BorrowedSlice data) override {
+            clearerr(_f);
             if (fwrite(data.data(), data.size(), 1, _f) != 1) {
                 // TODO: error code mapping
                 return {FileErrorCode::Unknown, std::strerror(errno)};
