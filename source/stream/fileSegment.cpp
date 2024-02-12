@@ -186,9 +186,7 @@ expected<uint64_t, FileError> FileSegment::append(BorrowedSlice d, int64_t times
 
     // If an error happens when appending, truncate the file to the current size so that we don't have any
     // partial data in the file, and then return the error.
-    auto e = _f->append(
-        BorrowedSlice{reinterpret_cast<const uint8_t *>(&header), // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
-                      sizeof(header)});
+    auto e = _f->append(BorrowedSlice{&header, sizeof(header)});
     if (e.code != FileErrorCode::NoError) {
         _f->truncate(_total_bytes);
         return e;

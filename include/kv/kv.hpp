@@ -80,9 +80,14 @@ namespace kv __attribute__((visibility("default"))) {
 
         [[nodiscard]] KVError compactNoLock() noexcept;
 
-        [[nodiscard]] bool removeKey(const std::string &key) noexcept;
+        bool removeKey(const std::string &key) noexcept;
 
         void truncateAndLog(uint32_t truncate, const KVError &) const noexcept;
+
+        [[nodiscard]] KVError openFile() noexcept;
+
+        void inline addOrRemoveKeyInInitialization(const std::string &key, const uint32_t beginning_pointer,
+                                                   const uint32_t added_size, uint8_t flags);
 
       public:
         [[nodiscard]] static expected<std::shared_ptr<KV>, KVError> openOrCreate(KVOptions &&) noexcept;

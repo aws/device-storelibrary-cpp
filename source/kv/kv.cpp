@@ -63,9 +63,7 @@ void KV::truncateAndLog(uint32_t truncate, const KVError &err) const noexcept {
     _f->truncate(truncate);
 }
 
-KVError KV::initialize() {
-    std::lock_guard<std::mutex> lock(_lock);
-
+KVError KV::openFile() {
     // Read from main file if it exists. If it doesn't exist, use the shadow file if available.
     if (_opts.filesystem_implementation->exists(_opts.identifier)) {
         _opts.filesystem_implementation->remove(_shadow_name);
@@ -78,6 +76,16 @@ KVError KV::initialize() {
         return KVError{KVErrorCodes::ReadError, e.err().msg};
     }
     _f = std::move(e.val());
+    return KVError{KVErrorCodes::NoError, {}};
+}
+
+KVError KV::initialize() {
+    std::lock_guard<std::mutex> lock(_lock);
+
+    auto e = openFile();
+    if (e.code != KVErrorCodes::NoError) {
+        return e;
+    }
 
     while (true) {
         uint32_t beginning_pointer = _byte_position;
@@ -120,32 +128,41 @@ KVError KV::initialize() {
             }
         }
 
-        if (header.flags & DELETED_FLAG) {
-            [[maybe_unused]] auto _ = removeKey(key_or.val());
-            // Count deleted entry as added because compaction would be helpful in shrinking the map.
-            _added_bytes += sizeof(header) + header.key_length + header.value_length;
-        } else {
-            bool found = false;
-            for (auto &point : _key_pointers) {
-                if (point.first == key_or.val()) {
-                    point.second = beginning_pointer;
-                    found = true;
-                    // Since we already had this key in our map, the one we just read should be considered as "added",
-                    // meaning that compaction would be helpful in shrinking the map.
-                    _added_bytes += sizeof(header) + header.key_length + header.value_length;
-                    break;
-                }
-            }
+        const uint32_t added_size = sizeof(header) + header.key_length + header.value_length;
 
-            if (!found) {
-                _key_pointers.emplace_back(key_or.val(), beginning_pointer);
-            }
-        }
+        // Update our internal mapping to add, remove, or update the key's pointer as necessary
+        addOrRemoveKeyInInitialization(key_or.val(), beginning_pointer, added_size, header.flags);
 
-        _byte_position += sizeof(header) + header.key_length + header.value_length;
+        _byte_position += added_size;
     }
 
     return KVError{KVErrorCodes::NoError, {}};
+}
+
+// Only use this method during KV::initialize.
+void inline KV::addOrRemoveKeyInInitialization(const std::string &key, const uint32_t beginning_pointer,
+                                               const uint32_t added_size, uint8_t flags) {
+    if (flags & DELETED_FLAG) {
+        removeKey(key);
+        // Count deleted entry as added because compaction would be helpful in shrinking the map.
+        _added_bytes += added_size;
+    } else {
+        bool found = false;
+        for (auto &point : _key_pointers) {
+            if (point.first == key) {
+                point.second = beginning_pointer;
+                found = true;
+                // Since we already had this key in our map, the one we just read should be considered as "added",
+                // meaning that compaction would be helpful in shrinking the map.
+                _added_bytes += added_size;
+                break;
+            }
+        }
+
+        if (!found) {
+            _key_pointers.emplace_back(key, beginning_pointer);
+        }
+    }
 }
 
 static KVError fileErrorToKVError(const FileError &e) {
@@ -260,9 +277,7 @@ KVError KV::put(const std::string &key, BorrowedSlice data) {
         .crc32 = crc,
         .value_length = value_len,
     };
-    _f->append(
-        BorrowedSlice(reinterpret_cast<const uint8_t *>(&header), // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
-                      sizeof(header)));
+    _f->append(BorrowedSlice(&header, sizeof(header)));
     _f->append(BorrowedSlice{key});
     _f->append(data);
 
@@ -305,9 +320,7 @@ KVError KV::readWrite(std::pair<std::string, uint32_t> &p, FileLike &f) {
     }
     auto value = std::move(value_or.val());
 
-    f.append(
-        BorrowedSlice{reinterpret_cast<const uint8_t *>(&header), // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
-                      sizeof(header)});
+    f.append(BorrowedSlice{&header, sizeof(header)});
     f.append(BorrowedSlice{p.first});
     f.append(BorrowedSlice{value.data(), value.size()});
 
@@ -391,9 +404,7 @@ KVError KV::remove(const std::string &key) {
         .crc32 = crc,
         .value_length = value_len,
     };
-    _f->append(
-        BorrowedSlice(reinterpret_cast<const uint8_t *>(&header), // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
-                      sizeof(header)));
+    _f->append(BorrowedSlice(&header, sizeof(header)));
     _f->append(BorrowedSlice{key});
 
     _byte_position += sizeof(header) + key_len;
