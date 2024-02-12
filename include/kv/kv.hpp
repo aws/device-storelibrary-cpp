@@ -87,7 +87,12 @@ namespace kv __attribute__((visibility("default"))) {
         [[nodiscard]] KVError openFile() noexcept;
 
         void inline addOrRemoveKeyInInitialization(const std::string &key, const uint32_t beginning_pointer,
-                                                   const uint32_t added_size, uint8_t flags);
+                                                   const uint32_t added_size, uint8_t flags) noexcept;
+
+        [[nodiscard]] inline KVError writeEntry(const std::string &key, const BorrowedSlice data,
+                                                const uint8_t flags) const noexcept;
+
+        template <typename... Args> [[nodiscard]] inline FileError appendMultiple(const Args &...args) const noexcept;
 
       public:
         [[nodiscard]] static expected<std::shared_ptr<KV>, KVError> openOrCreate(KVOptions &&) noexcept;

@@ -250,6 +250,43 @@ expected<OwnedSlice, KVError> KV::get(const std::string &key) const {
     return KVError{KVErrorCodes::KeyNotFound, {}};
 }
 
+template <typename... Args> inline FileError KV::appendMultiple(const Args &...args) const noexcept {
+    // Try to append any non-zero data, rolling back all appends if any fails by truncating the file.
+    for (auto arg : {args...}) {
+        if (arg.size() > 0) {
+            auto e = _f->append(arg);
+            if (e.code != FileErrorCode::NoError) {
+                _f->truncate(_byte_position);
+                return e;
+            }
+        }
+    }
+    return FileError{FileErrorCode::NoError, {}};
+}
+
+inline KVError KV::writeEntry(const std::string &key, const BorrowedSlice data, const uint8_t flags) const noexcept {
+    auto key_len = static_cast<key_length_type>(key.length());
+    auto value_len = data.size();
+
+    auto crc = crc32::crc32_of(BorrowedSlice{&flags, sizeof(flags)}, BorrowedSlice{&key_len, sizeof(key_len)},
+                               BorrowedSlice{&value_len, sizeof(value_len)}, BorrowedSlice{data.data(), data.size()});
+
+    auto header = KVHeader{
+        .magic_and_version = MAGIC_AND_VERSION,
+        .flags = flags,
+        .key_length = key_len,
+        .crc32 = crc,
+        .value_length = value_len,
+    };
+
+    auto e = appendMultiple(BorrowedSlice(&header, sizeof(header)), BorrowedSlice{key}, data);
+    if (e.code != FileErrorCode::NoError) {
+        return KVError{KVErrorCodes::WriteError, e.msg};
+    }
+
+    return KVError{KVErrorCodes::NoError, {}};
+}
+
 KVError KV::put(const std::string &key, BorrowedSlice data) {
     if (key.empty()) {
         return KVError{KVErrorCodes::InvalidArguments, "Key cannot be empty"};
@@ -263,23 +300,10 @@ KVError KV::put(const std::string &key, BorrowedSlice data) {
     }
 
     std::lock_guard<std::mutex> lock(_lock);
-    auto key_len = static_cast<key_length_type>(key.length());
-    auto value_len = static_cast<value_length_type>(data.size());
-    uint8_t flags = 0;
-
-    auto crc = crc32::crc32_of(BorrowedSlice{&flags, sizeof(flags)}, BorrowedSlice{&key_len, sizeof(key_len)},
-                               BorrowedSlice{&value_len, sizeof(value_len)}, BorrowedSlice{data.data(), data.size()});
-
-    auto header = KVHeader{
-        .magic_and_version = MAGIC_AND_VERSION,
-        .flags = flags,
-        .key_length = key_len,
-        .crc32 = crc,
-        .value_length = value_len,
-    };
-    _f->append(BorrowedSlice(&header, sizeof(header)));
-    _f->append(BorrowedSlice{key});
-    _f->append(data);
+    auto e = writeEntry(key, data, 0);
+    if (e.code != KVErrorCodes::NoError) {
+        return e;
+    }
 
     bool found = false;
     for (auto &point : _key_pointers) {
@@ -290,15 +314,16 @@ KVError KV::put(const std::string &key, BorrowedSlice data) {
         }
     }
 
+    const uint32_t added_size = sizeof(KVHeader) + static_cast<uint32_t>(key.length()) + data.size();
     if (found) {
         // If the key already existed in the map, then count the duplicated bytes to know when we need to compact.
         // Newly added keys do not count against compaction.
-        _added_bytes += sizeof(header) + key_len + value_len;
+        _added_bytes += added_size;
     } else {
         _key_pointers.emplace_back(key, _byte_position);
     }
 
-    _byte_position += sizeof(header) + key_len + value_len;
+    _byte_position += added_size;
 
     if (_added_bytes > _opts.compact_after) {
         // We're already holding the mutex, so call compactNoLock() directly.
@@ -320,9 +345,18 @@ KVError KV::readWrite(std::pair<std::string, uint32_t> &p, FileLike &f) {
     }
     auto value = std::move(value_or.val());
 
-    f.append(BorrowedSlice{&header, sizeof(header)});
-    f.append(BorrowedSlice{p.first});
-    f.append(BorrowedSlice{value.data(), value.size()});
+    auto e = f.append(BorrowedSlice{&header, sizeof(header)});
+    if (e.code != FileErrorCode::NoError) {
+        return KVError{KVErrorCodes::WriteError, e.msg};
+    }
+    e = f.append(BorrowedSlice{p.first});
+    if (e.code != FileErrorCode::NoError) {
+        return KVError{KVErrorCodes::WriteError, e.msg};
+    }
+    e = f.append(BorrowedSlice{value.data(), value.size()});
+    if (e.code != FileErrorCode::NoError) {
+        return KVError{KVErrorCodes::WriteError, e.msg};
+    }
 
     p.second = _byte_position;
     _byte_position += sizeof(header) + header.key_length + header.value_length;
@@ -340,7 +374,9 @@ KVError KV::compactNoLock() {
         return KVError{KVErrorCodes::WriteError, shadow_or.err().msg};
     }
 
-    // Reset internal counters
+    // save and reset internal counters
+    auto saved_byte_position = _byte_position;
+    auto saved_added_bytes = _added_bytes;
     _byte_position = 0;
     _added_bytes = 0;
 
@@ -350,6 +386,9 @@ KVError KV::compactNoLock() {
         for (auto &point : _key_pointers) {
             auto err = readWrite(point, *shadow);
             if (err.code != KVErrorCodes::NoError) {
+                // Rollback internal state
+                _byte_position = saved_byte_position;
+                _added_bytes = saved_added_bytes;
                 return KVError{KVErrorCodes::WriteError, err.msg};
             }
         }
@@ -391,24 +430,12 @@ KVError KV::remove(const std::string &key) {
         return KVError{KVErrorCodes::KeyNotFound, {}};
     }
 
-    key_length_type key_len = key.size();
-    value_length_type value_len = 0;
-    uint8_t flags = DELETED_FLAG;
+    auto e = writeEntry(key, BorrowedSlice{}, DELETED_FLAG);
+    if (e.code != KVErrorCodes::NoError) {
+        return e;
+    }
 
-    auto crc = crc32::crc32_of(BorrowedSlice{&flags, sizeof(flags)}, BorrowedSlice{&key_len, sizeof(key_len)},
-                               BorrowedSlice{&value_len, sizeof(value_len)});
-    auto header = KVHeader{
-        .magic_and_version = MAGIC_AND_VERSION,
-        .flags = flags,
-        .key_length = key_len,
-        .crc32 = crc,
-        .value_length = value_len,
-    };
-    _f->append(BorrowedSlice(&header, sizeof(header)));
-    _f->append(BorrowedSlice{key});
-
-    _byte_position += sizeof(header) + key_len;
-
+    _byte_position += sizeof(KVHeader) + key.length();
     return KVError{KVErrorCodes::NoError, {}};
 }
 } // namespace kv

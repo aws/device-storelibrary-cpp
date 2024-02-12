@@ -11,6 +11,7 @@ namespace gg __attribute__((visibility("default"))) {
         const uint32_t _size;
 
       public:
+        BorrowedSlice() : _data(nullptr), _size(0){};
         BorrowedSlice(const uint8_t *data, const uint32_t size) : _data(data), _size(size){};
         BorrowedSlice(const void *data, const uint32_t size) : _data(static_cast<const uint8_t *>(data)), _size(size){};
         BorrowedSlice(const char *data, const uint32_t size)
