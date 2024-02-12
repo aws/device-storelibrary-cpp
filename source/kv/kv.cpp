@@ -95,17 +95,10 @@ KVError KV::initialize() {
             continue;
         }
         const auto header = header_or.val();
-        _byte_position += sizeof(KVHeader);
 
         auto key_or = readKeyFrom(beginning_pointer, header.key_length);
         if (!key_or) {
             truncateAndLog(beginning_pointer, key_or.err());
-            continue;
-        }
-        _byte_position += header.key_length;
-
-        if (header.flags & DELETED_FLAG) {
-            [[maybe_unused]] auto _ = removeKey(key_or.val());
             continue;
         }
 
@@ -127,20 +120,29 @@ KVError KV::initialize() {
             }
         }
 
-        _byte_position += header.value_length;
+        if (header.flags & DELETED_FLAG) {
+            [[maybe_unused]] auto _ = removeKey(key_or.val());
+            // Count deleted entry as added because compaction would be helpful in shrinking the map.
+            _added_bytes += sizeof(header) + header.key_length + header.value_length;
+        } else {
+            bool found = false;
+            for (auto &point : _key_pointers) {
+                if (point.first == key_or.val()) {
+                    point.second = beginning_pointer;
+                    found = true;
+                    // Since we already had this key in our map, the one we just read should be considered as "added",
+                    // meaning that compaction would be helpful in shrinking the map.
+                    _added_bytes += sizeof(header) + header.key_length + header.value_length;
+                    break;
+                }
+            }
 
-        bool found = false;
-        for (auto &point : _key_pointers) {
-            if (point.first == key_or.val()) {
-                point.second = beginning_pointer;
-                found = true;
-                break;
+            if (!found) {
+                _key_pointers.emplace_back(key_or.val(), beginning_pointer);
             }
         }
 
-        if (!found) {
-            _key_pointers.emplace_back(key_or.val(), beginning_pointer);
-        }
+        _byte_position += sizeof(header) + header.key_length + header.value_length;
     }
 
     return KVError{KVErrorCodes::NoError, {}};
