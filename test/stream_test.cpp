@@ -88,7 +88,7 @@ SCENARIO("Stream validates data length", "[stream]") {
     auto stream = std::move(stream_or.val());
 
     std::string value{};
-    auto seq_or = stream->append(BorrowedSlice{value.data(), UINT32_MAX});
+    auto seq_or = stream->append(BorrowedSlice{value.data(), UINT32_MAX}, AppendOptions{});
     REQUIRE(!seq_or);
     REQUIRE(seq_or.err().code == StreamErrorCode::RecordTooLarge);
 }
@@ -103,7 +103,7 @@ SCENARIO("Stream deletes oldest data when full", "[stream]") {
     OwnedSlice data{1 * 1024 * 1024};
 
     for (int i = 0; i < 30; i++) {
-        auto seq_or = stream->append(BorrowedSlice{data.data(), data.size()});
+        auto seq_or = stream->append(BorrowedSlice{data.data(), data.size()}, AppendOptions{});
         REQUIRE(seq_or);
     }
 
@@ -124,11 +124,11 @@ SCENARIO("I can create a stream", "[stream]") {
     const std::string &value = GENERATE(take(5, random(1, 1 * 1024 * 1024, 0, static_cast<char>(255))));
 
     WHEN("I append values") {
-        auto seq_or = stream->append(BorrowedSlice{value});
+        auto seq_or = stream->append(BorrowedSlice{value}, AppendOptions{});
         REQUIRE(seq_or);
-        seq_or = stream->append(BorrowedSlice{value});
+        seq_or = stream->append(BorrowedSlice{value}, AppendOptions{});
         REQUIRE(seq_or);
-        seq_or = stream->append(BorrowedSlice{value});
+        seq_or = stream->append(BorrowedSlice{value}, AppendOptions{});
         REQUIRE(seq_or);
 
         auto it = stream->openOrCreateIterator("ita", IteratorOptions{});

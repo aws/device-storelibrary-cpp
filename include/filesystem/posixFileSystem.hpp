@@ -70,7 +70,15 @@ namespace gg __attribute__((visibility("default"))) {
             return {FileErrorCode::NoError, {}};
         };
 
-        void flush() override { fflush(_f); }
+        FileError flush() override {
+            if (fflush(_f) == 0) {
+                return FileError{FileErrorCode::NoError, {}};
+            }
+            // TODO: error code mapping
+            return {FileErrorCode::Unknown, std::strerror(errno)};
+        }
+
+        void sync() override { fsync(fileno(_f)); }
 
         FileError truncate(uint32_t max) override {
             if (ftruncate(fileno(_f), max) != 0) {
@@ -162,7 +170,9 @@ namespace gg __attribute__((visibility("default"))) {
             return FileError{FileErrorCode::NoError, {}};
         };
 
-        void flush() override { fsync(_f); }
+        FileError flush() override { return FileError{FileErrorCode::NoError, {}}; }
+
+        void sync() override { fsync(_f); }
 
         FileError truncate(uint32_t max) override {
             if (ftruncate(_f, max) != 0) {

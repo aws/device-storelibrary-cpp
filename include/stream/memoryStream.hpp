@@ -18,8 +18,8 @@ namespace gg __attribute__((visibility("default"))) {
       public:
         static std::shared_ptr<StreamInterface> openOrCreate(StreamOptions &&) noexcept;
 
-        expected<uint64_t, StreamError> append(BorrowedSlice) noexcept override;
-        expected<uint64_t, StreamError> append(OwnedSlice &&) noexcept override;
+        expected<uint64_t, StreamError> append(BorrowedSlice, const AppendOptions &) noexcept override;
+        expected<uint64_t, StreamError> append(OwnedSlice &&, const AppendOptions &) noexcept override;
 
         [[nodiscard]] expected<OwnedRecord, StreamError> read(uint64_t sequence_number,
                                                               const ReadOptions &) const noexcept override;

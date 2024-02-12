@@ -10,7 +10,7 @@ std::shared_ptr<StreamInterface> MemoryStream::openOrCreate(StreamOptions &&opts
     return std::shared_ptr<StreamInterface>(new MemoryStream(std::move(opts)));
 }
 
-expected<uint64_t, StreamError> MemoryStream::append(BorrowedSlice d) {
+expected<uint64_t, StreamError> MemoryStream::append(BorrowedSlice d, [[maybe_unused]] const AppendOptions &) {
     auto record_size = d.size();
     auto err = remove_records_if_new_record_beyond_max_size(record_size);
     if (err.code != StreamErrorCode::NoError) {
@@ -46,7 +46,7 @@ StreamError MemoryStream::remove_records_if_new_record_beyond_max_size(uint32_t 
     return StreamError{StreamErrorCode::NoError, {}};
 }
 
-expected<uint64_t, StreamError> MemoryStream::append(OwnedSlice &&d) {
+expected<uint64_t, StreamError> MemoryStream::append(OwnedSlice &&d, [[maybe_unused]] const AppendOptions &) {
     auto record_size = d.size();
     auto err = remove_records_if_new_record_beyond_max_size(record_size);
     if (err.code != StreamErrorCode::NoError) {

@@ -47,7 +47,7 @@ int main() {
         using namespace aws::gg;
         using namespace aws::gg::kv;
 
-        auto fs = std::make_shared<PosixUnbufferedFileSystem>(std::filesystem::current_path() / "stream1");
+        auto fs = std::make_shared<PosixFileSystem>(std::filesystem::current_path() / "stream1");
 
         /*
         auto kv_or = KV::openOrCreate(KVOptions{
@@ -91,7 +91,7 @@ int main() {
 
         expected<uint64_t, StreamError> last_sequence_number{0};
         for (int i = 0; i < NUM_RECORDS; i++) {
-            last_sequence_number = s->append(BorrowedSlice{data.data(), data.size()});
+            last_sequence_number = s->append(BorrowedSlice{data.data(), data.size()}, AppendOptions{});
         }
 
         auto last_record_or = s->read(last_sequence_number.val(), ReadOptions{});

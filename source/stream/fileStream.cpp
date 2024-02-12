@@ -84,7 +84,7 @@ StreamError FileStream::makeNextSegment() {
     return StreamError{StreamErrorCode::NoError, {}};
 }
 
-expected<uint64_t, StreamError> FileStream::append(BorrowedSlice d) {
+expected<uint64_t, StreamError> FileStream::append(BorrowedSlice d, const AppendOptions &append_opts) {
     std::lock_guard<std::mutex> lock(_segments_lock);
 
     auto err = removeSegmentsIfNewRecordBeyondMaxSize(d.size());
@@ -104,7 +104,7 @@ expected<uint64_t, StreamError> FileStream::append(BorrowedSlice d) {
     auto &seg = _segments.back();
     auto seq = _next_sequence_number.fetch_add(1);
 
-    auto e = seg.append(d, aws::gg::timestamp(), seq);
+    auto e = seg.append(d, aws::gg::timestamp(), seq, append_opts.sync_on_append);
     if (!e) {
         return StreamError{StreamErrorCode::WriteError, e.err().msg};
     }
@@ -133,9 +133,9 @@ StreamError FileStream::removeSegmentsIfNewRecordBeyondMaxSize(uint32_t record_s
     return StreamError{StreamErrorCode::NoError, {}};
 }
 
-expected<uint64_t, StreamError> FileStream::append(OwnedSlice &&d) {
+expected<uint64_t, StreamError> FileStream::append(OwnedSlice &&d, const AppendOptions &append_opts) {
     auto x = std::move(d);
-    return append(BorrowedSlice(x.data(), x.size()));
+    return append(BorrowedSlice(x.data(), x.size()), append_opts);
 }
 
 [[nodiscard]] expected<OwnedRecord, StreamError> FileStream::read(uint64_t sequence_number,

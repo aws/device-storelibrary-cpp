@@ -81,7 +81,9 @@ class SpyFileLike : public aws::gg::FileLike {
 
     aws::gg::FileError append(aws::gg::BorrowedSlice data) override { return _real->append(data); }
 
-    void flush() override { return _real->flush(); }
+    aws::gg::FileError flush() override { return _real->flush(); }
+
+    void sync() override {}
 
     aws::gg::FileError truncate(uint32_t s) override { return _real->truncate(s); }
 };

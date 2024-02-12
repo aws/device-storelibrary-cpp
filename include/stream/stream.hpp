@@ -116,6 +116,10 @@ namespace gg __attribute__((visibility("default"))) {
         std::uint32_t suggested_start{0};
     };
 
+    struct AppendOptions {
+        bool sync_on_append{false};
+    };
+
 #if __cplusplus >= 201703L
 #define WEAK_FROM_THIS weak_from_this
 #else
@@ -139,14 +143,14 @@ namespace gg __attribute__((visibility("default"))) {
          *
          * @return the sequence number of the record appended.
          */
-        virtual expected<uint64_t, StreamError> append(BorrowedSlice) noexcept = 0;
+        virtual expected<uint64_t, StreamError> append(BorrowedSlice, const AppendOptions &) noexcept = 0;
 
         /**
          * Append data into the stream.
          *
          * @return the sequence number of the record appended.
          */
-        virtual expected<uint64_t, StreamError> append(OwnedSlice &&) noexcept = 0;
+        virtual expected<uint64_t, StreamError> append(OwnedSlice &&, const AppendOptions &) noexcept = 0;
 
         /**
          * Read a record from the stream by its sequence number or an error.

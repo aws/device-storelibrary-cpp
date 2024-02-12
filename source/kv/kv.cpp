@@ -261,6 +261,11 @@ template <typename... Args> inline FileError KV::appendMultiple(const Args &...a
             }
         }
     }
+    auto e = _f->flush();
+    if (e.code != FileErrorCode::NoError) {
+        _f->truncate(_byte_position);
+        return e;
+    }
     return FileError{FileErrorCode::NoError, {}};
 }
 
@@ -363,8 +368,6 @@ expected<uint32_t, KVError> KV::readWrite(uint32_t begin, std::pair<std::string,
 }
 
 KVError KV::compactNoLock() {
-    _f->flush();
-
     // Remove any previous partially written shadow
     _opts.filesystem_implementation->remove(_shadow_name);
     auto shadow_or = _opts.filesystem_implementation->open(_shadow_name);
@@ -387,7 +390,11 @@ KVError KV::compactNoLock() {
             new_points.emplace_back(point);
         }
 
-        shadow->flush();
+        auto e = shadow->flush();
+        if (e.code != FileErrorCode::NoError) {
+            return KVError{KVErrorCodes::WriteError, e.msg};
+        }
+        shadow->sync();
     }
 
     // Close our file handle before doing renames
