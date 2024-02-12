@@ -15,7 +15,7 @@ expected<std::shared_ptr<KV>, KVError> KV::openOrCreate(KVOptions &&opts) {
         return KVError{KVErrorCodes::InvalidArguments, "Filesystem implementation cannot be null"};
     }
 
-    auto kv = std::shared_ptr<KV>(new KV(std::move(opts)));
+    auto kv = std::shared_ptr<KV>(new KV((opts)));
     auto err = kv->initialize();
     if (err.code != KVErrorCodes::NoError) {
         return err;
@@ -199,7 +199,7 @@ expected<std::string, KVError> KV::readKeyFrom(uint32_t begin, key_length_type k
 expected<OwnedSlice, KVError> KV::readValueFrom(const uint32_t begin) const {
     auto header_or = readHeaderFrom(begin);
     if (!header_or) {
-        return std::move(header_or.err());
+        return header_or.err();
     }
     auto header = header_or.val();
 
@@ -341,12 +341,12 @@ KVError KV::put(const std::string &key, BorrowedSlice data) {
 expected<uint32_t, KVError> KV::readWrite(uint32_t begin, std::pair<std::string, uint32_t> &p, FileLike &f) {
     auto header_or = readHeaderFrom(p.second);
     if (!header_or) {
-        return std::move(header_or.err());
+        return header_or.err();
     }
     auto header = header_or.val();
     auto value_or = readValueFrom(p.second, header.key_length, header.value_length);
     if (!value_or) {
-        return std::move(value_or.err());
+        return value_or.err();
     }
     auto value = std::move(value_or.val());
 

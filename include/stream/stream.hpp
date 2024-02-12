@@ -213,7 +213,7 @@ namespace gg __attribute__((visibility("default"))) {
                                                                        .may_return_later_records = true,
                                                                        .suggested_start = _offset});
             if (!record_or) {
-                return std::move(record_or.err());
+                return record_or.err();
             }
             auto x = std::move(record_or.val());
             timestamp = x.timestamp;

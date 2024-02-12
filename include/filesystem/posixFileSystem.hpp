@@ -208,7 +208,7 @@ namespace gg __attribute__((visibility("default"))) {
             if (res.code == FileErrorCode::NoError) {
                 return {std::move(f)};
             } else {
-                return {std::move(res)};
+                return res;
             }
         };
 
@@ -255,7 +255,7 @@ namespace gg __attribute__((visibility("default"))) {
             if (res.code == FileErrorCode::NoError) {
                 return {std::move(f)};
             } else {
-                return {std::move(res)};
+                return res;
             }
         };
     };
