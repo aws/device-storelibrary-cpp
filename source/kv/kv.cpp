@@ -333,7 +333,7 @@ KVError KV::put(const std::string &key, BorrowedSlice data) {
     return KVError{KVErrorCodes::NoError, {}};
 }
 
-KVError KV::readWrite(std::pair<std::string, uint32_t> &p, FileLike &f) {
+expected<uint32_t, KVError> KV::readWrite(uint32_t begin, std::pair<std::string, uint32_t> &p, FileLike &f) {
     auto header_or = readHeaderFrom(p.second);
     if (!header_or) {
         return std::move(header_or.err());
@@ -358,10 +358,8 @@ KVError KV::readWrite(std::pair<std::string, uint32_t> &p, FileLike &f) {
         return KVError{KVErrorCodes::WriteError, e.msg};
     }
 
-    p.second = _byte_position;
-    _byte_position += sizeof(header) + header.key_length + header.value_length;
-
-    return KVError{KVErrorCodes::NoError, {}};
+    p.second = begin;
+    return sizeof(header) + header.key_length + header.value_length;
 }
 
 KVError KV::compactNoLock() {
@@ -374,23 +372,19 @@ KVError KV::compactNoLock() {
         return KVError{KVErrorCodes::WriteError, shadow_or.err().msg};
     }
 
-    // save and reset internal counters
-    auto saved_byte_position = _byte_position;
-    auto saved_added_bytes = _added_bytes;
-    _byte_position = 0;
-    _added_bytes = 0;
-
+    uint32_t new_byte_pos = 0;
+    std::vector<decltype(_key_pointers)::value_type> new_points{};
+    new_points.reserve(_key_pointers.size());
     {
         auto shadow = std::move(shadow_or.val());
-
-        for (auto &point : _key_pointers) {
-            auto err = readWrite(point, *shadow);
-            if (err.code != KVErrorCodes::NoError) {
-                // Rollback internal state
-                _byte_position = saved_byte_position;
-                _added_bytes = saved_added_bytes;
-                return KVError{KVErrorCodes::WriteError, err.msg};
+        for (const auto &in_point : _key_pointers) {
+            auto point = in_point;
+            auto err_or = readWrite(new_byte_pos, point, *shadow);
+            if (!err_or) {
+                return KVError{KVErrorCodes::WriteError, err_or.err().msg};
             }
+            new_byte_pos += err_or.val();
+            new_points.emplace_back(point);
         }
 
         shadow->flush();
@@ -407,6 +401,10 @@ KVError KV::compactNoLock() {
     }
     // Replace our internal filehandle to use the new main file
     _f = std::move(main_or.val());
+
+    _added_bytes = 0;
+    _byte_position = new_byte_pos;
+    _key_pointers = new_points;
 
     return KVError{KVErrorCodes::NoError, {}};
 }

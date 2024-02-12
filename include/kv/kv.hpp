@@ -72,7 +72,8 @@ namespace kv __attribute__((visibility("default"))) {
 
         [[nodiscard]] expected<OwnedSlice, KVError> readValueFrom(uint32_t) const noexcept;
 
-        [[nodiscard]] KVError readWrite(std::pair<std::string, uint32_t> &, FileLike &) noexcept;
+        [[nodiscard]] expected<uint32_t, KVError> readWrite(uint32_t, std::pair<std::string, uint32_t> &,
+                                                            FileLike &) noexcept;
 
         KV(KVOptions &&opts) noexcept : _opts(std::move(opts)), _shadow_name(_opts.identifier + "s") {}
 
