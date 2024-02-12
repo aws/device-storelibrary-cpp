@@ -40,7 +40,7 @@ namespace gg __attribute__((visibility("default"))) {
             if (end < begin) {
                 return FileError{FileErrorCode::InvalidArguments, "End must be after the beginning"};
             } else if (end == begin) {
-                return FileError{FileErrorCode::InvalidArguments, "Beginning and end should not be equal"};
+                return OwnedSlice{0};
             }
 
             std::lock_guard<std::mutex> lock(_read_lock);

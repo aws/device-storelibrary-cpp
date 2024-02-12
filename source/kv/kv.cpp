@@ -94,26 +94,22 @@ KVError KV::initialize() {
             truncateAndLog(beginning_pointer, header_or.err());
             continue;
         }
+        const auto header = header_or.val();
         _byte_position += sizeof(KVHeader);
 
-        if (header_or.val().key_length == 0 && header_or.val().value_length == 0) {
-            continue;
-        }
-
-        auto key_or = readKeyFrom(beginning_pointer, header_or.val().key_length);
+        auto key_or = readKeyFrom(beginning_pointer, header.key_length);
         if (!key_or) {
-            truncateAndLog(beginning_pointer, header_or.err());
+            truncateAndLog(beginning_pointer, key_or.err());
             continue;
         }
-        _byte_position += header_or.val().key_length;
+        _byte_position += header.key_length;
 
-        if (header_or.val().flags & DELETED_FLAG) {
+        if (header.flags & DELETED_FLAG) {
             [[maybe_unused]] auto _ = removeKey(key_or.val());
             continue;
         }
 
         if (_opts.full_corruption_check_on_open) {
-            const auto header = header_or.val();
             auto value_or = readValueFrom(beginning_pointer, header.key_length, header.value_length);
 
             if (!value_or) {
@@ -131,7 +127,7 @@ KVError KV::initialize() {
             }
         }
 
-        _byte_position += header_or.val().value_length;
+        _byte_position += header.value_length;
 
         bool found = false;
         for (auto &point : _key_pointers) {
