@@ -15,7 +15,7 @@ expected<std::shared_ptr<KV>, KVError> KV::openOrCreate(KVOptions &&opts) {
         return KVError{KVErrorCodes::InvalidArguments, "Filesystem implementation cannot be null"};
     }
 
-    auto kv = std::shared_ptr<KV>(new KV((opts)));
+    auto kv = std::shared_ptr<KV>(new KV(std::move(opts)));
     auto err = kv->initialize();
     if (err.code != KVErrorCodes::NoError) {
         return err;
