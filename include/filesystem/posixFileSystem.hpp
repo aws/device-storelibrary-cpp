@@ -1,6 +1,7 @@
 #pragma once
 #include "common/expected.hpp"
 #include "filesystem.hpp"
+#include <fcntl.h>
 #include <filesystem>
 #include <mutex>
 #include <unistd.h>
@@ -80,8 +81,100 @@ namespace gg __attribute__((visibility("default"))) {
         }
     };
 
+    class PosixUnbufferedFileLike : public FileLike {
+        int _f{0};
+        std::mutex _read_lock{};
+        std::filesystem::path _path;
+
+      public:
+        explicit PosixUnbufferedFileLike(std::filesystem::path &&path) : _path(std::move(path)){};
+        PosixUnbufferedFileLike(PosixUnbufferedFileLike &&) = delete;
+        PosixUnbufferedFileLike(PosixUnbufferedFileLike &) = delete;
+        PosixUnbufferedFileLike &operator=(PosixUnbufferedFileLike &) = delete;
+        PosixUnbufferedFileLike &operator=(PosixUnbufferedFileLike &&) = delete;
+
+        ~PosixUnbufferedFileLike() override {
+            if (_f) {
+                ::close(_f);
+            }
+        }
+
+        FileError open() noexcept {
+            // open file or create with permissions 660
+            _f = ::open(_path.c_str(), O_RDWR | O_CREAT | O_APPEND, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+            if (_f <= 0) {
+                // TODO: error code mapping
+                return FileError{FileErrorCode::Unknown, std::strerror(errno)};
+            }
+            return FileError{FileErrorCode::NoError, {}};
+        }
+
+        expected<OwnedSlice, FileError> read(uint32_t begin, uint32_t end) override {
+            if (end < begin) {
+                return FileError{FileErrorCode::InvalidArguments, "End must be after the beginning"};
+            } else if (end == begin) {
+                return OwnedSlice{0};
+            }
+
+            std::lock_guard<std::mutex> lock(_read_lock);
+            auto d = OwnedSlice{(end - begin)};
+
+            if (lseek(_f, begin, SEEK_SET) < 0) {
+                // TODO: error code mapping
+                return FileError{FileErrorCode::Unknown, std::strerror(errno)};
+            }
+
+            uint8_t *read_pointer = d.data();
+            uint32_t read_remaining = d.size();
+
+            while (read_remaining > 0) {
+                int did_read = ::read(_f, read_pointer, read_remaining);
+
+                if (did_read == 0) {
+                    return {FileError{FileErrorCode::EndOfFile, {}}};
+                }
+                if (did_read < 0) {
+                    // TODO: error code mapping
+                    return FileError{FileErrorCode::Unknown, std::strerror(errno)};
+                }
+
+                read_remaining -= did_read;
+                read_pointer += did_read;
+            }
+            return d;
+        };
+
+        FileError append(BorrowedSlice data) override {
+            const uint8_t *write_pointer = data.data();
+            uint32_t write_remaining = data.size();
+
+            while (write_remaining > 0) {
+                int did_write = ::write(_f, write_pointer, write_remaining);
+                if (did_write <= 0) {
+                    // TODO: error code mapping
+                    return FileError{FileErrorCode::Unknown, std::strerror(errno)};
+                }
+
+                write_remaining -= did_write;
+                write_pointer += did_write;
+            }
+
+            return FileError{FileErrorCode::NoError, {}};
+        };
+
+        void flush() override { fsync(_f); }
+
+        FileError truncate(uint32_t max) override {
+            if (ftruncate(_f, max) != 0) {
+                // TODO: error code mapping
+                return {FileErrorCode::Unknown, std::strerror(errno)};
+            }
+            return {FileErrorCode::NoError, {}};
+        }
+    };
+
     class PosixFileSystem : public FileSystemInterface {
-      private:
+      protected:
         std::filesystem::path _base_path;
 
       public:
@@ -129,6 +222,21 @@ namespace gg __attribute__((visibility("default"))) {
                 output.emplace_back(entry.path().filename().string());
             }
             return output;
+        };
+    };
+
+    class PosixUnbufferedFileSystem : public PosixFileSystem {
+      public:
+        explicit PosixUnbufferedFileSystem(std::filesystem::path base_path) : PosixFileSystem(std::move(base_path)){};
+
+        expected<std::unique_ptr<FileLike>, FileError> open(const std::string &identifier) override {
+            auto f = std::make_unique<PosixUnbufferedFileLike>(_base_path / identifier);
+            auto res = f->open();
+            if (res.code == FileErrorCode::NoError) {
+                return {std::move(f)};
+            } else {
+                return {std::move(res)};
+            }
         };
     };
 } // namespace gg

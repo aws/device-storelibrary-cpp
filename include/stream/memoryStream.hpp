@@ -1,15 +1,15 @@
 #pragma once
 #include "stream.hpp"
-#include <list>
 #include <unordered_map>
+#include <vector>
 
 namespace aws {
 namespace gg __attribute__((visibility("default"))) {
     class MemoryStream : public StreamInterface {
       private:
         StreamOptions _opts;
-        std::list<OwnedRecord> _records = {};
-        std::unordered_map<std::string, uint64_t> _iterators = {};
+        std::vector<OwnedRecord> _records{};
+        std::unordered_map<std::string, uint64_t> _iterators{};
 
         explicit MemoryStream(StreamOptions &&o) noexcept : _opts(std::move(o)) {}
 

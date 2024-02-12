@@ -31,13 +31,15 @@ StreamError MemoryStream::remove_records_if_new_record_beyond_max_size(uint32_t 
     // Make room if we need more room
     if (_current_size_bytes + record_size > _opts.maximum_size_bytes) {
         // TODO: Bail out early if we have enough space
-        _records.remove_if([this, record_size](const OwnedRecord &r) {
-            if (_current_size_bytes + record_size > _opts.maximum_size_bytes) {
-                _current_size_bytes -= r.data.size();
-                return true;
-            }
-            return false;
-        });
+        _records.erase(std::remove_if(_records.begin(), _records.end(),
+                                      [&](const auto &r) {
+                                          if (_current_size_bytes + record_size > _opts.maximum_size_bytes) {
+                                              _current_size_bytes -= r.data.size();
+                                              return true;
+                                          }
+                                          return false;
+                                      }),
+                       _records.end());
         _first_sequence_number = _records.front().sequence_number;
     }
 
@@ -92,4 +94,4 @@ void MemoryStream::setCheckpoint(const std::string &identifier, uint64_t sequenc
 }
 
 } // namespace gg
-}; // namespace aws
+} // namespace aws

@@ -47,7 +47,7 @@ int main() {
         using namespace aws::gg;
         using namespace aws::gg::kv;
 
-        auto fs = std::make_shared<PosixFileSystem>(std::filesystem::current_path() / "stream1");
+        auto fs = std::make_shared<PosixUnbufferedFileSystem>(std::filesystem::current_path() / "stream1");
 
         /*
         auto kv_or = KV::openOrCreate(KVOptions{
