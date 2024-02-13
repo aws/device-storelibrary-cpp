@@ -440,7 +440,13 @@ KVError KV::remove(const std::string &key) {
         return e;
     }
 
-    _byte_position += sizeof(KVHeader) + key.length();
+    auto added_size = sizeof(KVHeader) + key.length();
+    _byte_position += added_size;
+    _added_bytes += added_size;
+
+    if (_added_bytes > _opts.compact_after) {
+        return compactNoLock();
+    }
     return KVError{KVErrorCodes::NoError, {}};
 }
 } // namespace kv
