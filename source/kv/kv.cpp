@@ -177,9 +177,10 @@ expected<KVHeader, KVError> KV::readHeaderFrom(uint32_t begin) const {
     if (!header_or) {
         return fileErrorToKVError(header_or.err());
     }
-    auto const *header = reinterpret_cast<KVHeader *>( // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
-        header_or.val().data());
-    auto ret = KVHeader{*header};
+
+    KVHeader ret{};
+    // Use memcpy instead of reinterpret cast to avoid UB.
+    memcpy(&ret, header_or.val().data(), sizeof(KVHeader));
 
     if (ret.magic_and_version != MAGIC_AND_VERSION) {
         return KVError{KVErrorCodes::HeaderCorrupted, "Invalid magic and version"};

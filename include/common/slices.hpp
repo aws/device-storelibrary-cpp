@@ -26,6 +26,8 @@ namespace gg __attribute__((visibility("default"))) {
         [[nodiscard]] uint32_t size() const { return _size; };
 
         [[nodiscard]] std::string string() const { return {char_data(), _size}; };
+
+        static_assert(sizeof(uint8_t) == sizeof(char), "Char and uint8 must be the same size");
     };
 
     class OwnedSlice : private std::unique_ptr<uint8_t[]> {

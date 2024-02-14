@@ -49,7 +49,7 @@ class FileSegment {
     std::uint32_t _total_bytes{0};
     std::string _segment_id;
 
-    static LogEntryHeader const *convertSliceToHeader(const OwnedSlice &) noexcept;
+    static LogEntryHeader convertSliceToHeader(const OwnedSlice &) noexcept;
 
     void truncateAndLog(uint32_t truncate, const StreamError &err) const;
 };

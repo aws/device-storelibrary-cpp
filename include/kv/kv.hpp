@@ -23,6 +23,7 @@ namespace kv __attribute__((visibility("default"))) {
     constexpr auto VALUE_LENGTH_MAX = UINT32_MAX;
     constexpr auto KEY_LENGTH_MAX = UINT16_MAX;
 
+#pragma pack(push, 4)
     struct KVHeader {
         uint8_t magic_and_version{MAGIC_AND_VERSION};
         uint8_t flags{0};
@@ -30,6 +31,8 @@ namespace kv __attribute__((visibility("default"))) {
         uint32_t crc32{0};
         value_length_type value_length{0};
     };
+#pragma pack(pop)
+
     } // namespace detail
 
     enum class KVErrorCodes : std::uint8_t {

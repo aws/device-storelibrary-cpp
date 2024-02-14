@@ -131,19 +131,18 @@ StreamError FileSegment::open(bool full_corruption_check_on_open) {
             truncateAndLog(offset, StreamError{StreamErrorCode::ReadError, header_data_or.err().msg});
             continue;
         }
-        LogEntryHeader const *header = convertSliceToHeader(header_data_or.val());
+        LogEntryHeader header = convertSliceToHeader(header_data_or.val());
 
-        if (header->magic_and_version != MAGIC_AND_VERSION) {
+        if (header.magic_and_version != MAGIC_AND_VERSION) {
             truncateAndLog(offset, StreamError{StreamErrorCode::HeaderDataCorrupted, {}});
             continue;
         }
         if (full_corruption_check_on_open) {
-            auto value_or =
-                read(header->relative_sequence_number + _base_seq_num, ReadOptions{
-                                                                           .check_for_corruption = true,
-                                                                           .may_return_later_records = false,
-                                                                           .suggested_start = offset,
-                                                                       });
+            auto value_or = read(header.relative_sequence_number + _base_seq_num, ReadOptions{
+                                                                                      .check_for_corruption = true,
+                                                                                      .may_return_later_records = false,
+                                                                                      .suggested_start = offset,
+                                                                                  });
             if (!value_or) {
                 truncateAndLog(offset, value_or.err());
                 continue;
@@ -151,21 +150,23 @@ StreamError FileSegment::open(bool full_corruption_check_on_open) {
         }
 
         offset += HEADER_SIZE;
-        offset += header->payload_length_bytes;
-        _total_bytes += header->payload_length_bytes + HEADER_SIZE;
-        _highest_seq_num = std::max(_highest_seq_num, _base_seq_num + header->relative_sequence_number);
+        offset += header.payload_length_bytes;
+        _total_bytes += header.payload_length_bytes + HEADER_SIZE;
+        _highest_seq_num = std::max(_highest_seq_num, _base_seq_num + header.relative_sequence_number);
     }
 }
 
-LogEntryHeader const *FileSegment::convertSliceToHeader(const OwnedSlice &data) {
-    auto *header =
-        reinterpret_cast<LogEntryHeader *>(data.data()); // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
-    header->payload_length_bytes = static_cast<int32_t>(_ntohl(header->payload_length_bytes));
-    header->relative_sequence_number = static_cast<int32_t>(_ntohl(header->relative_sequence_number));
-    header->byte_position = static_cast<int32_t>(_ntohl(header->byte_position));
-    header->crc = static_cast<int64_t>(_ntohll(header->crc));
-    header->timestamp = static_cast<int64_t>(_ntohll(header->timestamp));
-    header->magic_and_version = static_cast<int32_t>(_ntohl(header->magic_and_version));
+LogEntryHeader FileSegment::convertSliceToHeader(const OwnedSlice &data) {
+    LogEntryHeader header{};
+    // Use memcpy instead of reinterpret cast to avoid UB.
+    memcpy(&header, data.data(), sizeof(LogEntryHeader));
+
+    header.payload_length_bytes = static_cast<int32_t>(_ntohl(header.payload_length_bytes));
+    header.relative_sequence_number = static_cast<int32_t>(_ntohl(header.relative_sequence_number));
+    header.byte_position = static_cast<int32_t>(_ntohl(header.byte_position));
+    header.crc = static_cast<int64_t>(_ntohll(header.crc));
+    header.timestamp = static_cast<int64_t>(_ntohll(header.timestamp));
+    header.magic_and_version = static_cast<int32_t>(_ntohl(header.magic_and_version));
     return header;
 }
 
@@ -235,48 +236,47 @@ expected<OwnedRecord, StreamError> FileSegment::read(uint64_t sequence_number, c
             }
             return StreamError{StreamErrorCode::ReadError, header_data_or.err().msg};
         }
-        LogEntryHeader const *header = convertSliceToHeader(header_data_or.val());
+        LogEntryHeader header = convertSliceToHeader(header_data_or.val());
 
-        if (header->magic_and_version != MAGIC_AND_VERSION) {
+        if (header.magic_and_version != MAGIC_AND_VERSION) {
             return StreamError{StreamErrorCode::HeaderDataCorrupted, {}};
         }
 
         auto expected_rel_seq_num = static_cast<int32_t>(sequence_number - _base_seq_num);
 
         // If the record we read is after the one we wanted, and we're not allowed to return later records, we must fail
-        if (header->relative_sequence_number > expected_rel_seq_num && !read_options.may_return_later_records) {
+        if (header.relative_sequence_number > expected_rel_seq_num && !read_options.may_return_later_records) {
             return StreamError{StreamErrorCode::RecordNotFound, RecordNotFoundErrorStr};
         }
 
         // We found the one we want, or the next available sequence number was acceptable to us
-        if (header->relative_sequence_number == expected_rel_seq_num ||
-            (header->relative_sequence_number > expected_rel_seq_num && read_options.may_return_later_records)) {
-            auto data_or = _f->read(offset + HEADER_SIZE, offset + HEADER_SIZE + header->payload_length_bytes);
+        if (header.relative_sequence_number == expected_rel_seq_num ||
+            (header.relative_sequence_number > expected_rel_seq_num && read_options.may_return_later_records)) {
+            auto data_or = _f->read(offset + HEADER_SIZE, offset + HEADER_SIZE + header.payload_length_bytes);
             if (!data_or) {
                 return StreamError{StreamErrorCode::ReadError, header_data_or.err().msg};
             }
             auto data = std::move(data_or.val());
-            auto data_len_swap = static_cast<int32_t>(_htonl(header->payload_length_bytes));
-            auto ts_swap = static_cast<int64_t>(_htonll(header->timestamp));
+            auto data_len_swap = static_cast<int32_t>(_htonl(header.payload_length_bytes));
+            auto ts_swap = static_cast<int64_t>(_htonll(header.timestamp));
 
             if (read_options.check_for_corruption &&
-                header->crc !=
-                    static_cast<int64_t>(crc32::crc32_of(BorrowedSlice{&ts_swap, sizeof(ts_swap)},
-                                                         BorrowedSlice{&data_len_swap, sizeof(data_len_swap)},
-                                                         BorrowedSlice{data.data(), data.size()}))) {
+                header.crc != static_cast<int64_t>(crc32::crc32_of(BorrowedSlice{&ts_swap, sizeof(ts_swap)},
+                                                                   BorrowedSlice{&data_len_swap, sizeof(data_len_swap)},
+                                                                   BorrowedSlice{data.data(), data.size()}))) {
                 return StreamError{StreamErrorCode::RecordDataCorrupted, {}};
             }
 
             return OwnedRecord{
                 std::move(data),
-                header->timestamp,
+                header.timestamp,
                 sequence_number,
                 offset + HEADER_SIZE,
             };
         }
 
         offset += HEADER_SIZE;
-        offset += header->payload_length_bytes;
+        offset += header.payload_length_bytes;
     }
 }
 

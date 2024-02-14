@@ -216,8 +216,9 @@ PersistentIterator::PersistentIterator(std::string id, uint64_t start, std::shar
     : _id(std::move(id)), _store(std::move(kv)), _sequence_number(start) {
     auto value_or = _store->get(_id);
     if (value_or) {
-        auto last_value = *reinterpret_cast<uint64_t *>( // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
-            value_or.val().data());
+        uint64_t last_value;
+        // Use memcpy instead of reinterpret cast to avoid UB.
+        memcpy(&last_value, value_or.val().data(), sizeof(uint64_t));
         _sequence_number = std::max(start, last_value);
     }
 }
