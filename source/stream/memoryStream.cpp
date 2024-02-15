@@ -6,8 +6,8 @@ namespace aws {
 namespace gg {
 static constexpr const char *const RecordNotFoundErrorStr = "Record not found";
 
-std::shared_ptr<StreamInterface> MemoryStream::openOrCreate(StreamOptions &&opts) {
-    return std::shared_ptr<StreamInterface>(new MemoryStream(std::move(opts)));
+std::shared_ptr<MemoryStream> MemoryStream::openOrCreate(StreamOptions &&opts) {
+    return std::shared_ptr<MemoryStream>(new MemoryStream(std::move(opts)));
 }
 
 expected<uint64_t, StreamError> MemoryStream::append(BorrowedSlice d, [[maybe_unused]] const AppendOptions &) {

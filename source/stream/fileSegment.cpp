@@ -96,7 +96,7 @@ FileSegment::FileSegment(uint64_t base, std::shared_ptr<FileSystemInterface> int
 }
 
 void FileSegment::truncateAndLog(uint32_t truncate, const StreamError &err) const noexcept {
-    if (_logger && _logger->level >= logging::LogLevel::Warning) {
+    if (_logger && _logger->level <= logging::LogLevel::Warning) {
         using namespace std::string_literals;
         auto message = "Truncating "s + _segment_id + " to a length of "s + std::to_string(truncate);
         if (!err.msg.empty()) {

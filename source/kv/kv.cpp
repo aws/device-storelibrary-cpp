@@ -50,7 +50,7 @@ static std::string string(const KVErrorCodes e) {
 }
 
 void KV::truncateAndLog(uint32_t truncate, const KVError &err) const noexcept {
-    if (_opts.logger && _opts.logger->level >= logging::LogLevel::Warning) {
+    if (_opts.logger && _opts.logger->level <= logging::LogLevel::Warning) {
         using namespace std::string_literals;
         auto message = "Truncating "s + _opts.identifier + " to a length of "s + std::to_string(truncate);
         if (!err.msg.empty()) {
@@ -331,7 +331,11 @@ KVError KV::put(const std::string &key, BorrowedSlice data) {
 
     _byte_position += added_size;
 
-    if (_added_bytes > _opts.compact_after) {
+    return maybeCompact();
+}
+
+KVError KV::maybeCompact() noexcept {
+    if (_opts.compact_after > 0 && _added_bytes > static_cast<int64_t>(_opts.compact_after)) {
         // We're already holding the mutex, so call compactNoLock() directly.
         return compactNoLock();
     }
@@ -385,6 +389,9 @@ KVError KV::compactNoLock() {
             auto point = in_point;
             auto err_or = readWrite(new_byte_pos, point, *shadow);
             if (!err_or) {
+                // Close and delete the partially written shadow
+                shadow.reset();
+                _opts.filesystem_implementation->remove(_shadow_name);
                 return KVError{KVErrorCodes::WriteError, err_or.err().msg};
             }
             new_byte_pos += err_or.val();
@@ -393,6 +400,9 @@ KVError KV::compactNoLock() {
 
         auto e = shadow->flush();
         if (e.code != FileErrorCode::NoError) {
+            // Close and delete the partially written shadow
+            shadow.reset();
+            _opts.filesystem_implementation->remove(_shadow_name);
             return KVError{KVErrorCodes::WriteError, e.msg};
         }
         shadow->sync();
@@ -445,10 +455,7 @@ KVError KV::remove(const std::string &key) {
     _byte_position += added_size;
     _added_bytes += added_size;
 
-    if (_added_bytes > _opts.compact_after) {
-        return compactNoLock();
-    }
-    return KVError{KVErrorCodes::NoError, {}};
+    return maybeCompact();
 }
 } // namespace kv
 } // namespace gg

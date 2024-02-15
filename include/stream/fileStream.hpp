@@ -69,7 +69,7 @@ class PersistentIterator {
     uint64_t _sequence_number{0};
 };
 
-class __attribute__((visibility("default"))) FileStream : public StreamInterface {
+class __attribute__((visibility("default"))) FileStream final : public StreamInterface {
   private:
     mutable std::mutex _segments_lock{}; // TODO: would like this to be a shared_mutex, but that is c++17.
     StreamOptions _opts;
@@ -88,8 +88,7 @@ class __attribute__((visibility("default"))) FileStream : public StreamInterface
     [[nodiscard]] StreamError loadExistingSegments() noexcept;
 
   public:
-    [[nodiscard]] static expected<std::shared_ptr<StreamInterface>, StreamError>
-    openOrCreate(StreamOptions &&) noexcept;
+    [[nodiscard]] static expected<std::shared_ptr<FileStream>, StreamError> openOrCreate(StreamOptions &&) noexcept;
 
     expected<uint64_t, StreamError> append(BorrowedSlice, const AppendOptions &) noexcept override;
     expected<uint64_t, StreamError> append(OwnedSlice &&, const AppendOptions &) noexcept override;

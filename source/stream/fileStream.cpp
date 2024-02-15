@@ -5,13 +5,13 @@
 
 namespace aws {
 namespace gg {
-expected<std::shared_ptr<StreamInterface>, StreamError> FileStream::openOrCreate(StreamOptions &&opts) {
+expected<std::shared_ptr<FileStream>, StreamError> FileStream::openOrCreate(StreamOptions &&opts) {
     auto stream = std::shared_ptr<FileStream>(new FileStream(std::move(opts)));
     auto err = stream->loadExistingSegments();
     if (err.code != StreamErrorCode::NoError) {
         return err;
     }
-    return std::shared_ptr<StreamInterface>(stream);
+    return stream;
 }
 
 static constexpr int BASE_10 = 10;

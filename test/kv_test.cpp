@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 #include <string_view>
+#include <vector>
 
 using namespace aws::gg;
 using namespace aws::gg::kv;
@@ -16,7 +17,6 @@ class Logger : public logging::Logger {
         switch (level) {
         case logging::LogLevel::Disabled:
             break;
-
         case logging::LogLevel::Trace:
             break;
         case logging::LogLevel::Debug:
@@ -46,6 +46,16 @@ static auto open_kv(const std::string &path) {
         .logger = logger,
         .identifier = "test-kv-map",
         .compact_after = 0,
+    });
+}
+
+static auto open_kv_manual_compaction(const std::string &path) {
+    return KV::openOrCreate(KVOptions{
+        .full_corruption_check_on_open = true,
+        .filesystem_implementation = std::make_shared<SpyFileSystem>(std::make_shared<PosixFileSystem>(path)),
+        .logger = logger,
+        .identifier = "test-kv-map",
+        .compact_after = -1,
     });
 }
 
@@ -91,6 +101,56 @@ SCENARIO("I cannot put invalid inputs to the map", "[kv]") {
         REQUIRE(e.code == KVErrorCodes::InvalidArguments);
         REQUIRE(e.msg.find("Value length") != std::string::npos);
     }
+}
+
+SCENARIO("I create a KV map with manual compaction", "[kv]") {
+    auto temp_dir = TempDir();
+    auto kv_or = open_kv_manual_compaction(temp_dir.path());
+    REQUIRE(kv_or);
+    auto kv = std::move(kv_or.val());
+
+    std::vector<std::string> keys{};
+    auto key_gen = random(1, 512);
+    for (int i = 0; i < 20; i++) {
+        keys.emplace_back(key_gen.get());
+        key_gen.next();
+    }
+    const std::string &value = GENERATE(take(1, random(1, 1 * 1024 * 1024)));
+
+    // Put duplicated key-values so that we would benefit from compaction
+    for (int i = 0; i < 10; i++) {
+        for (const auto &k : keys) {
+            auto e = kv->put(k, BorrowedSlice{value});
+            REQUIRE(e.code == KVErrorCodes::NoError);
+        }
+    }
+
+    auto size_now = kv->currentSizeBytes();
+    auto e = kv->compact();
+    REQUIRE(e.code == KVErrorCodes::NoError);
+    // Ensure we got smaller
+    REQUIRE(kv->currentSizeBytes() < size_now);
+}
+
+SCENARIO("I open a KV map from a shadow file", "[kv]") {
+    auto temp_dir = TempDir();
+    std::filesystem::create_directories(temp_dir.path());
+
+    // map1 is a valid KV map which is truncated to 5K which makes the last value unreadable.
+    // This will verify that we're still able to load the file and read as much as is uncorrupted.
+    std::filesystem::copy_file(std::filesystem::path(__FILE__).parent_path() / "test_data" / "kv" / "map1.kv",
+                               // identifier is test-kv-map, so the shadow file name is test-kv-maps
+                               temp_dir.path() / "test-kv-maps");
+
+    auto kv_or = open_kv(temp_dir.path());
+    REQUIRE(kv_or);
+    auto kv = std::move(kv_or.val());
+
+    auto keys_or = kv->listKeys();
+    REQUIRE(keys_or);
+    auto keys = keys_or.val();
+    REQUIRE(keys.size() == 1);
+    REQUIRE(keys.front() == "a"s);
 }
 
 SCENARIO("I can create a KV map", "[kv]") {

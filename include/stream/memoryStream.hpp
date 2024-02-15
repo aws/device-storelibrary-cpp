@@ -5,7 +5,7 @@
 
 namespace aws {
 namespace gg __attribute__((visibility("default"))) {
-    class MemoryStream : public StreamInterface {
+    class MemoryStream final : public StreamInterface {
       private:
         StreamOptions _opts;
         std::vector<OwnedRecord> _records{};
@@ -16,7 +16,7 @@ namespace gg __attribute__((visibility("default"))) {
         StreamError remove_records_if_new_record_beyond_max_size(uint32_t record_size) noexcept;
 
       public:
-        static std::shared_ptr<StreamInterface> openOrCreate(StreamOptions &&) noexcept;
+        static std::shared_ptr<MemoryStream> openOrCreate(StreamOptions &&) noexcept;
 
         expected<uint64_t, StreamError> append(BorrowedSlice, const AppendOptions &) noexcept override;
         expected<uint64_t, StreamError> append(OwnedSlice &&, const AppendOptions &) noexcept override;

@@ -53,7 +53,9 @@ namespace kv __attribute__((visibility("default"))) {
         const std::shared_ptr<FileSystemInterface> filesystem_implementation;
         const std::shared_ptr<logging::Logger> logger;
         std::string identifier;
-        uint32_t compact_after;
+        // 0 means compact immediately when compaction would help. Negative numbers means to never automatically
+        // compact. Positive number means to compact when it would save approximately that number of bytes.
+        int32_t compact_after;
     };
 
     class KV {
@@ -98,6 +100,8 @@ namespace kv __attribute__((visibility("default"))) {
 
         template <typename... Args> [[nodiscard]] inline FileError appendMultiple(const Args &...args) const noexcept;
 
+        [[nodiscard]] KVError maybeCompact() noexcept;
+
       public:
         [[nodiscard]] static expected<std::shared_ptr<KV>, KVError> openOrCreate(KVOptions &&) noexcept;
 
@@ -113,6 +117,8 @@ namespace kv __attribute__((visibility("default"))) {
             std::lock_guard<std::mutex> lock(_lock);
             return compactNoLock();
         }
+
+        [[nodiscard]] std::uint32_t currentSizeBytes() const noexcept { return _byte_position; }
     };
 } // namespace kv
 } // namespace gg
