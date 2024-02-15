@@ -41,6 +41,7 @@ namespace gg __attribute__((visibility("default"))) {
         WriteError,
         StreamClosed,
         InvalidArguments,
+        DiskFull,
         Unknown,
     };
 

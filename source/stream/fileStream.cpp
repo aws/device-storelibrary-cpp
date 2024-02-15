@@ -16,24 +16,36 @@ expected<std::shared_ptr<FileStream>, StreamError> FileStream::openOrCreate(Stre
 
 static constexpr int BASE_10 = 10;
 
+static StreamError kvErrorToStreamError(const kv::KVError &kv_err) {
+    switch (kv_err.code) {
+    case kv::KVErrorCodes::InvalidArguments:
+        return StreamError{StreamErrorCode::InvalidArguments, kv_err.msg};
+    case kv::KVErrorCodes::ReadError:
+        return StreamError{StreamErrorCode::ReadError, kv_err.msg};
+    case kv::KVErrorCodes::DiskFull:
+        return StreamError{StreamErrorCode::DiskFull, kv_err.msg};
+    default:
+        return StreamError{StreamErrorCode::WriteError, kv_err.msg};
+    }
+}
+
+static StreamError fileErrorToStreamError(const FileError &e) {
+    if (e.code == FileErrorCode::DiskFull) {
+        return StreamError{StreamErrorCode::DiskFull, e.msg};
+    }
+    return StreamError{StreamErrorCode::ReadError, e.msg};
+}
+
 StreamError FileStream::loadExistingSegments() {
     auto kv_err_or = kv::KV::openOrCreate(std::move(_opts.kv_options));
     if (!kv_err_or) {
-        // TODO: Better error mapping
-        switch (kv_err_or.err().code) {
-        case kv::KVErrorCodes::InvalidArguments:
-            return StreamError{StreamErrorCode::InvalidArguments, kv_err_or.err().msg};
-        case kv::KVErrorCodes::ReadError:
-            return StreamError{StreamErrorCode::ReadError, kv_err_or.err().msg};
-        default:
-            return StreamError{StreamErrorCode::WriteError, kv_err_or.err().msg};
-        }
+        return kvErrorToStreamError(kv_err_or.err());
     }
     _kv_store = std::move(kv_err_or.val());
 
     auto files_or = _opts.file_implementation->list();
     if (!files_or) {
-        return StreamError{StreamErrorCode::ReadError, files_or.err().msg};
+        return fileErrorToStreamError(files_or.err());
     }
 
     auto files = std::move(files_or.val());
@@ -106,7 +118,7 @@ expected<uint64_t, StreamError> FileStream::append(BorrowedSlice d, const Append
 
     auto e = seg.append(d, aws::gg::timestamp(), seq, append_opts.sync_on_append);
     if (!e) {
-        return StreamError{StreamErrorCode::WriteError, e.err().msg};
+        return fileErrorToStreamError(e.err());
     }
     // Only increment the size if successful. On failure, we expect the segment to not keep any partially written
     // data. There could be partly written data if the application dies before truncating, but we'll find that

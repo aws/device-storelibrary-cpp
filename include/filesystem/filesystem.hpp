@@ -13,8 +13,11 @@ namespace gg __attribute__((visibility("default"))) {
         NoError,
         InvalidArguments,
         EndOfFile,
-        InsufficientPermissions,
+        AccessDenied,
         FileDoesNotExist,
+        TooManyOpenFiles,
+        DiskFull,
+        IOError,
         Unknown,
     };
 

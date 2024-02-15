@@ -44,6 +44,8 @@ static std::string string(const KVErrorCodes e) {
         return "InvalidArguments"s;
     case KVErrorCodes::Unknown:
         return "Unknown"s;
+    case KVErrorCodes::DiskFull:
+        return "Disk full"s;
     }
     // Unreachable.
     return {};
@@ -168,6 +170,8 @@ void inline KV::addOrRemoveKeyInInitialization(const std::string &key, const uin
 static KVError fileErrorToKVError(const FileError &e) {
     if (e.code == FileErrorCode::EndOfFile) {
         return KVError{KVErrorCodes::EndOfFile, e.msg};
+    } else if (e.code == FileErrorCode::DiskFull) {
+        return KVError{KVErrorCodes::DiskFull, e.msg};
     }
     return KVError{KVErrorCodes::ReadError, e.msg};
 }

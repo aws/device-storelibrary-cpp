@@ -80,6 +80,8 @@ static std::string string(const StreamErrorCode e) {
         return "InvalidArguments"s;
     case StreamErrorCode::Unknown:
         return "Unknown"s;
+    case StreamErrorCode::DiskFull:
+        return "DiskFull"s;
     }
     // Unreachable.
     return {};
@@ -111,10 +113,11 @@ void FileSegment::truncateAndLog(uint32_t truncate, const StreamError &err) cons
 
 StreamError FileSegment::open(bool full_corruption_check_on_open) {
     auto file_or = _file_implementation->open(_segment_id);
-    if (file_or) {
-        _f = std::move(file_or.val());
+    if (!file_or) {
+        return StreamError{StreamErrorCode::WriteError, file_or.err().msg};
     }
 
+    _f = std::move(file_or.val());
     uint32_t offset = 0;
 
     while (true) {

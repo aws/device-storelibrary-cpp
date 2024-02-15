@@ -44,6 +44,7 @@ namespace kv __attribute__((visibility("default"))) {
         DataCorrupted,
         EndOfFile,
         InvalidArguments,
+        DiskFull,
         Unknown,
     };
     using KVError = GenericError<KVErrorCodes>;

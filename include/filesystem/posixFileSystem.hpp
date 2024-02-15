@@ -19,6 +19,36 @@ namespace gg __attribute__((visibility("default"))) {
 #endif
     }
 
+    static FileError errnoToFileError(int err, const std::string& str = {}) {
+        using namespace std::string_literals;
+        switch (err) {
+            case EACCES:
+                return FileError{FileErrorCode::AccessDenied, str + " Access denied"s};
+            case EDQUOT:
+                return FileError{FileErrorCode::DiskFull, str + " User inode/disk block quota exhausted"s};
+            case EINVAL:
+                return FileError{FileErrorCode::InvalidArguments, str + " Unknown invalid arguments"s};
+            case EISDIR:
+                return FileError{FileErrorCode::InvalidArguments, str + " Path cannot be opened for writing because it is a directory"s};
+            case ELOOP:
+                return FileError{FileErrorCode::InvalidArguments, str + " Too many symbolic links"s};
+            case EMFILE:
+                [[fallthrough]];
+            case ENFILE:
+                return FileError{FileErrorCode::TooManyOpenFiles, str + " Too many open files. Consider raising limits."s};
+            case ENOENT:
+                return FileError{FileErrorCode::FileDoesNotExist, str + " Path does not exist"s};
+            case EFBIG:
+                return FileError{FileErrorCode::InvalidArguments, str + " File is too large"s};
+            case EIO:
+                return FileError{FileErrorCode::IOError, str + " Unknown IO error"s};
+            case ENOSPC:
+                return FileError{FileErrorCode::DiskFull, str + " Disk full"s};
+            default:
+                return FileError{FileErrorCode::Unknown, str + " Unknown error code: "s + std::to_string(err)};
+        }
+    }
+
     class PosixFileLike : public FileLike {
         std::mutex _read_lock{};
         std::filesystem::path _path;
@@ -40,8 +70,7 @@ namespace gg __attribute__((visibility("default"))) {
         FileError open() noexcept {
             _f = std::fopen(_path.c_str(), "ab+");
             if (!_f) {
-                // TODO: error code mapping
-                return FileError{FileErrorCode::Unknown, std::strerror(errno)};
+                return errnoToFileError(errno);
             }
             return FileError{FileErrorCode::NoError, {}};
         }
@@ -57,15 +86,13 @@ namespace gg __attribute__((visibility("default"))) {
             clearerr(_f);
             auto d = OwnedSlice{(end - begin)};
             if (std::fseek(_f, begin, SEEK_SET) != 0) {
-                // TODO: error code mapping
-                return FileError{FileErrorCode::Unknown, std::strerror(errno)};
+                return errnoToFileError(errno);
             }
             if (std::fread((void *)d.data(), d.size(), 1, _f) != 1) {
                 if (feof(_f) != 0) {
                     return {FileError{FileErrorCode::EndOfFile, {}}};
                 } else {
-                    // TODO: error code mapping
-                    return FileError{FileErrorCode::Unknown, std::strerror(errno)};
+                    return errnoToFileError(errno);
                 }
             }
             return d;
@@ -74,8 +101,7 @@ namespace gg __attribute__((visibility("default"))) {
         FileError append(BorrowedSlice data) override {
             clearerr(_f);
             if (fwrite(data.data(), data.size(), 1, _f) != 1) {
-                // TODO: error code mapping
-                return {FileErrorCode::Unknown, std::strerror(errno)};
+                return errnoToFileError(errno);
             }
             return {FileErrorCode::NoError, {}};
         };
@@ -84,16 +110,14 @@ namespace gg __attribute__((visibility("default"))) {
             if (fflush(_f) == 0) {
                 return FileError{FileErrorCode::NoError, {}};
             }
-            // TODO: error code mapping
-            return {FileErrorCode::Unknown, std::strerror(errno)};
+            return errnoToFileError(errno);
         }
 
         void sync() override { aws::gg::sync(fileno(_f)); }
 
         FileError truncate(uint32_t max) override {
             if (ftruncate(fileno(_f), max) != 0) {
-                // TODO: error code mapping
-                return {FileErrorCode::Unknown, std::strerror(errno)};
+                return errnoToFileError(errno);
             }
             return {FileErrorCode::NoError, {}};
         }
@@ -121,8 +145,7 @@ namespace gg __attribute__((visibility("default"))) {
             // open file or create with permissions 660
             _f = ::open(_path.c_str(), O_RDWR | O_CREAT | O_APPEND, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
             if (_f <= 0) {
-                // TODO: error code mapping
-                return FileError{FileErrorCode::Unknown, std::strerror(errno)};
+                return errnoToFileError(errno);
             }
             return FileError{FileErrorCode::NoError, {}};
         }
@@ -138,8 +161,7 @@ namespace gg __attribute__((visibility("default"))) {
             auto d = OwnedSlice{(end - begin)};
 
             if (lseek(_f, begin, SEEK_SET) < 0) {
-                // TODO: error code mapping
-                return FileError{FileErrorCode::Unknown, std::strerror(errno)};
+                return errnoToFileError(errno);
             }
 
             uint8_t *read_pointer = d.data();
@@ -152,8 +174,7 @@ namespace gg __attribute__((visibility("default"))) {
                     return {FileError{FileErrorCode::EndOfFile, {}}};
                 }
                 if (did_read < 0) {
-                    // TODO: error code mapping
-                    return FileError{FileErrorCode::Unknown, std::strerror(errno)};
+                    return errnoToFileError(errno);
                 }
 
                 read_remaining -= did_read;
@@ -169,8 +190,7 @@ namespace gg __attribute__((visibility("default"))) {
             while (write_remaining > 0) {
                 int did_write = ::write(_f, write_pointer, write_remaining);
                 if (did_write <= 0) {
-                    // TODO: error code mapping
-                    return FileError{FileErrorCode::Unknown, std::strerror(errno)};
+                    return errnoToFileError(errno);
                 }
 
                 write_remaining -= did_write;
@@ -186,8 +206,7 @@ namespace gg __attribute__((visibility("default"))) {
 
         FileError truncate(uint32_t max) override {
             if (ftruncate(_f, max) != 0) {
-                // TODO: error code mapping
-                return {FileErrorCode::Unknown, std::strerror(errno)};
+                return errnoToFileError(errno);
             }
             return {FileErrorCode::NoError, {}};
         }
@@ -222,8 +241,7 @@ namespace gg __attribute__((visibility("default"))) {
             if (!ec) {
                 return {FileErrorCode::NoError, {}};
             }
-            // TODO: error code mapping
-            return {FileErrorCode::Unknown, ec.message()};
+            return errnoToFileError(ec.value(), ec.message());
         };
 
         FileError remove(const std::string &id) override {
@@ -232,8 +250,7 @@ namespace gg __attribute__((visibility("default"))) {
             if (!ec) {
                 return {FileErrorCode::NoError, {}};
             }
-            // TODO: error code mapping
-            return {FileErrorCode::Unknown, ec.message()};
+            return errnoToFileError(ec.value(), ec.message());
         };
 
         expected<std::vector<std::string>, FileError> list() override {
