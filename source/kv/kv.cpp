@@ -16,9 +16,9 @@ expected<std::shared_ptr<KV>, KVError> KV::openOrCreate(KVOptions &&opts) {
     }
 
     auto kv = std::shared_ptr<KV>(new KV(std::move(opts)));
-    auto err = kv->initialize();
-    if (err.code != KVErrorCodes::NoError) {
-        return err;
+    auto ok = kv->initialize();
+    if (!ok) {
+        return ok;
     }
     return kv;
 }
@@ -84,9 +84,9 @@ KVError KV::openFile() {
 KVError KV::initialize() {
     std::lock_guard<std::mutex> lock(_lock);
 
-    auto e = openFile();
-    if (e.code != KVErrorCodes::NoError) {
-        return e;
+    auto ok = openFile();
+    if (!ok) {
+        return ok;
     }
 
     while (true) {
@@ -168,12 +168,26 @@ void inline KV::addOrRemoveKeyInInitialization(const std::string &key, const uin
 }
 
 static KVError fileErrorToKVError(const FileError &e) {
-    if (e.code == FileErrorCode::EndOfFile) {
+    switch (e.code) {
+    case FileErrorCode::NoError:
+        return KVError{KVErrorCodes::NoError, e.msg};
+    case FileErrorCode::InvalidArguments:
+        return KVError{KVErrorCodes::InvalidArguments, e.msg};
+    case FileErrorCode::EndOfFile:
         return KVError{KVErrorCodes::EndOfFile, e.msg};
-    } else if (e.code == FileErrorCode::DiskFull) {
+    case FileErrorCode::AccessDenied:
+        [[fallthrough]];
+    case FileErrorCode::TooManyOpenFiles:
+        return KVError{KVErrorCodes::WriteError, e.msg};
+    case FileErrorCode::DiskFull:
         return KVError{KVErrorCodes::DiskFull, e.msg};
+    case FileErrorCode::FileDoesNotExist:
+        [[fallthrough]];
+    case FileErrorCode::IOError:
+        [[fallthrough]];
+    case FileErrorCode::Unknown:
+        return KVError{KVErrorCodes::ReadError, e.msg};
     }
-    return KVError{KVErrorCodes::ReadError, e.msg};
 }
 
 expected<KVHeader, KVError> KV::readHeaderFrom(uint32_t begin) const {
@@ -260,14 +274,14 @@ template <typename... Args> inline FileError KV::appendMultiple(const Args &...a
     for (auto arg : {args...}) {
         if (arg.size() > 0) {
             auto e = _f->append(arg);
-            if (e.code != FileErrorCode::NoError) {
+            if (!e) {
                 _f->truncate(_byte_position);
                 return e;
             }
         }
     }
     auto e = _f->flush();
-    if (e.code != FileErrorCode::NoError) {
+    if (!e) {
         _f->truncate(_byte_position);
         return e;
     }
@@ -289,12 +303,7 @@ inline KVError KV::writeEntry(const std::string &key, const BorrowedSlice data, 
         .value_length = value_len,
     };
 
-    auto e = appendMultiple(BorrowedSlice(&header, sizeof(header)), BorrowedSlice{key}, data);
-    if (e.code != FileErrorCode::NoError) {
-        return KVError{KVErrorCodes::WriteError, e.msg};
-    }
-
-    return KVError{KVErrorCodes::NoError, {}};
+    return fileErrorToKVError(appendMultiple(BorrowedSlice(&header, sizeof(header)), BorrowedSlice{key}, data));
 }
 
 KVError KV::put(const std::string &key, BorrowedSlice data) {
@@ -311,7 +320,7 @@ KVError KV::put(const std::string &key, BorrowedSlice data) {
 
     std::lock_guard<std::mutex> lock(_lock);
     auto e = writeEntry(key, data, 0);
-    if (e.code != KVErrorCodes::NoError) {
+    if (!e) {
         return e;
     }
 
@@ -360,16 +369,16 @@ expected<uint32_t, KVError> KV::readWrite(uint32_t begin, std::pair<std::string,
     auto value = std::move(value_or.val());
 
     auto e = f.append(BorrowedSlice{&header, sizeof(header)});
-    if (e.code != FileErrorCode::NoError) {
-        return KVError{KVErrorCodes::WriteError, e.msg};
+    if (!e) {
+        return fileErrorToKVError(e);
     }
     e = f.append(BorrowedSlice{p.first});
-    if (e.code != FileErrorCode::NoError) {
-        return KVError{KVErrorCodes::WriteError, e.msg};
+    if (!e) {
+        return fileErrorToKVError(e);
     }
     e = f.append(BorrowedSlice{value.data(), value.size()});
-    if (e.code != FileErrorCode::NoError) {
-        return KVError{KVErrorCodes::WriteError, e.msg};
+    if (!e) {
+        return fileErrorToKVError(e);
     }
 
     p.second = begin;
@@ -403,7 +412,7 @@ KVError KV::compactNoLock() {
         }
 
         auto e = shadow->flush();
-        if (e.code != FileErrorCode::NoError) {
+        if (!e) {
             // Close and delete the partially written shadow
             shadow.reset();
             _opts.filesystem_implementation->remove(_shadow_name);
@@ -451,7 +460,7 @@ KVError KV::remove(const std::string &key) {
     }
 
     auto e = writeEntry(key, BorrowedSlice{}, DELETED_FLAG);
-    if (e.code != KVErrorCodes::NoError) {
+    if (!e) {
         return e;
     }
 

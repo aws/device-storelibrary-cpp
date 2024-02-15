@@ -82,6 +82,8 @@ static std::string string(const StreamErrorCode e) {
         return "Unknown"s;
     case StreamErrorCode::DiskFull:
         return "DiskFull"s;
+    case StreamErrorCode::IteratorNotFound:
+        return "IteratorNotFound"s;
     }
     // Unreachable.
     return {};
@@ -192,17 +194,17 @@ expected<uint64_t, FileError> FileSegment::append(BorrowedSlice d, int64_t times
     // If an error happens when appending, truncate the file to the current size so that we don't have any
     // partial data in the file, and then return the error.
     auto e = _f->append(BorrowedSlice{&header, sizeof(header)});
-    if (e.code != FileErrorCode::NoError) {
+    if (!e) {
         _f->truncate(_total_bytes);
         return e;
     }
     e = _f->append(d);
-    if (e.code != FileErrorCode::NoError) {
+    if (!e) {
         _f->truncate(_total_bytes);
         return e;
     }
     e = _f->flush();
-    if (e.code != FileErrorCode::NoError) {
+    if (!e) {
         _f->truncate(_total_bytes);
         return e;
     }

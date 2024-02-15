@@ -42,6 +42,7 @@ namespace gg __attribute__((visibility("default"))) {
         StreamClosed,
         InvalidArguments,
         DiskFull,
+        IteratorNotFound,
         Unknown,
     };
 
@@ -144,14 +145,14 @@ namespace gg __attribute__((visibility("default"))) {
          *
          * @return the sequence number of the record appended.
          */
-        virtual expected<uint64_t, StreamError> append(BorrowedSlice, const AppendOptions &) noexcept = 0;
+        [[nodiscard]] virtual expected<uint64_t, StreamError> append(BorrowedSlice, const AppendOptions &) noexcept = 0;
 
         /**
          * Append data into the stream.
          *
          * @return the sequence number of the record appended.
          */
-        virtual expected<uint64_t, StreamError> append(OwnedSlice &&, const AppendOptions &) noexcept = 0;
+        [[nodiscard]] virtual expected<uint64_t, StreamError> append(OwnedSlice &&, const AppendOptions &) noexcept = 0;
 
         /**
          * Read a record from the stream by its sequence number or an error.
@@ -180,7 +181,7 @@ namespace gg __attribute__((visibility("default"))) {
          *
          * @param identifier identifier of the iterator to delete.
          */
-        virtual void deleteIterator(const std::string &identifier) noexcept = 0;
+        [[nodiscard]] virtual StreamError deleteIterator(const std::string &identifier) noexcept = 0;
 
         /**
          * Persist a checkpoint for the iterator identified at the given sequence number.
@@ -189,7 +190,8 @@ namespace gg __attribute__((visibility("default"))) {
          * @param sequence_number sequence number of the record. When opening an existing iterator it will start from
          * this record.
          */
-        virtual void setCheckpoint(const std::string &identifier, uint64_t sequence_number) noexcept = 0;
+        [[nodiscard]] virtual StreamError setCheckpoint(const std::string &identifier,
+                                                        uint64_t sequence_number) noexcept = 0;
 
         StreamInterface() noexcept = default;
 
@@ -227,8 +229,7 @@ namespace gg __attribute__((visibility("default"))) {
 
     inline StreamError Iterator::checkpoint() const noexcept {
         if (auto stream = _stream.lock()) {
-            stream->setCheckpoint(_id, sequence_number);
-            return StreamError{StreamErrorCode::NoError, {}};
+            return stream->setCheckpoint(_id, sequence_number);
         }
         return StreamError{StreamErrorCode::StreamClosed, "Unable to read from destroyed stream"};
     }

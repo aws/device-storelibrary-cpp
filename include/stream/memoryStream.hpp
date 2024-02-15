@@ -25,9 +25,9 @@ namespace gg __attribute__((visibility("default"))) {
                                                               const ReadOptions &) const noexcept override;
 
         [[nodiscard]] Iterator openOrCreateIterator(const std::string &identifier, IteratorOptions) noexcept override;
-        void deleteIterator(const std::string &identifier) noexcept override;
+        [[nodiscard]] StreamError deleteIterator(const std::string &identifier) noexcept override;
 
-        void setCheckpoint(const std::string &, uint64_t) noexcept override;
+        [[nodiscard]] StreamError setCheckpoint(const std::string &, uint64_t) noexcept override;
     };
 } // namespace gg
 } // namespace aws

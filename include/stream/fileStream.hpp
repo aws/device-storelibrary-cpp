@@ -59,9 +59,9 @@ class PersistentIterator {
     PersistentIterator(std::string id, uint64_t start, std::shared_ptr<kv::KV>) noexcept;
 
     uint64_t getSequenceNumber() const noexcept { return _sequence_number; }
-    const std::string &getIdentifier() const noexcept { return _id; }
-    void setCheckpoint(uint64_t) noexcept;
-    void remove() noexcept;
+    [[nodiscard]] const std::string &getIdentifier() const noexcept { return _id; }
+    [[nodiscard]] StreamError setCheckpoint(uint64_t) noexcept;
+    [[nodiscard]] StreamError remove() noexcept;
 
   private:
     std::string _id;
@@ -96,9 +96,9 @@ class __attribute__((visibility("default"))) FileStream final : public StreamInt
     [[nodiscard]] expected<OwnedRecord, StreamError> read(uint64_t, const ReadOptions &) const noexcept override;
 
     [[nodiscard]] Iterator openOrCreateIterator(const std::string &identifier, IteratorOptions) noexcept override;
-    void deleteIterator(const std::string &identifier) noexcept override;
+    [[nodiscard]] StreamError deleteIterator(const std::string &identifier) noexcept override;
 
-    void setCheckpoint(const std::string &, uint64_t) noexcept override;
+    [[nodiscard]] StreamError setCheckpoint(const std::string &, uint64_t) noexcept override;
 };
 
 } // namespace gg

@@ -7,6 +7,8 @@ namespace gg __attribute__((visibility("default"))) {
     template <class E> struct GenericError {
         E code;
         std::string msg;
+
+        explicit operator bool() const { return code == E::NoError; }
     };
 } // namespace gg
 } // namespace aws

@@ -12,9 +12,9 @@ std::shared_ptr<MemoryStream> MemoryStream::openOrCreate(StreamOptions &&opts) {
 
 expected<uint64_t, StreamError> MemoryStream::append(BorrowedSlice d, [[maybe_unused]] const AppendOptions &) {
     auto record_size = d.size();
-    auto err = remove_records_if_new_record_beyond_max_size(record_size);
-    if (err.code != StreamErrorCode::NoError) {
-        return err;
+    auto ok = remove_records_if_new_record_beyond_max_size(record_size);
+    if (!ok) {
+        return ok;
     }
 
     auto seq = _next_sequence_number++;
@@ -48,9 +48,9 @@ StreamError MemoryStream::remove_records_if_new_record_beyond_max_size(uint32_t 
 
 expected<uint64_t, StreamError> MemoryStream::append(OwnedSlice &&d, [[maybe_unused]] const AppendOptions &) {
     auto record_size = d.size();
-    auto err = remove_records_if_new_record_beyond_max_size(record_size);
-    if (err.code != StreamErrorCode::NoError) {
-        return err;
+    auto ok = remove_records_if_new_record_beyond_max_size(record_size);
+    if (!ok) {
+        return ok;
     }
 
     uint64_t seq = _next_sequence_number++;
@@ -87,10 +87,14 @@ expected<uint64_t, StreamError> MemoryStream::append(OwnedSlice &&d, [[maybe_unu
                     _iterators.count(identifier) ? _iterators[identifier] : _first_sequence_number.load()};
 }
 
-void MemoryStream::deleteIterator(const std::string &identifier) { _iterators.erase(identifier); }
+StreamError MemoryStream::deleteIterator(const std::string &identifier) {
+    _iterators.erase(identifier);
+    return StreamError{StreamErrorCode::NoError, {}};
+}
 
-void MemoryStream::setCheckpoint(const std::string &identifier, uint64_t sequence_number) {
+StreamError MemoryStream::setCheckpoint(const std::string &identifier, uint64_t sequence_number) {
     _iterators[identifier] = sequence_number;
+    return StreamError{StreamErrorCode::NoError, {}};
 }
 
 } // namespace gg

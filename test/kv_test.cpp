@@ -121,13 +121,13 @@ SCENARIO("I create a KV map with manual compaction", "[kv]") {
     for (int i = 0; i < 10; i++) {
         for (const auto &k : keys) {
             auto e = kv->put(k, BorrowedSlice{value});
-            REQUIRE(e.code == KVErrorCodes::NoError);
+            REQUIRE(e);
         }
     }
 
     auto size_now = kv->currentSizeBytes();
     auto e = kv->compact();
-    REQUIRE(e.code == KVErrorCodes::NoError);
+    REQUIRE(e);
     // Ensure we got smaller
     REQUIRE(kv->currentSizeBytes() < size_now);
 }
@@ -165,7 +165,7 @@ SCENARIO("I can create a KV map", "[kv]") {
         REQUIRE(keys_or);
         REQUIRE(keys_or.val().empty());
         auto e = kv->put("key", BorrowedSlice{"value"});
-        REQUIRE(e.code == KVErrorCodes::NoError);
+        REQUIRE(e);
 
         keys_or = kv->listKeys();
         REQUIRE(keys_or);
@@ -173,7 +173,7 @@ SCENARIO("I can create a KV map", "[kv]") {
         REQUIRE(keys_or.val()[0] == "key"s);
 
         e = kv->compact();
-        REQUIRE(e.code == KVErrorCodes::NoError);
+        REQUIRE(e);
 
         const std::string &key = GENERATE(take(10, random(1, 512)));
         const std::string &value = GENERATE(take(1, random(1, 1 * 1024 * 1024)));
@@ -181,7 +181,7 @@ SCENARIO("I can create a KV map", "[kv]") {
 
         WHEN("I add a value") {
             e = kv->put(key, BorrowedSlice{value});
-            REQUIRE(e.code == KVErrorCodes::NoError);
+            REQUIRE(e);
 
             THEN("I can get the value back") {
                 auto v_or = kv->get(key);
@@ -190,14 +190,14 @@ SCENARIO("I can create a KV map", "[kv]") {
 
                 AND_WHEN("I update the value") {
                     e = kv->put(key, BorrowedSlice{new_value.data(), static_cast<uint32_t>(new_value.size())});
-                    REQUIRE(e.code == KVErrorCodes::NoError);
+                    REQUIRE(e);
                     THEN("I get the new value back") {
                         v_or = kv->get(key);
                         REQUIRE(v_or);
                         REQUIRE(std::string_view{v_or.val().char_data(), v_or.val().size()} == new_value);
 
                         e = kv->put(key, BorrowedSlice{value});
-                        REQUIRE(e.code == KVErrorCodes::NoError);
+                        REQUIRE(e);
 
                         AND_WHEN("I close the KV and open it again") {
                             kv.reset();
@@ -214,7 +214,7 @@ SCENARIO("I can create a KV map", "[kv]") {
 
                                 AND_WHEN("I remove the key") {
                                     e = kv->remove(key);
-                                    REQUIRE(e.code == KVErrorCodes::NoError);
+                                    REQUIRE(e);
 
                                     THEN("I can't get the value back") {
                                         v_or = kv->get(key);

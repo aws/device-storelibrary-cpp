@@ -7,9 +7,9 @@ namespace aws {
 namespace gg {
 expected<std::shared_ptr<FileStream>, StreamError> FileStream::openOrCreate(StreamOptions &&opts) {
     auto stream = std::shared_ptr<FileStream>(new FileStream(std::move(opts)));
-    auto err = stream->loadExistingSegments();
-    if (err.code != StreamErrorCode::NoError) {
-        return err;
+    auto ok = stream->loadExistingSegments();
+    if (!ok) {
+        return ok;
     }
     return stream;
 }
@@ -18,6 +18,8 @@ static constexpr int BASE_10 = 10;
 
 static StreamError kvErrorToStreamError(const kv::KVError &kv_err) {
     switch (kv_err.code) {
+    case kv::KVErrorCodes::NoError:
+        return StreamError{StreamErrorCode::NoError, kv_err.msg};
     case kv::KVErrorCodes::InvalidArguments:
         return StreamError{StreamErrorCode::InvalidArguments, kv_err.msg};
     case kv::KVErrorCodes::ReadError:
@@ -60,9 +62,9 @@ StreamError FileStream::loadExistingSegments() {
                 continue;
             }
             FileSegment segment{base, _opts.file_implementation, _opts.logger};
-            auto err = segment.open(_opts.full_corruption_check_on_open);
-            if (err.code != StreamErrorCode::NoError) {
-                return err;
+            auto ok = segment.open(_opts.full_corruption_check_on_open);
+            if (!ok) {
+                return ok;
             }
             _segments.push_back(std::move(segment));
         }
@@ -87,9 +89,9 @@ StreamError FileStream::loadExistingSegments() {
 StreamError FileStream::makeNextSegment() {
     FileSegment segment{_next_sequence_number, _opts.file_implementation, _opts.logger};
 
-    auto err = segment.open(_opts.full_corruption_check_on_open);
-    if (err.code != StreamErrorCode::NoError) {
-        return err;
+    auto ok = segment.open(_opts.full_corruption_check_on_open);
+    if (!ok) {
+        return ok;
     }
 
     _segments.push_back(std::move(segment));
@@ -99,16 +101,16 @@ StreamError FileStream::makeNextSegment() {
 expected<uint64_t, StreamError> FileStream::append(BorrowedSlice d, const AppendOptions &append_opts) {
     std::lock_guard<std::mutex> lock(_segments_lock);
 
-    auto err = removeSegmentsIfNewRecordBeyondMaxSize(d.size());
-    if (err.code != StreamErrorCode::NoError) {
-        return err;
+    auto ok = removeSegmentsIfNewRecordBeyondMaxSize(d.size());
+    if (!ok) {
+        return ok;
     }
 
     // Check if we need a new segment because we don't have any, or the last segment is getting too big.
     if (_segments.empty() || _segments.back().totalSizeBytes() >= _opts.minimum_segment_size_bytes) {
-        err = makeNextSegment();
-        if (err.code != StreamErrorCode::NoError) {
-            return err;
+        ok = makeNextSegment();
+        if (!ok) {
+            return ok;
         }
     }
 
@@ -202,26 +204,27 @@ expected<uint64_t, StreamError> FileStream::append(OwnedSlice &&d, const AppendO
                     std::max(_first_sequence_number.load(), _iterators.back().getSequenceNumber())};
 }
 
-void FileStream::deleteIterator(const std::string &identifier) {
+StreamError FileStream::deleteIterator(const std::string &identifier) {
     for (size_t i = 0; i < _iterators.size(); i++) {
         auto iter = _iterators[i];
         if (iter.getIdentifier() == identifier) {
-            iter.remove();
+            auto e = iter.remove();
             auto it = _iterators.begin();
             std::advance(it, i);
             _iterators.erase(it);
-            break;
+            return e;
         }
     }
+    return StreamError{StreamErrorCode::IteratorNotFound, {}};
 }
 
-void FileStream::setCheckpoint(const std::string &identifier, uint64_t sequence_number) {
+StreamError FileStream::setCheckpoint(const std::string &identifier, uint64_t sequence_number) {
     for (auto &iter : _iterators) {
         if (iter.getIdentifier() == identifier) {
-            iter.setCheckpoint(sequence_number);
-            return;
+            return iter.setCheckpoint(sequence_number);
         }
     }
+    return StreamError{StreamErrorCode::IteratorNotFound, {}};
 }
 
 PersistentIterator::PersistentIterator(std::string id, uint64_t start, std::shared_ptr<kv::KV> kv)
@@ -235,18 +238,15 @@ PersistentIterator::PersistentIterator(std::string id, uint64_t start, std::shar
     }
 }
 
-void PersistentIterator::setCheckpoint(uint64_t sequence_number) {
+StreamError PersistentIterator::setCheckpoint(uint64_t sequence_number) {
     _sequence_number = sequence_number + 1; // Set the sequence number to the next in line, so that we
                                             // point to where we'd want to resume reading (ie. the first unread record).
 
-    // TODO: something with the error
-    [[maybe_unused]] auto _ = _store->put(_id, BorrowedSlice{&_sequence_number, sizeof(uint64_t)});
+    auto e = _store->put(_id, BorrowedSlice{&_sequence_number, sizeof(uint64_t)});
+    return kvErrorToStreamError(e);
 }
 
-void PersistentIterator::remove() {
-    // TODO: something with the error
-    [[maybe_unused]] auto _ = _store->remove(_id);
-}
+StreamError PersistentIterator::remove() { return kvErrorToStreamError(_store->remove(_id)); }
 
 } // namespace gg
 }; // namespace aws

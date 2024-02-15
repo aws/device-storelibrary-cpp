@@ -172,7 +172,7 @@ SCENARIO("I can create a stream", "[stream]") {
         REQUIRE(!v_or);
         REQUIRE(v_or.err().code == StreamErrorCode::RecordNotFound);
 
-        stream->deleteIterator("ita");
+        REQUIRE(stream->deleteIterator("ita"));
 
         AND_WHEN("I close and reopen the stream") {
             stream = nullptr;
