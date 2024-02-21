@@ -188,6 +188,8 @@ static KVError fileErrorToKVError(const FileError &e) {
     case FileErrorCode::Unknown:
         return KVError{KVErrorCodes::ReadError, e.msg};
     }
+    // Unreachable.
+    return {};
 }
 
 expected<KVHeader, KVError> KV::readHeaderFrom(uint32_t begin) const {

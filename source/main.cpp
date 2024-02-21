@@ -115,7 +115,7 @@ int main() {
 
             std::cout << "last checkpoint: " << s->openOrCreateIterator("a", IteratorOptions{}).sequence_number
                       << std::endl;
-            s->deleteIterator("a");
+            (void)s->deleteIterator("a");
             std::cout << "after deleting iterator: " << s->openOrCreateIterator("a", IteratorOptions{}).sequence_number
                       << std::endl;
         }

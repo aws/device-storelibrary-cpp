@@ -19,33 +19,34 @@ namespace gg __attribute__((visibility("default"))) {
 #endif
     }
 
-    static FileError errnoToFileError(int err, const std::string& str = {}) {
+    static FileError errnoToFileError(int err, const std::string &str = {}) {
         using namespace std::string_literals;
         switch (err) {
-            case EACCES:
-                return FileError{FileErrorCode::AccessDenied, str + " Access denied"s};
-            case EDQUOT:
-                return FileError{FileErrorCode::DiskFull, str + " User inode/disk block quota exhausted"s};
-            case EINVAL:
-                return FileError{FileErrorCode::InvalidArguments, str + " Unknown invalid arguments"s};
-            case EISDIR:
-                return FileError{FileErrorCode::InvalidArguments, str + " Path cannot be opened for writing because it is a directory"s};
-            case ELOOP:
-                return FileError{FileErrorCode::InvalidArguments, str + " Too many symbolic links"s};
-            case EMFILE:
-                [[fallthrough]];
-            case ENFILE:
-                return FileError{FileErrorCode::TooManyOpenFiles, str + " Too many open files. Consider raising limits."s};
-            case ENOENT:
-                return FileError{FileErrorCode::FileDoesNotExist, str + " Path does not exist"s};
-            case EFBIG:
-                return FileError{FileErrorCode::InvalidArguments, str + " File is too large"s};
-            case EIO:
-                return FileError{FileErrorCode::IOError, str + " Unknown IO error"s};
-            case ENOSPC:
-                return FileError{FileErrorCode::DiskFull, str + " Disk full"s};
-            default:
-                return FileError{FileErrorCode::Unknown, str + " Unknown error code: "s + std::to_string(err)};
+        case EACCES:
+            return FileError{FileErrorCode::AccessDenied, str + " Access denied"s};
+        case EDQUOT:
+            return FileError{FileErrorCode::DiskFull, str + " User inode/disk block quota exhausted"s};
+        case EINVAL:
+            return FileError{FileErrorCode::InvalidArguments, str + " Unknown invalid arguments"s};
+        case EISDIR:
+            return FileError{FileErrorCode::InvalidArguments,
+                             str + " Path cannot be opened for writing because it is a directory"s};
+        case ELOOP:
+            return FileError{FileErrorCode::InvalidArguments, str + " Too many symbolic links"s};
+        case EMFILE:
+            [[fallthrough]];
+        case ENFILE:
+            return FileError{FileErrorCode::TooManyOpenFiles, str + " Too many open files. Consider raising limits."s};
+        case ENOENT:
+            return FileError{FileErrorCode::FileDoesNotExist, str + " Path does not exist"s};
+        case EFBIG:
+            return FileError{FileErrorCode::InvalidArguments, str + " File is too large"s};
+        case EIO:
+            return FileError{FileErrorCode::IOError, str + " Unknown IO error"s};
+        case ENOSPC:
+            return FileError{FileErrorCode::DiskFull, str + " Disk full"s};
+        default:
+            return FileError{FileErrorCode::Unknown, str + " Unknown error code: "s + std::to_string(err)};
         }
     }
 
