@@ -16,7 +16,7 @@ include(cmake/ClangFormat.cmake)
 
 add_library(greenlake_kv include/kv/kv.hpp include/common/expected.hpp include/common/crc32.hpp
         include/filesystem/filesystem.hpp include/common/slices.hpp
-        include/common/util.hpp source/kv/kv.cpp
+        include/common/util.hpp src/kv/kv.cpp
         include/common/logging.hpp)
 set_target_properties(greenlake_kv PROPERTIES LINKER_LANGUAGE CXX)
 target_include_directories(greenlake_kv PUBLIC include)
@@ -30,11 +30,11 @@ target_clangtidy_setup(greenlake_kv)
 
 add_library(greenlake_stream include/stream/stream.hpp include/stream/fileStream.hpp
         include/stream/memoryStream.hpp include/common/crc32.hpp include/common/slices.hpp
-        source/stream/memoryStream.cpp source/stream/fileStream.cpp
+        src/stream/memoryStream.cpp src/stream/fileStream.cpp
         include/common/expected.hpp
         include/common/util.hpp
         include/common/logging.hpp
-        source/stream/fileSegment.cpp)
+        src/stream/fileSegment.cpp)
 set_target_properties(greenlake_stream PROPERTIES LINKER_LANGUAGE CXX)
 target_link_libraries(greenlake_stream PUBLIC greenlake_kv)
 target_compile_options(greenlake_stream PRIVATE -fno-exceptions -Wall -Wextra -Werror)
@@ -46,7 +46,7 @@ target_clangformat_setup(greenlake_stream)
 target_clangtidy_setup(greenlake_stream)
 
 set(CMAKE_CXX_STANDARD 17)
-add_executable(greenlake_example include/filesystem/posixFileSystem.hpp source/main.cpp)
+add_executable(greenlake_example include/filesystem/posixFileSystem.hpp src/main.cpp)
 target_link_libraries(greenlake_example PRIVATE greenlake_stream)
 target_compile_options(greenlake_example PRIVATE -fno-exceptions -Wall -Wextra -Werror)
 if(NOT CMAKE_BUILD_TYPE MATCHES "Debug")
