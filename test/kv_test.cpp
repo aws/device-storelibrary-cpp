@@ -195,6 +195,45 @@ SCENARIO("I can detect a corrupt KV map value", "[kv]") {
     }
 }
 
+SCENARIO("I can detect a corrupt KV map header", "[kv]") {
+    GIVEN("I create an KV map") {
+        auto temp_dir = TempDir();
+        auto kv_or = open_kv(temp_dir.path());
+        REQUIRE(kv_or);
+
+        auto kv = std::move(kv_or.val());
+
+        const std::string &key = GENERATE(take(10, random(1, 512)));
+        const std::string &value = GENERATE(take(1, random(1, 1 * 1024 * 1024)));
+
+        WHEN("I add a value") {
+            auto e = kv->put(key, BorrowedSlice{value});
+            REQUIRE(e);
+
+            THEN("I can get the value back") {
+                auto v_or = kv->get(key);
+                REQUIRE(v_or);
+                REQUIRE(std::string_view{v_or.val().char_data(), v_or.val().size()} == value);
+
+                WHEN("I corrupt the value's header") {
+                    std::fstream file(temp_dir.path() / "test-kv-map", std::ios::in | std::ios::out | std::ios::binary);
+                    REQUIRE(file);
+                    // entries are stored as [header, key, value]
+                    // seek to header and overwrite it
+                    std::string newContent = "A";
+                    file.write(newContent.c_str(), static_cast<std::streamsize>(newContent.size()));
+                    file.close();
+                    THEN("Getting the value fails") {
+                        v_or = kv->get(key);
+                        REQUIRE(!v_or);
+                        REQUIRE(v_or.err().code == KVErrorCodes::HeaderCorrupted);
+                    }
+                }
+            }
+        }
+    }
+}
+
 SCENARIO("I can create a KV map", "[kv]") {
     GIVEN("I create an empty KV map") {
         auto temp_dir = TempDir();
