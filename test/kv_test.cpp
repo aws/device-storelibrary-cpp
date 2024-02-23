@@ -2,6 +2,8 @@
 #include "kv/kv.hpp"
 #include "test_utils.hpp"
 #include <catch2/catch_test_macros.hpp>
+#include <fstream>
+#include <iostream>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -151,6 +153,46 @@ SCENARIO("I open a KV map from a shadow file", "[kv]") {
     auto keys = keys_or.val();
     REQUIRE(keys.size() == 1);
     REQUIRE(keys.front() == "a"s);
+}
+
+SCENARIO("I can detect a corrupt KV map value", "[kv]") {
+    GIVEN("I create an KV map") {
+        auto temp_dir = TempDir();
+        auto kv_or = open_kv(temp_dir.path());
+        REQUIRE(kv_or);
+
+        auto kv = std::move(kv_or.val());
+
+        const std::string &key = GENERATE(take(10, random(1, 512)));
+        const std::string &value = GENERATE(take(1, random(1, 1 * 1024 * 1024)));
+
+        WHEN("I add a value") {
+            auto e = kv->put(key, BorrowedSlice{value});
+            REQUIRE(e);
+
+            THEN("I can get the value back") {
+                auto v_or = kv->get(key);
+                REQUIRE(v_or);
+                REQUIRE(std::string_view{v_or.val().char_data(), v_or.val().size()} == value);
+
+                WHEN("I corrupt the value") {
+                    std::fstream file(temp_dir.path() / "test-kv-map", std::ios::in | std::ios::out | std::ios::binary);
+                    REQUIRE(file);
+                    // entries are stored as [header, key, value]
+                    // seek to value and overwrite it
+                    file.seekp(sizeof(aws::gg::kv::detail::KVHeader) + key.size() + 1);
+                    std::string newContent = "New Content";
+                    file.write(newContent.c_str(), static_cast<std::streamsize>(newContent.size()));
+                    file.close();
+                    THEN("Getting the value fails") {
+                        v_or = kv->get(key);
+                        REQUIRE(!v_or);
+                        REQUIRE(v_or.err().code == KVErrorCodes::DataCorrupted);
+                    }
+                }
+            }
+        }
+    }
 }
 
 SCENARIO("I can create a KV map", "[kv]") {
