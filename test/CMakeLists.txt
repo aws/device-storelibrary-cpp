@@ -9,6 +9,7 @@ add_executable(tests kv_test.cpp
         stream_test.cpp)
 target_link_libraries(tests PRIVATE Catch2::Catch2WithMain greenlake_stream)
 target_clangformat_setup(tests)
+target_compile_options(tests PRIVATE -Wall -Wextra -Werror -pedantic)
 
 if(CMAKE_BUILD_TYPE MATCHES "Debug")
     include(../cmake/Sanitizers.cmake)

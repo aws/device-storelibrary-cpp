@@ -152,8 +152,8 @@ expected<uint64_t, StreamError> FileStream::append(OwnedSlice &&d, const AppendO
     return append(BorrowedSlice(x.data(), x.size()), append_opts);
 }
 
-[[nodiscard]] expected<OwnedRecord, StreamError> FileStream::read(uint64_t sequence_number,
-                                                                  const ReadOptions &provided_options) const {
+expected<OwnedRecord, StreamError> FileStream::read(uint64_t sequence_number,
+                                                    const ReadOptions &provided_options) const {
     if (sequence_number < _first_sequence_number || sequence_number >= _next_sequence_number) {
         return StreamError{StreamErrorCode::RecordNotFound, RecordNotFoundErrorStr};
     }
@@ -191,7 +191,7 @@ expected<uint64_t, StreamError> FileStream::append(OwnedSlice &&d, const AppendO
     return StreamError{StreamErrorCode::RecordNotFound, RecordNotFoundErrorStr};
 }
 
-[[nodiscard]] Iterator FileStream::openOrCreateIterator(const std::string &identifier, IteratorOptions) {
+Iterator FileStream::openOrCreateIterator(const std::string &identifier, IteratorOptions) {
     for (const auto &iter : _iterators) {
         if (iter.getIdentifier() == identifier) {
             return Iterator{WEAK_FROM_THIS(), identifier,

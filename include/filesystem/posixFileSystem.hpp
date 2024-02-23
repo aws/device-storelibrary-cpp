@@ -33,8 +33,7 @@ namespace gg __attribute__((visibility("default"))) {
                              str + " Path cannot be opened for writing because it is a directory"s};
         case ELOOP:
             return FileError{FileErrorCode::InvalidArguments, str + " Too many symbolic links"s};
-        case EMFILE:
-            [[fallthrough]];
+        case EMFILE: // fallthrough
         case ENFILE:
             return FileError{FileErrorCode::TooManyOpenFiles, str + " Too many open files. Consider raising limits."s};
         case ENOENT:
@@ -169,7 +168,7 @@ namespace gg __attribute__((visibility("default"))) {
             uint32_t read_remaining = d.size();
 
             while (read_remaining > 0) {
-                int did_read = ::read(_f, read_pointer, read_remaining);
+                auto did_read = ::read(_f, read_pointer, read_remaining);
 
                 if (did_read == 0) {
                     return {FileError{FileErrorCode::EndOfFile, {}}};
@@ -178,7 +177,7 @@ namespace gg __attribute__((visibility("default"))) {
                     return errnoToFileError(errno);
                 }
 
-                read_remaining -= did_read;
+                read_remaining -= static_cast<uint32_t>(did_read);
                 read_pointer += did_read;
             }
             return d;
@@ -189,12 +188,12 @@ namespace gg __attribute__((visibility("default"))) {
             uint32_t write_remaining = data.size();
 
             while (write_remaining > 0) {
-                int did_write = ::write(_f, write_pointer, write_remaining);
+                auto did_write = ::write(_f, write_pointer, write_remaining);
                 if (did_write <= 0) {
                     return errnoToFileError(errno);
                 }
 
-                write_remaining -= did_write;
+                write_remaining -= static_cast<uint32_t>(did_write);
                 write_pointer += did_write;
             }
 

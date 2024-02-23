@@ -31,8 +31,8 @@ class RandomStringGenerator : public Catch::Generators::IGenerator<std::string> 
     bool next() override {
         auto length = m_length_dist(m_rand);
         current_string = std::string{};
-        current_string.reserve(length);
-        for (size_t i = 0; i < length; i++) {
+        current_string.reserve(static_cast<size_t>(length));
+        for (auto i = 0; i < length; i++) {
             current_string += static_cast<char>(m_value_dist(m_rand));
         }
         return true;
@@ -41,7 +41,7 @@ class RandomStringGenerator : public Catch::Generators::IGenerator<std::string> 
 
 std::string const &RandomStringGenerator::get() const { return current_string; }
 
-Catch::Generators::GeneratorWrapper<std::string> random(int min_len, int max_len) {
+__attribute__((unused)) Catch::Generators::GeneratorWrapper<std::string> random(int min_len, int max_len) {
     return {Catch::Detail::make_unique<RandomStringGenerator>(min_len, max_len, ' ', '~')};
 }
 
@@ -57,7 +57,7 @@ class TempDir {
 
     ~TempDir() { std::filesystem::remove_all(_path); }
 
-    [[nodiscard]] const std::filesystem::path &path() const { return _path; }
+    const std::filesystem::path &path() const { return _path; }
 };
 
 class SpyFileLike : public aws::gg::FileLike {

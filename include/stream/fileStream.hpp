@@ -23,14 +23,14 @@ class FileSegment {
 
     ~FileSegment() = default;
 
-    [[nodiscard]] StreamError open(bool full_corruption_check_on_open) noexcept;
+    StreamError open(bool full_corruption_check_on_open) noexcept;
 
     bool operator<(const FileSegment &other) const noexcept { return _base_seq_num < other._base_seq_num; }
 
-    [[nodiscard]] expected<uint64_t, FileError> append(BorrowedSlice d, int64_t timestamp_ms, uint64_t sequence_number,
-                                                       bool sync) noexcept;
+    expected<uint64_t, FileError> append(BorrowedSlice d, int64_t timestamp_ms, uint64_t sequence_number,
+                                         bool sync) noexcept;
 
-    [[nodiscard]] expected<OwnedRecord, StreamError> read(uint64_t sequence_number, const ReadOptions &) const noexcept;
+    expected<OwnedRecord, StreamError> read(uint64_t sequence_number, const ReadOptions &) const noexcept;
 
     void remove() noexcept;
 
@@ -59,9 +59,9 @@ class PersistentIterator {
     PersistentIterator(std::string id, uint64_t start, std::shared_ptr<kv::KV>) noexcept;
 
     uint64_t getSequenceNumber() const noexcept { return _sequence_number; }
-    [[nodiscard]] const std::string &getIdentifier() const noexcept { return _id; }
-    [[nodiscard]] StreamError setCheckpoint(uint64_t) noexcept;
-    [[nodiscard]] StreamError remove() noexcept;
+    const std::string &getIdentifier() const noexcept { return _id; }
+    StreamError setCheckpoint(uint64_t) noexcept;
+    StreamError remove() noexcept;
 
   private:
     std::string _id;
@@ -82,23 +82,23 @@ class __attribute__((visibility("default"))) FileStream final : public StreamInt
         _segments.reserve(1 + ((_opts.maximum_size_bytes - 1) / _opts.minimum_segment_size_bytes));
     }
 
-    [[nodiscard]] StreamError removeSegmentsIfNewRecordBeyondMaxSize(uint32_t record_size) noexcept;
+    StreamError removeSegmentsIfNewRecordBeyondMaxSize(uint32_t record_size) noexcept;
 
-    [[nodiscard]] StreamError makeNextSegment() noexcept;
-    [[nodiscard]] StreamError loadExistingSegments() noexcept;
+    StreamError makeNextSegment() noexcept;
+    StreamError loadExistingSegments() noexcept;
 
   public:
-    [[nodiscard]] static expected<std::shared_ptr<FileStream>, StreamError> openOrCreate(StreamOptions &&) noexcept;
+    static expected<std::shared_ptr<FileStream>, StreamError> openOrCreate(StreamOptions &&) noexcept;
 
     expected<uint64_t, StreamError> append(BorrowedSlice, const AppendOptions &) noexcept override;
     expected<uint64_t, StreamError> append(OwnedSlice &&, const AppendOptions &) noexcept override;
 
-    [[nodiscard]] expected<OwnedRecord, StreamError> read(uint64_t, const ReadOptions &) const noexcept override;
+    expected<OwnedRecord, StreamError> read(uint64_t, const ReadOptions &) const noexcept override;
 
-    [[nodiscard]] Iterator openOrCreateIterator(const std::string &identifier, IteratorOptions) noexcept override;
-    [[nodiscard]] StreamError deleteIterator(const std::string &identifier) noexcept override;
+    Iterator openOrCreateIterator(const std::string &identifier, IteratorOptions) noexcept override;
+    StreamError deleteIterator(const std::string &identifier) noexcept override;
 
-    [[nodiscard]] StreamError setCheckpoint(const std::string &, uint64_t) noexcept override;
+    StreamError setCheckpoint(const std::string &, uint64_t) noexcept override;
 };
 
 } // namespace gg

@@ -61,7 +61,7 @@ SCENARIO("I cannot create a stream", "[stream]") {
     auto temp_dir = TempDir();
     auto fs = std::make_shared<SpyFileSystem>(std::make_shared<PosixFileSystem>(temp_dir.path()));
 
-    fs->when("open", SpyFileSystem::OpenType{[](const std::string &s) {
+    fs->when("open", SpyFileSystem::OpenType{[](__attribute__((unused)) const std::string &s) {
                  return FileError{FileErrorCode::AccessDenied, {}};
              }})
         ->when("list", SpyFileSystem::ListType{[]() {

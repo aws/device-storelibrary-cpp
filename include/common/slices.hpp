@@ -17,15 +17,15 @@ namespace gg __attribute__((visibility("default"))) {
         BorrowedSlice(const char *data, const uint32_t size)
             : _data(reinterpret_cast<const uint8_t *>(data)), _size(size){};
         explicit BorrowedSlice(const std::string &s)
-            : _data(reinterpret_cast<const uint8_t *>(s.data())), _size(s.length()){};
+            : _data(reinterpret_cast<const uint8_t *>(s.data())), _size(static_cast<uint32_t>(s.length())){};
 
-        [[nodiscard]] const uint8_t *data() const { return _data; };
+        const uint8_t *data() const { return _data; };
 
-        [[nodiscard]] const char *char_data() const { return reinterpret_cast<const char *>(_data); };
+        const char *char_data() const { return reinterpret_cast<const char *>(_data); };
 
-        [[nodiscard]] uint32_t size() const { return _size; };
+        uint32_t size() const { return _size; };
 
-        [[nodiscard]] std::string string() const { return {char_data(), _size}; };
+        std::string string() const { return {char_data(), _size}; };
 
         static_assert(sizeof(uint8_t) == sizeof(char), "Char and uint8 must be the same size");
     };
@@ -56,13 +56,13 @@ namespace gg __attribute__((visibility("default"))) {
 
         ~OwnedSlice() = default;
 
-        [[nodiscard]] uint8_t *data() const { return get(); };
+        uint8_t *data() const { return get(); };
 
-        [[nodiscard]] const char *char_data() const { return reinterpret_cast<const char *>(get()); };
+        const char *char_data() const { return reinterpret_cast<const char *>(get()); };
 
-        [[nodiscard]] uint32_t size() const { return _size; };
+        uint32_t size() const { return _size; };
 
-        [[nodiscard]] std::string string() const { return {char_data(), _size}; };
+        std::string string() const { return {char_data(), _size}; };
     };
 } // namespace gg
 } // namespace aws

@@ -10,7 +10,7 @@ std::shared_ptr<MemoryStream> MemoryStream::openOrCreate(StreamOptions &&opts) {
     return std::shared_ptr<MemoryStream>(new MemoryStream(std::move(opts)));
 }
 
-expected<uint64_t, StreamError> MemoryStream::append(BorrowedSlice d, [[maybe_unused]] const AppendOptions &) {
+expected<uint64_t, StreamError> MemoryStream::append(BorrowedSlice d, const AppendOptions &) {
     auto record_size = d.size();
     auto ok = remove_records_if_new_record_beyond_max_size(record_size);
     if (!ok) {
@@ -46,7 +46,7 @@ StreamError MemoryStream::remove_records_if_new_record_beyond_max_size(uint32_t 
     return StreamError{StreamErrorCode::NoError, {}};
 }
 
-expected<uint64_t, StreamError> MemoryStream::append(OwnedSlice &&d, [[maybe_unused]] const AppendOptions &) {
+expected<uint64_t, StreamError> MemoryStream::append(OwnedSlice &&d, const AppendOptions &) {
     auto record_size = d.size();
     auto ok = remove_records_if_new_record_beyond_max_size(record_size);
     if (!ok) {
@@ -59,8 +59,7 @@ expected<uint64_t, StreamError> MemoryStream::append(OwnedSlice &&d, [[maybe_unu
     return seq;
 }
 
-[[nodiscard]] expected<OwnedRecord, StreamError> MemoryStream::read(uint64_t sequence_number,
-                                                                    [[maybe_unused]] const ReadOptions &) const {
+expected<OwnedRecord, StreamError> MemoryStream::read(uint64_t sequence_number, const ReadOptions &) const {
     if (sequence_number < _first_sequence_number) {
         return StreamError{StreamErrorCode::RecordNotFound, RecordNotFoundErrorStr};
     }
@@ -82,7 +81,7 @@ expected<uint64_t, StreamError> MemoryStream::append(OwnedSlice &&d, [[maybe_unu
     return StreamError{StreamErrorCode::RecordNotFound, RecordNotFoundErrorStr};
 }
 
-[[nodiscard]] Iterator MemoryStream::openOrCreateIterator(const std::string &identifier, IteratorOptions) {
+Iterator MemoryStream::openOrCreateIterator(const std::string &identifier, IteratorOptions) {
     return Iterator{WEAK_FROM_THIS(), identifier,
                     _iterators.count(identifier) ? _iterators[identifier] : _first_sequence_number.load()};
 }

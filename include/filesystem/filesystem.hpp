@@ -25,11 +25,11 @@ namespace gg __attribute__((visibility("default"))) {
 
     class FileLike {
       public:
-        [[nodiscard]] virtual expected<OwnedSlice, FileError> read(uint32_t begin, uint32_t end) = 0;
+        virtual expected<OwnedSlice, FileError> read(uint32_t begin, uint32_t end) = 0;
 
-        [[nodiscard]] virtual FileError append(BorrowedSlice data) = 0;
+        virtual FileError append(BorrowedSlice data) = 0;
 
-        [[nodiscard]] virtual FileError flush() = 0;
+        virtual FileError flush() = 0;
 
         virtual void sync() = 0;
 

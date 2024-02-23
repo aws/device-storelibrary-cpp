@@ -16,15 +16,15 @@ namespace gg __attribute__((visibility("default"))) {
         expected(const UnexpectedT &unexpect) : _unexpected(unexpect) {}
         explicit operator bool() const { return _is_set; }
 
-        [[nodiscard]] const ExpectedT &val() const & { return _val; }
-        [[nodiscard]] ExpectedT &val() & { return _val; }
-        [[nodiscard]] const ExpectedT &&val() const && { return std::move(_val); }
-        [[nodiscard]] ExpectedT &&val() && { return std::move(_val); }
+        const ExpectedT &val() const & { return _val; }
+        ExpectedT &val() & { return _val; }
+        const ExpectedT &&val() const && { return std::move(_val); }
+        ExpectedT &&val() && { return std::move(_val); }
 
-        [[nodiscard]] const UnexpectedT &err() const & { return _unexpected; }
-        [[nodiscard]] UnexpectedT &err() & { return _unexpected; }
-        [[nodiscard]] const UnexpectedT &&err() const && { return std::move(_unexpected); }
-        [[nodiscard]] UnexpectedT &&err() && { return std::move(_unexpected); }
+        const UnexpectedT &err() const & { return _unexpected; }
+        UnexpectedT &err() & { return _unexpected; }
+        const UnexpectedT &&err() const && { return std::move(_unexpected); }
+        UnexpectedT &&err() && { return std::move(_unexpected); }
     };
 } // namespace gg
 } // namespace aws

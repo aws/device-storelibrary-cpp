@@ -102,7 +102,7 @@ namespace gg __attribute__((visibility("default"))) {
 
         expected<CheckpointableOwnedRecord, StreamError> operator*() noexcept;
 
-        [[nodiscard]] Iterator &&begin() noexcept { return std::move(*this); }
+        Iterator &&begin() noexcept { return std::move(*this); }
 
         /**
          * The iterator never ends.
@@ -145,14 +145,14 @@ namespace gg __attribute__((visibility("default"))) {
          *
          * @return the sequence number of the record appended.
          */
-        [[nodiscard]] virtual expected<uint64_t, StreamError> append(BorrowedSlice, const AppendOptions &) noexcept = 0;
+        virtual expected<uint64_t, StreamError> append(BorrowedSlice, const AppendOptions &) noexcept = 0;
 
         /**
          * Append data into the stream.
          *
          * @return the sequence number of the record appended.
          */
-        [[nodiscard]] virtual expected<uint64_t, StreamError> append(OwnedSlice &&, const AppendOptions &) noexcept = 0;
+        virtual expected<uint64_t, StreamError> append(OwnedSlice &&, const AppendOptions &) noexcept = 0;
 
         /**
          * Read a record from the stream by its sequence number or an error.
@@ -160,8 +160,8 @@ namespace gg __attribute__((visibility("default"))) {
          * @param sequence_number the sequence number of the record to read.
          * @return the Record.
          */
-        [[nodiscard]] virtual expected<OwnedRecord, StreamError> read(uint64_t sequence_number,
-                                                                      const ReadOptions &) const noexcept = 0;
+        virtual expected<OwnedRecord, StreamError> read(uint64_t sequence_number,
+                                                        const ReadOptions &) const noexcept = 0;
 
         /**
          * Create an iterator identified by the chosen identifier. If an iterator already exists with the same
@@ -173,15 +173,14 @@ namespace gg __attribute__((visibility("default"))) {
          * on to resume from the last checkpoint.
          * @return the iterator.
          */
-        [[nodiscard]] virtual Iterator openOrCreateIterator(const std::string &identifier,
-                                                            IteratorOptions) noexcept = 0;
+        virtual Iterator openOrCreateIterator(const std::string &identifier, IteratorOptions) noexcept = 0;
 
         /**
          * Delete the persisted iterator if present. Nop if no iterator exists with the given identifier.
          *
          * @param identifier identifier of the iterator to delete.
          */
-        [[nodiscard]] virtual StreamError deleteIterator(const std::string &identifier) noexcept = 0;
+        virtual StreamError deleteIterator(const std::string &identifier) noexcept = 0;
 
         /**
          * Persist a checkpoint for the iterator identified at the given sequence number.
@@ -190,8 +189,7 @@ namespace gg __attribute__((visibility("default"))) {
          * @param sequence_number sequence number of the record. When opening an existing iterator it will start from
          * this record.
          */
-        [[nodiscard]] virtual StreamError setCheckpoint(const std::string &identifier,
-                                                        uint64_t sequence_number) noexcept = 0;
+        virtual StreamError setCheckpoint(const std::string &identifier, uint64_t sequence_number) noexcept = 0;
 
         StreamInterface() noexcept = default;
 
@@ -234,7 +232,7 @@ namespace gg __attribute__((visibility("default"))) {
         return StreamError{StreamErrorCode::StreamClosed, "Unable to read from destroyed stream"};
     }
 
-    [[nodiscard]] inline int64_t timestamp() {
+    inline int64_t timestamp() {
         return std::chrono::duration_cast<std::chrono::milliseconds>(
                    std::chrono::system_clock::now().time_since_epoch())
             .count();
