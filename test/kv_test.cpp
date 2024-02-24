@@ -61,6 +61,31 @@ static auto open_kv_manual_compaction(const std::string &path) {
     });
 }
 
+static void random_string(std::string &s, const int len) {
+    static std::random_device rd;
+    static std::mt19937 mt(rd());
+    static std::uniform_int_distribution<int> dist(0, 25);
+    s.reserve(len);
+    for (int i = 0; i < len; ++i) {
+        s.push_back('a' + dist(mt));
+    }
+}
+
+// TODO consider making Catch generator for filled-up KV store
+static auto generate_key_values(const int count) {
+    std::vector<std::pair<std::string, std::string>> key_values;
+    for (auto i = 0; i < count; i++) {
+        std::string key;
+        random_string(key, 512);
+
+        std::string value;
+        random_string(value, 1 * 1024 * 1024);
+
+        key_values.emplace_back(key, value);
+    }
+    return key_values;
+}
+
 SCENARIO("I cannot create a KV map with invalid inputs", "kv") {
     auto kv_or = KV::openOrCreate(KVOptions{
         .filesystem_implementation{},
@@ -156,38 +181,67 @@ SCENARIO("I open a KV map from a shadow file", "[kv]") {
 }
 
 SCENARIO("I can detect a corrupt KV map value", "[kv]") {
-    GIVEN("I create an KV map") {
+    GIVEN("I create a KV map with multiple entries") {
         auto temp_dir = TempDir();
         auto kv_or = open_kv(temp_dir.path());
         REQUIRE(kv_or);
 
         auto kv = std::move(kv_or.val());
 
-        const std::string &key = GENERATE(take(10, random(1, 512)));
-        const std::string &value = GENERATE(take(1, random(1, 1 * 1024 * 1024)));
-
-        WHEN("I add a value") {
-            auto e = kv->put(key, BorrowedSlice{value});
+        // populate the map with random keys and values
+        auto num_entries = 10;
+        auto test_data = generate_key_values(num_entries);
+        for (const auto &key_value : test_data) {
+            auto e = kv->put(key_value.first, BorrowedSlice{key_value.second});
             REQUIRE(e);
+            auto v_or = kv->get(key_value.first);
+            REQUIRE(v_or);
+            REQUIRE(std::string_view{v_or.val().char_data(), v_or.val().size()} == key_value.second);
+        }
 
-            THEN("I can get the value back") {
-                auto v_or = kv->get(key);
-                REQUIRE(v_or);
-                REQUIRE(std::string_view{v_or.val().char_data(), v_or.val().size()} == value);
+        WHEN("I corrupt the next to last entry's value") {
+            std::fstream file(temp_dir.path() / "test-kv-map", std::ios::in | std::ios::out | std::ios::binary);
+            REQUIRE(file);
 
-                WHEN("I corrupt the value") {
-                    std::fstream file(temp_dir.path() / "test-kv-map", std::ios::in | std::ios::out | std::ios::binary);
-                    REQUIRE(file);
-                    // entries are stored as [header, key, value]
-                    // seek to value and overwrite it
-                    file.seekp(sizeof(aws::gg::kv::detail::KVHeader) + key.size() + 1);
-                    std::string newContent = "New Content";
-                    file.write(newContent.c_str(), static_cast<std::streamsize>(newContent.size()));
-                    file.close();
-                    THEN("Getting the value fails") {
-                        v_or = kv->get(key);
-                        REQUIRE(!v_or);
-                        REQUIRE(v_or.err().code == KVErrorCodes::DataCorrupted);
+            // entries are stored as [header, key, value]
+            // seek to last value and overwrite it
+            auto offset = 0;
+            for (auto i = 0; i < num_entries - 2; i++) {
+                offset += sizeof(aws::gg::kv::detail::KVHeader);
+                offset += test_data[i].first.size();
+                offset += test_data[i].second.size();
+            }
+            file.seekp(offset + sizeof(aws::gg::kv::detail::KVHeader) + test_data[num_entries - 1].first.size());
+
+            std::string corrupted_value = "value";
+            file.write(corrupted_value.c_str(), static_cast<std::streamsize>(corrupted_value.size()));
+            file.close();
+
+            THEN("Retrieving next to last entry fails") {
+                auto v_or = kv->get(test_data[num_entries - 2].first);
+                REQUIRE(!v_or);
+                REQUIRE(v_or.err().code == KVErrorCodes::DataCorrupted);
+
+                AND_WHEN("I reset the store") {
+                    kv.reset();
+                    kv_or = open_kv(temp_dir.path());
+                    REQUIRE(kv_or);
+                    kv = std::move(kv_or.val());
+
+                    THEN("Corrupted entry and subsequent entries are removed") {
+                        for (auto i = num_entries - 2; i < num_entries; i++) {
+                            v_or = kv->get(test_data[i].first);
+                            REQUIRE(!v_or);
+                            REQUIRE(v_or.err().code == KVErrorCodes::KeyNotFound);
+                        }
+
+                        AND_THEN("Rest of store is untouched") {
+                            for (auto i = 0; i < num_entries - 2; i++) {
+                                v_or = kv->get(test_data[i].first);
+                                REQUIRE(v_or);
+                                REQUIRE(v_or.val().string() == test_data[i].second);
+                            }
+                        }
                     }
                 }
             }
@@ -196,37 +250,67 @@ SCENARIO("I can detect a corrupt KV map value", "[kv]") {
 }
 
 SCENARIO("I can detect a corrupt KV map header", "[kv]") {
-    GIVEN("I create an KV map") {
+    GIVEN("I create a KV map with multiple entries") {
         auto temp_dir = TempDir();
         auto kv_or = open_kv(temp_dir.path());
         REQUIRE(kv_or);
 
         auto kv = std::move(kv_or.val());
 
-        const std::string &key = GENERATE(take(10, random(1, 512)));
-        const std::string &value = GENERATE(take(1, random(1, 1 * 1024 * 1024)));
-
-        WHEN("I add a value") {
-            auto e = kv->put(key, BorrowedSlice{value});
+        // populate the map with random keys and values
+        auto num_entries = 10;
+        auto test_data = generate_key_values(num_entries);
+        for (const auto &key_value : test_data) {
+            auto e = kv->put(key_value.first, BorrowedSlice{key_value.second});
             REQUIRE(e);
+            auto v_or = kv->get(key_value.first);
+            REQUIRE(v_or);
+            REQUIRE(std::string_view{v_or.val().char_data(), v_or.val().size()} == key_value.second);
+        }
 
-            THEN("I can get the value back") {
-                auto v_or = kv->get(key);
-                REQUIRE(v_or);
-                REQUIRE(std::string_view{v_or.val().char_data(), v_or.val().size()} == value);
+        WHEN("I corrupt the next to last entry's header") {
+            std::fstream file(temp_dir.path() / "test-kv-map", std::ios::in | std::ios::out | std::ios::binary);
+            REQUIRE(file);
 
-                WHEN("I corrupt the value's header") {
-                    std::fstream file(temp_dir.path() / "test-kv-map", std::ios::in | std::ios::out | std::ios::binary);
-                    REQUIRE(file);
-                    // entries are stored as [header, key, value]
-                    // seek to header and overwrite it
-                    std::string newContent = "A";
-                    file.write(newContent.c_str(), static_cast<std::streamsize>(newContent.size()));
-                    file.close();
-                    THEN("Getting the value fails") {
-                        v_or = kv->get(key);
-                        REQUIRE(!v_or);
-                        REQUIRE(v_or.err().code == KVErrorCodes::HeaderCorrupted);
+            // entries are stored as [header, key, value]
+            // seek to last header and overwrite it
+            auto offset = 0;
+            for (auto i = 0; i < num_entries - 2; i++) {
+                offset += sizeof(aws::gg::kv::detail::KVHeader);
+                offset += test_data[i].first.size();
+                offset += test_data[i].second.size();
+            }
+            file.seekp(offset);
+
+            std::string corrupted_header = "A";
+            file.write(corrupted_header.c_str(), static_cast<std::streamsize>(corrupted_header.size()));
+            file.close();
+
+            THEN("Retrieving next to last entry fails") {
+                auto v_or = kv->get(test_data[num_entries - 2].first);
+                REQUIRE(!v_or);
+                REQUIRE(v_or.err().code == KVErrorCodes::HeaderCorrupted);
+
+                AND_WHEN("I reset the store") {
+                    kv.reset();
+                    kv_or = open_kv(temp_dir.path());
+                    REQUIRE(kv_or);
+                    kv = std::move(kv_or.val());
+
+                    THEN("Corrupted entry and subsequent entries are removed") {
+                        for (auto i = num_entries - 2; i < num_entries; i++) {
+                            v_or = kv->get(test_data[i].first);
+                            REQUIRE(!v_or);
+                            REQUIRE(v_or.err().code == KVErrorCodes::KeyNotFound);
+                        }
+
+                        AND_THEN("Rest of store is untouched") {
+                            for (auto i = 0; i < num_entries - 2; i++) {
+                                v_or = kv->get(test_data[i].first);
+                                REQUIRE(v_or);
+                                REQUIRE(v_or.val().string() == test_data[i].second);
+                            }
+                        }
                     }
                 }
             }
