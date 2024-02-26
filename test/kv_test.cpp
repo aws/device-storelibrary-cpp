@@ -86,7 +86,7 @@ static auto generate_key_values(const int count) {
     return key_values;
 }
 
-SCENARIO("I cannot create a KV map with invalid inputs", "kv") {
+SCENARIO("I cannot create a KV map with invalid inputs", "[kv]") {
     auto kv_or = KV::openOrCreate(KVOptions{
         .filesystem_implementation{},
         .identifier{"test-kv-map"},
