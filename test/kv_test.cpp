@@ -61,32 +61,7 @@ static auto open_kv_manual_compaction(const std::string &path) {
     });
 }
 
-static void random_string(std::string &s, const int len) {
-    static std::random_device rd;
-    static std::mt19937 mt(rd());
-    static std::uniform_int_distribution<int> dist(0, 25);
-    s.reserve(len);
-    for (int i = 0; i < len; ++i) {
-        s.push_back('a' + dist(mt));
-    }
-}
-
-// TODO consider making Catch generator for filled-up KV store
-static auto generate_key_values(const int count) {
-    std::vector<std::pair<std::string, std::string>> key_values;
-    for (auto i = 0; i < count; i++) {
-        std::string key;
-        random_string(key, 512);
-
-        std::string value;
-        random_string(value, 1 * 1024 * 1024);
-
-        key_values.emplace_back(key, value);
-    }
-    return key_values;
-}
-
-SCENARIO("I cannot create a KV map with invalid inputs", "[kv]") {
+SCENARIO("I cannot create a KV map with invalid inputs", "kv") {
     auto kv_or = KV::openOrCreate(KVOptions{
         .filesystem_implementation{},
         .identifier{"test-kv-map"},

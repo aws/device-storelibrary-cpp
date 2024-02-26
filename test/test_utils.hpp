@@ -15,6 +15,31 @@
 
 namespace {
 
+static void random_string(std::string &s, const int len) {
+    static std::random_device rd;
+    static std::mt19937 mt(rd());
+    static std::uniform_int_distribution<int> dist(0, 25);
+    s.reserve(len);
+    for (int i = 0; i < len; ++i) {
+        s.push_back('a' + dist(mt));
+    }
+}
+
+// TODO consider making Catch generator for filled-up KV store
+__attribute__((unused)) static auto generate_key_values(const int count) {
+    std::vector<std::pair<std::string, std::string>> key_values;
+    for (auto i = 0; i < count; i++) {
+        std::string key;
+        random_string(key, 512);
+
+        std::string value;
+        random_string(value, 1 * 1024 * 1024);
+
+        key_values.emplace_back(key, value);
+    }
+    return key_values;
+}
+
 class RandomStringGenerator : public Catch::Generators::IGenerator<std::string> {
     std::minstd_rand m_rand{std::random_device{}()};
     std::uniform_int_distribution<> m_length_dist;
