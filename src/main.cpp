@@ -32,7 +32,7 @@ class MyLogger : public aws::gg::logging::Logger {
 };
 
 int main() {
-    srand(time(nullptr));
+    srand(static_cast<uint32_t>(time(nullptr)));
     auto data = std::array<char, 128>{};
     for (char &i : data) {
         i = (rand() % 64) + 64;
@@ -53,10 +53,11 @@ int main() {
 
         if (use_kv) {
             auto kv_or = KV::openOrCreate(KVOptions{
-                .filesystem_implementation = fs,
-                .logger = logger,
-                .identifier = "m",
-                .compact_after = 16 * 1024 * 1024,
+                false,
+                fs,
+                logger,
+                "m",
+                16 * 1024 * 1024,
             });
             if (!kv_or) {
                 std::cerr << kv_or.err().msg << std::endl;
@@ -69,17 +70,18 @@ int main() {
         } else {
             // auto s = MemoryStream::openOrCreate(StreamOptions{.maximum_size_bytes = 500 * 1024 * 1024});
             auto s_or = FileStream::openOrCreate(StreamOptions{
-                .minimum_segment_size_bytes = 1024 * 1024,
-                .maximum_size_bytes = 10 * 1024 * 1024,
-                .file_implementation = fs,
-                .logger = logger,
-                .kv_options =
-                    KVOptions{
-                        .filesystem_implementation = fs,
-                        .logger = logger,
-                        .identifier = "m",
-                        .compact_after = 512 * 1024,
-                    },
+                1024 * 1024,
+                10 * 1024 * 1024,
+                false,
+                fs,
+                logger,
+                KVOptions{
+                    false,
+                    fs,
+                    logger,
+                    "m",
+                    512 * 1024,
+                },
             });
             if (!s_or) {
                 std::cerr << s_or.err().msg << std::endl;

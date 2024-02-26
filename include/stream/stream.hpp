@@ -202,17 +202,12 @@ namespace gg __attribute__((visibility("default"))) {
         bool full_corruption_check_on_open = false;
         const std::shared_ptr<FileSystemInterface> file_implementation{};
         const std::shared_ptr<logging::Logger> logger{};
-        kv::KVOptions kv_options = {.filesystem_implementation = file_implementation,
-                                    .logger = logger,
-                                    .identifier = "kv",
-                                    .compact_after = 128 * 1024};
+        kv::KVOptions kv_options = {false, file_implementation, logger, "kv", 128 * 1024};
     };
 
     inline expected<CheckpointableOwnedRecord, StreamError> Iterator::operator*() noexcept {
         if (auto stream = _stream.lock()) {
-            auto record_or = stream->read(sequence_number, ReadOptions{.check_for_corruption = true,
-                                                                       .may_return_later_records = true,
-                                                                       .suggested_start = _offset});
+            auto record_or = stream->read(sequence_number, ReadOptions{true, true, _offset});
             if (!record_or) {
                 return record_or.err();
             }

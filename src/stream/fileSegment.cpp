@@ -144,11 +144,7 @@ StreamError FileSegment::open(bool full_corruption_check_on_open) {
         }
         if (full_corruption_check_on_open) {
             auto value_or = read(static_cast<std::uint64_t>(header.relative_sequence_number) + _base_seq_num,
-                                 ReadOptions{
-                                     .check_for_corruption = true,
-                                     .may_return_later_records = false,
-                                     .suggested_start = offset,
-                                 });
+                                 ReadOptions{true, false, offset});
             if (!value_or) {
                 truncateAndLog(offset, value_or.err());
                 continue;
@@ -187,12 +183,12 @@ expected<uint64_t, FileError> FileSegment::append(BorrowedSlice d, int64_t times
     auto crc = static_cast<int64_t>(_htonll(
         crc32::crc32_of(BorrowedSlice{&ts, sizeof(ts)}, BorrowedSlice{&data_len_swap, sizeof(data_len_swap)}, d)));
     auto header = LogEntryHeader{
-        .relative_sequence_number =
-            static_cast<int32_t>(_htonl(static_cast<std::uint32_t>(sequence_number - _base_seq_num))),
-        .byte_position = byte_position,
-        .crc = crc,
-        .timestamp = ts,
-        .payload_length_bytes = static_cast<int32_t>(_htonl(d.size())),
+        static_cast<int32_t>(_htonl(static_cast<std::uint32_t>(MAGIC_AND_VERSION))),
+        static_cast<int32_t>(_htonl(static_cast<std::uint32_t>(sequence_number - _base_seq_num))),
+        byte_position,
+        crc,
+        ts,
+        static_cast<int32_t>(_htonl(d.size())),
     };
 
     // If an error happens when appending, truncate the file to the current size so that we don't have any
