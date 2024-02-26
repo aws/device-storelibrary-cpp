@@ -224,6 +224,82 @@ SCENARIO("I can detect a corrupt KV map value", "[kv]") {
     }
 }
 
+SCENARIO("KV store with multiple values per key is corrupted", "[kv]") {
+    GIVEN("I create an uncompacted KV map containing a key with multiple values") {
+        auto temp_dir = TempDir();
+        auto kv_or = open_kv(temp_dir.path());
+        REQUIRE(kv_or);
+
+        auto kv = std::move(kv_or.val());
+
+        auto num_unique_keys = 2;
+
+        auto test_data = generate_key_values(num_unique_keys);
+        for (const auto &key_value : test_data) {
+            auto e = kv->put(key_value.first, BorrowedSlice{key_value.second});
+            REQUIRE(e);
+            auto v_or = kv->get(key_value.first);
+            REQUIRE(v_or);
+            REQUIRE(std::string_view{v_or.val().char_data(), v_or.val().size()} == key_value.second);
+        }
+
+        // overwrite the values for each key
+        for (const auto &key_value : test_data) {
+            auto e = kv->put(key_value.first, BorrowedSlice{"overwritten"});
+            REQUIRE(e);
+            auto v_or = kv->get(key_value.first);
+            REQUIRE(v_or);
+            REQUIRE(std::string_view{v_or.val().char_data(), v_or.val().size()} == "overwritten");
+        }
+
+        WHEN("I corrupt the new values") {
+            std::fstream file(temp_dir.path() / "test-kv-map", std::ios::in | std::ios::out | std::ios::binary);
+            REQUIRE(file);
+
+            // entries are stored as [header, key, value]
+            auto offset = 0;
+            for (auto i = 0; i < num_unique_keys; i++) {
+                offset += sizeof(aws::gg::kv::detail::KVHeader);
+                offset += test_data[i].first.size();
+                offset += test_data[i].second.size();
+            }
+            file.seekp(offset);
+
+            std::string corrupted_header = "A";
+            file.write(corrupted_header.c_str(), static_cast<std::streamsize>(corrupted_header.size()));
+            file.close();
+
+            AND_WHEN("I reset the store") {
+                kv.reset();
+                kv_or = open_kv(temp_dir.path());
+                REQUIRE(kv_or);
+                kv = std::move(kv_or.val());
+
+                THEN("Old values are returned for the keys") {
+                    for (const auto &key_value : test_data) {
+                        auto v_or = kv->get(key_value.first);
+                        REQUIRE(v_or);
+                        REQUIRE(std::string_view{v_or.val().char_data(), v_or.val().size()} == key_value.second);
+                    }
+                }
+            }
+
+            AND_WHEN("I compact the store") {
+                REQUIRE(kv->compact());
+                THEN("Data is corrupted") {
+                    for (const auto &key_value : test_data) {
+                        auto v_or = kv->get(key_value.first);
+                        REQUIRE(!v_or);
+                        auto corrupted = v_or.err().code == KVErrorCodes::DataCorrupted ||
+                                         v_or.err().code == KVErrorCodes::HeaderCorrupted;
+                        REQUIRE(corrupted);
+                    }
+                }
+            }
+        }
+    }
+}
+
 SCENARIO("I can detect a corrupt KV map header", "[kv]") {
     GIVEN("I create a KV map with multiple entries") {
         auto temp_dir = TempDir();
