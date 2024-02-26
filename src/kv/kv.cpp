@@ -113,19 +113,9 @@ KVError KV::initialize() noexcept {
         }
 
         if (_opts.full_corruption_check_on_open) {
-            auto value_or = readValueFrom(beginning_pointer, header.key_length, header.value_length);
-
+            auto value_or = readValueFrom(beginning_pointer, header);
             if (!value_or) {
                 truncateAndLog(beginning_pointer, value_or.err());
-                continue;
-            }
-
-            auto crc = crc32::crc32_of(BorrowedSlice{&header.flags, sizeof(header.flags)},
-                                       BorrowedSlice{&header.key_length, sizeof(header.key_length)},
-                                       BorrowedSlice{&header.value_length, sizeof(header.value_length)},
-                                       BorrowedSlice{value_or.val().data(), value_or.val().size()});
-            if (crc != header.crc32) {
-                truncateAndLog(beginning_pointer, KVError{KVErrorCodes::DataCorrupted, {}});
                 continue;
             }
         }
@@ -219,11 +209,14 @@ expected<OwnedSlice, KVError> KV::readValueFrom(const uint32_t begin) const noex
     if (!header_or) {
         return header_or.err();
     }
-    auto header = header_or.val();
+    return readValueFrom(begin, header_or.val());
+}
 
-    auto value_or = readValueFrom(begin, header.key_length, header.value_length);
+expected<OwnedSlice, KVError> KV::readValueFrom(const uint32_t begin, const KVHeader header) const noexcept {
+    auto value_or = _f->read(begin + sizeof(KVHeader) + header.key_length,
+                             begin + sizeof(KVHeader) + header.key_length + header.value_length);
     if (!value_or) {
-        return value_or;
+        return fileErrorToKVError(value_or.err());
     }
     auto crc = crc32::crc32_of(BorrowedSlice{&header.flags, sizeof(header.flags)},
                                BorrowedSlice{&header.key_length, sizeof(header.key_length)},
@@ -232,16 +225,6 @@ expected<OwnedSlice, KVError> KV::readValueFrom(const uint32_t begin) const noex
 
     if (crc != header.crc32) {
         return KVError{KVErrorCodes::DataCorrupted, "CRC mismatch"};
-    }
-    return value_or;
-}
-
-expected<OwnedSlice, KVError> KV::readValueFrom(const uint32_t begin, key_length_type key_length,
-                                                value_length_type value_length) const noexcept {
-    auto value_or =
-        _f->read(begin + sizeof(KVHeader) + key_length, begin + sizeof(KVHeader) + key_length + value_length);
-    if (!value_or) {
-        return fileErrorToKVError(value_or.err());
     }
     return std::move(value_or.val());
 }
@@ -357,7 +340,7 @@ expected<uint32_t, KVError> KV::readWrite(uint32_t begin, std::pair<std::string,
         return header_or.err();
     }
     auto header = header_or.val();
-    auto value_or = readValueFrom(p.second, header.key_length, header.value_length);
+    auto value_or = readValueFrom(p.second, header);
     if (!value_or) {
         return value_or.err();
     }
