@@ -212,7 +212,7 @@ expected<OwnedSlice, KVError> KV::readValueFrom(const uint32_t begin) const noex
     return readValueFrom(begin, header_or.val());
 }
 
-expected<OwnedSlice, KVError> KV::readValueFrom(const uint32_t begin, const KVHeader header) const noexcept {
+expected<OwnedSlice, KVError> KV::readValueFrom(const uint32_t begin, const KVHeader &header) const noexcept {
     auto value_or = _f->read(begin + sizeof(KVHeader) + header.key_length,
                              begin + sizeof(KVHeader) + header.key_length + header.value_length);
     if (!value_or) {
@@ -380,6 +380,13 @@ KVError KV::compactNoLock() noexcept {
             auto point = in_point;
             auto err_or = readWrite(new_byte_pos, point, *shadow);
             if (!err_or) {
+                // if key is corrupted, remove it from the map
+                if (err_or.err().code == KVErrorCodes::HeaderCorrupted ||
+                    err_or.err().code == KVErrorCodes::DataCorrupted) {
+                    _opts.logger->log(logging::LogLevel::Warning, "Encountered corruption during compaction. Key <" +
+                                                                      point.first + "> will be dropped.");
+                    continue;
+                }
                 // Close and delete the partially written shadow
                 shadow.reset();
                 _opts.filesystem_implementation->remove(_shadow_name);

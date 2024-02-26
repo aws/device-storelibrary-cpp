@@ -61,7 +61,7 @@ static auto open_kv_manual_compaction(const std::string &path) {
     });
 }
 
-SCENARIO("I cannot create a KV map with invalid inputs", "kv") {
+SCENARIO("I cannot create a KV map with invalid inputs", "[kv]") {
     auto kv_or = KV::openOrCreate(KVOptions{
         .filesystem_implementation{},
         .identifier{"test-kv-map"},
@@ -252,7 +252,7 @@ SCENARIO("KV store with multiple values per key is corrupted", "[kv]") {
             REQUIRE(std::string_view{v_or.val().char_data(), v_or.val().size()} == "overwritten");
         }
 
-        WHEN("I corrupt the new values") {
+        WHEN("I corrupt the first value") {
             std::fstream file(temp_dir.path() / "test-kv-map", std::ios::in | std::ios::out | std::ios::binary);
             REQUIRE(file);
 
@@ -286,13 +286,16 @@ SCENARIO("KV store with multiple values per key is corrupted", "[kv]") {
 
             AND_WHEN("I compact the store") {
                 REQUIRE(kv->compact());
-                THEN("Data is corrupted") {
-                    for (const auto &key_value : test_data) {
-                        auto v_or = kv->get(key_value.first);
-                        REQUIRE(!v_or);
-                        auto corrupted = v_or.err().code == KVErrorCodes::DataCorrupted ||
-                                         v_or.err().code == KVErrorCodes::HeaderCorrupted;
-                        REQUIRE(corrupted);
+
+                THEN("The corrupted key is removed from the store") {
+                    auto v_or = kv->get(test_data[0].first);
+                    REQUIRE(!v_or);
+                    REQUIRE(v_or.err().code == KVErrorCodes::KeyNotFound);
+
+                    AND_THEN("The uncorrupted key is still in the store and points to newest value") {
+                        v_or = kv->get(test_data[1].first);
+                        REQUIRE(v_or);
+                        REQUIRE(v_or.val().string() == "overwritten");
                     }
                 }
             }

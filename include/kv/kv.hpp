@@ -73,7 +73,7 @@ namespace kv __attribute__((visibility("default"))) {
 
         expected<std::string, KVError> readKeyFrom(uint32_t, detail::key_length_type) const noexcept;
 
-        expected<OwnedSlice, KVError> readValueFrom(uint32_t, detail::KVHeader) const;
+        expected<OwnedSlice, KVError> readValueFrom(uint32_t, const detail::KVHeader &) const noexcept;
 
         expected<OwnedSlice, KVError> readValueFrom(uint32_t) const noexcept;
 
