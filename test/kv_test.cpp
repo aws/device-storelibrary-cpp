@@ -43,36 +43,43 @@ static const auto logger = std::make_shared<Logger>();
 
 static auto open_kv(const std::string &path) {
     return KV::openOrCreate(KVOptions{
-        .full_corruption_check_on_open = true,
-        .filesystem_implementation = std::make_shared<SpyFileSystem>(std::make_shared<PosixFileSystem>(path)),
-        .logger = logger,
-        .identifier = "test-kv-map",
-        .compact_after = 0,
+        true,
+        std::make_shared<SpyFileSystem>(std::make_shared<PosixFileSystem>(path)),
+        logger,
+        "test-kv-map",
+        0,
     });
 }
 
 static auto open_kv_manual_compaction(const std::string &path) {
     return KV::openOrCreate(KVOptions{
-        .full_corruption_check_on_open = true,
-        .filesystem_implementation = std::make_shared<SpyFileSystem>(std::make_shared<PosixFileSystem>(path)),
-        .logger = logger,
-        .identifier = "test-kv-map",
-        .compact_after = -1,
+        true,
+        std::make_shared<SpyFileSystem>(std::make_shared<PosixFileSystem>(path)),
+        logger,
+        "test-kv-map",
+        -1,
     });
 }
 
 SCENARIO("I cannot create a KV map with invalid inputs", "[kv]") {
     auto kv_or = KV::openOrCreate(KVOptions{
-        .filesystem_implementation{},
-        .identifier{"test-kv-map"},
+        {},
+        {},
+        {},
+        "test-kv-map",
+        {},
     });
     REQUIRE(!kv_or);
     REQUIRE(kv_or.err().code == KVErrorCodes::InvalidArguments);
 
     auto temp_dir = TempDir();
     kv_or = KV::openOrCreate(KVOptions{
-        .filesystem_implementation{std::make_shared<SpyFileSystem>(std::make_shared<PosixFileSystem>(temp_dir.path()))},
-        .identifier{}});
+        {},
+        {std::make_shared<SpyFileSystem>(std::make_shared<PosixFileSystem>(temp_dir.path()))},
+        {},
+        {},
+        {},
+    });
     REQUIRE(!kv_or);
     REQUIRE(kv_or.err().code == KVErrorCodes::InvalidArguments);
 }
