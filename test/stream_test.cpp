@@ -41,19 +41,18 @@ static const auto logger = std::make_shared<Logger>();
 
 static auto open_stream(std::shared_ptr<FileSystemInterface> fs) {
     return FileStream::openOrCreate(StreamOptions{
-        .minimum_segment_size_bytes = 1024 * 1024,
-        .maximum_size_bytes = 10 * 1024 * 1024,
-        .full_corruption_check_on_open = true,
-        .file_implementation = fs,
-        .logger = logger,
-        .kv_options =
-            kv::KVOptions{
-                .full_corruption_check_on_open = true,
-                .filesystem_implementation = fs,
-                .logger = logger,
-                .identifier = "m",
-                .compact_after = 1 * 1024,
-            },
+        1024 * 1024,
+        10 * 1024 * 1024,
+        true,
+        fs,
+        logger,
+        kv::KVOptions{
+            true,
+            fs,
+            logger,
+            "m",
+            1 * 1024,
+        },
     });
 }
 
