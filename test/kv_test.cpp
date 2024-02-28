@@ -142,24 +142,45 @@ SCENARIO("I create a KV map with manual compaction", "[kv]") {
 }
 
 SCENARIO("I open a KV map from a shadow file", "[kv]") {
-    auto temp_dir = TempDir();
-    std::filesystem::create_directories(temp_dir.path());
+    {
+        auto temp_dir = TempDir();
+        std::filesystem::create_directories(temp_dir.path());
 
-    // map1 is a valid KV map which is truncated to 5K which makes the last value unreadable.
-    // This will verify that we're still able to load the file and read as much as is uncorrupted.
-    std::filesystem::copy_file(std::filesystem::path(__FILE__).parent_path() / "test_data" / "kv" / "map1.kv",
-                               // identifier is test-kv-map, so the shadow file name is test-kv-maps
-                               temp_dir.path() / "test-kv-maps");
+        // map1 is a valid KV map which is truncated to 5K which makes the last value unreadable.
+        // This will verify that we're still able to load the file and read as much as is uncorrupted.
+        std::filesystem::copy_file(std::filesystem::path(__FILE__).parent_path() / "test_data" / "kv" / "map1.kv",
+                                   // identifier is test-kv-map, so the shadow file name is test-kv-maps
+                                   temp_dir.path() / "test-kv-maps");
 
-    auto kv_or = open_kv(temp_dir.path());
-    REQUIRE(kv_or);
-    auto kv = std::move(kv_or.val());
+        auto kv_or = open_kv(temp_dir.path());
+        REQUIRE(kv_or);
+        auto kv = std::move(kv_or.val());
 
-    auto keys_or = kv->listKeys();
-    REQUIRE(keys_or);
-    auto keys = keys_or.val();
-    REQUIRE(keys.size() == 1);
-    REQUIRE(keys.front() == "a"s);
+        auto keys_or = kv->listKeys();
+        REQUIRE(keys_or);
+        auto keys = keys_or.val();
+        REQUIRE(keys.size() == 1);
+        REQUIRE(keys.front() == "a"s);
+    }
+    {
+        auto temp_dir = TempDir();
+        std::filesystem::create_directories(temp_dir.path());
+
+        // map2 is a valid KV map which is truncated to 33 bytes which makes the last key unreadable.
+        // This will verify that we're still able to load the file and read as much as is uncorrupted.
+        std::filesystem::copy_file(std::filesystem::path(__FILE__).parent_path() / "test_data" / "kv" / "map2.kv",
+                                   // identifier is test-kv-map, so the shadow file name is test-kv-maps
+                                   temp_dir.path() / "test-kv-maps");
+        auto kv_or = open_kv(temp_dir.path());
+        REQUIRE(kv_or);
+        auto kv = std::move(kv_or.val());
+
+        auto keys_or = kv->listKeys();
+        REQUIRE(keys_or);
+        auto keys = keys_or.val();
+        REQUIRE(keys.size() == 1);
+        REQUIRE(keys.front() == "a"s);
+    }
 }
 
 SCENARIO("I can detect a corrupt KV map value", "[kv]") {
