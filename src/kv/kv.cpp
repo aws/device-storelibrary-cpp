@@ -106,6 +106,7 @@ KVError KV::initialize() noexcept {
         }
         const auto header = header_or.val();
 
+        // Checking key corruption is currently not supported. This can be added by computing crc32 on the key
         auto key_or = readKeyFrom(beginning_pointer, header.key_length);
         if (!key_or) {
             truncateAndLog(beginning_pointer, key_or.err());

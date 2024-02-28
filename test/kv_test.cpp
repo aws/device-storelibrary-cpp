@@ -181,12 +181,60 @@ SCENARIO("I can detect a corrupt KV map value", "[kv]") {
             REQUIRE(std::string_view{v_or.val().char_data(), v_or.val().size()} == key_value.second);
         }
 
+        WHEN("I corrupt the next to last entry's key") {
+            std::fstream file(temp_dir.path() / "test-kv-map", std::ios::in | std::ios::out | std::ios::binary);
+            REQUIRE(file);
+
+            // entries are stored as [header, key, value]
+            // seek next to last key and overwrite it
+            auto offset = 0;
+            for (auto i = 0; i < num_entries - 2; i++) {
+                offset += sizeof(aws::gg::kv::detail::KVHeader);
+                offset += test_data[i].first.size();
+                offset += test_data[i].second.size();
+            }
+
+            file.seekp(offset + sizeof(aws::gg::kv::detail::KVHeader));
+
+            std::string corrupted_key = "key";
+            std::string non_corrupted_key = test_data[num_entries - 2].first;
+            file.write(corrupted_key.c_str(), static_cast<std::streamsize>(corrupted_key.size()));
+            file.close();
+
+            THEN("Retrieving next to last entry succeeds") {
+                auto v_or = kv->get(test_data[num_entries - 2].first);
+                REQUIRE(v_or);
+                REQUIRE(std::string_view{v_or.val().char_data(), v_or.val().size()} == test_data[num_entries - 2].second);
+
+                AND_WHEN("I reset the store") {
+                    kv.reset();
+                    kv_or = open_kv(temp_dir.path());
+                    REQUIRE(kv_or);
+                    kv = std::move(kv_or.val());
+
+                    THEN("KeyNotFound for corrupted Key and rest of the store is untouched") {
+                        for (auto i = 0; i < num_entries; i++) {
+                            if (i == num_entries - 2) {
+                                v_or = kv->get(test_data[i].first);
+                                REQUIRE(!v_or);
+                                REQUIRE(v_or.err().code == KVErrorCodes::KeyNotFound);
+                            } else {
+                                v_or = kv->get(test_data[i].first);
+                                REQUIRE(v_or);
+                                REQUIRE(v_or.val().string() == test_data[i].second);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         WHEN("I corrupt the next to last entry's value") {
             std::fstream file(temp_dir.path() / "test-kv-map", std::ios::in | std::ios::out | std::ios::binary);
             REQUIRE(file);
 
             // entries are stored as [header, key, value]
-            // seek to last value and overwrite it
+            // seek next to last value and overwrite it
             auto offset = 0;
             for (auto i = 0; i < num_entries - 2; i++) {
                 offset += sizeof(aws::gg::kv::detail::KVHeader);
