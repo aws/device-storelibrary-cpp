@@ -113,6 +113,28 @@ SCENARIO("Stream deletes oldest data when full", "[stream]") {
     REQUIRE(stream->currentSizeBytes() < 10 * 1024 * 1024);
 }
 
+SCENARIO("I can delete an iterator") {
+    WHEN("I create an iterator") {
+        auto temp_dir = TempDir();
+        auto fs = std::make_shared<SpyFileSystem>(std::make_shared<PosixFileSystem>(temp_dir.path()));
+        auto stream_or = open_stream(fs);
+        REQUIRE(stream_or);
+        auto stream = std::move(stream_or.val());
+        auto app_or = stream->append(BorrowedSlice{"val"}, AppendOptions{});
+        REQUIRE(app_or);
+
+        auto it = stream->openOrCreateIterator("ita", IteratorOptions{});
+
+        THEN("I checkpoint the iterator") {
+            (*it).val().checkpoint();
+
+            THEN("I can delete the iterator") { REQUIRE(stream->deleteIterator("ita")); }
+        }
+
+        THEN("I can delete the iterator") { REQUIRE(stream->deleteIterator("ita")); }
+    }
+}
+
 SCENARIO("I can create a stream", "[stream]") {
     auto temp_dir = TempDir();
     auto fs = std::make_shared<SpyFileSystem>(std::make_shared<PosixFileSystem>(temp_dir.path()));

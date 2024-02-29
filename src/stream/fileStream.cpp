@@ -246,7 +246,13 @@ StreamError PersistentIterator::setCheckpoint(uint64_t sequence_number) {
     return kvErrorToStreamError(e);
 }
 
-StreamError PersistentIterator::remove() { return kvErrorToStreamError(_store->remove(_id)); }
+StreamError PersistentIterator::remove() {
+    auto e = _store->remove(_id);
+    if (e.code == kv::KVErrorCodes::KeyNotFound) {
+        return StreamError{StreamErrorCode::NoError, {}};
+    }
+    return kvErrorToStreamError(e);
+}
 
 } // namespace gg
 }; // namespace aws
