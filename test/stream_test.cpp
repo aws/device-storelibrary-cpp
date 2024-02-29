@@ -2,6 +2,9 @@
 #include "stream/fileStream.hpp"
 #include "test_utils.hpp"
 #include <catch2/catch_test_macros.hpp>
+#include <fstream>
+#include <iostream>
+#include <map>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -54,6 +57,38 @@ static auto open_stream(std::shared_ptr<FileSystemInterface> fs) {
             1 * 1024,
         },
     });
+}
+
+static const auto log_header_size = 32;
+
+static auto read_stream_values_by_segment(std::shared_ptr<SpyFileSystem> fs, std::filesystem::path temp_dir_path,
+                                          int value_size) {
+    auto files_or = fs->list();
+    REQUIRE(files_or);
+    auto files = std::move(files_or.val());
+    std::sort(files.begin(), files.end());
+    std::map<std::string, std::vector<std::string>> segments;
+    for (const auto &f : files) {
+        if (f.rfind(".log") == std::string::npos) {
+            continue;
+        }
+        auto file_or = fs->open(temp_dir_path / f);
+        REQUIRE(file_or);
+        std::vector<std::string> values;
+        auto pos = 0;
+        while (true) {
+            pos += log_header_size;
+            auto val_or = file_or.val()->read(pos, pos + value_size);
+            if (!val_or) {
+                REQUIRE(val_or.err().code == FileErrorCode::EndOfFile);
+                break;
+            }
+            values.emplace_back(val_or.val().string());
+            pos += value_size;
+        }
+        segments[f] = std::move(values);
+    }
+    return segments;
 }
 
 SCENARIO("I cannot create a stream", "[stream]") {
@@ -207,6 +242,115 @@ SCENARIO("I can create a stream", "[stream]") {
             v_or = *it;
             REQUIRE(v_or);
             REQUIRE(std::string_view{v_or.val().data.char_data(), v_or.val().data.size()} == value);
+        }
+    }
+}
+
+SCENARIO("Stream detects and recovers from corruption", "[stream]") {
+    auto temp_dir = TempDir();
+    auto fs = std::make_shared<SpyFileSystem>(std::make_shared<PosixFileSystem>(temp_dir.path()));
+
+    constexpr auto num_stream_values = 10;
+    constexpr auto stream_value_size = 1024 * 1024 / 4;
+
+    auto stream_or = open_stream(fs);
+    REQUIRE(stream_or);
+
+    // create stream and populate with random values
+    auto stream = std::move(stream_or.val());
+    for (auto i = 0; i < num_stream_values; i++) {
+        std::string value;
+        random_string(value, stream_value_size);
+        REQUIRE(stream->append(BorrowedSlice{value}, AppendOptions{}));
+    }
+
+    // sanity check: verify we can read all values in the stream
+    for (auto i = 0; i < num_stream_values; i++) {
+        REQUIRE(stream->read(i, ReadOptions{}));
+    }
+
+    std::map<std::string, std::vector<std::string>> segments =
+        read_stream_values_by_segment(fs, temp_dir.path(), stream_value_size);
+    REQUIRE(segments.size() > 1);
+
+    auto first_segment = segments.begin();
+    auto second_segment = std::next(segments.begin(), 1);
+
+    WHEN("I corrupt the second header in the first segment") {
+        std::fstream file(temp_dir.path() / first_segment->first, std::ios::in | std::ios::out | std::ios::binary);
+        REQUIRE(file);
+        file.seekp(log_header_size + stream_value_size);
+        std::string corrupted_header = "A";
+        file.write(corrupted_header.c_str(), static_cast<std::streamsize>(corrupted_header.size()));
+        file.close();
+
+        THEN("Reading data in segment, starting at corrupted entry, fails") {
+
+            // first entry isn't corrupted
+            auto val_or = stream->read(0, ReadOptions{});
+            REQUIRE(val_or);
+            REQUIRE(val_or.val().data.string() == first_segment->second[0]);
+
+            // rest of the current segment is unreadable
+            for (auto i = 1; i < static_cast<int>(first_segment->second.size()); i++) {
+                auto data_or = stream->read(i, ReadOptions{});
+                REQUIRE(!data_or);
+                REQUIRE(data_or.err().code == StreamErrorCode::RecordNotFound);
+            }
+
+            // reading data in next segment still works
+            val_or = stream->read(first_segment->second.size(), ReadOptions{});
+            REQUIRE(val_or);
+            REQUIRE(val_or.val().data.string() == second_segment->second[0]);
+
+            THEN("Reading data with may_return_later_records option will skip to the next segment") {
+                // first entry isn't corrupted
+                val_or = stream->read(0, ReadOptions{{}, true, {}});
+                REQUIRE(val_or);
+                REQUIRE(val_or.val().data.string() == first_segment->second[0]);
+
+                // instead of reading next entry (which is corrupted), skip to next segment
+                val_or = stream->read(1, ReadOptions{{}, true, {}});
+                REQUIRE(val_or);
+                REQUIRE(val_or.val().data.string() == second_segment->second[0]);
+
+                AND_WHEN("I reopen the stream") {
+                    stream_or = open_stream(fs);
+                    REQUIRE(stream_or);
+                    stream = std::move(stream_or.val());
+
+                    THEN("Reading data in segment, starting at corrupted entry, fails") {
+                        // first entry isn't corrupted
+                        val_or = stream->read(0, ReadOptions{});
+                        REQUIRE(val_or);
+                        REQUIRE(val_or.val().data.string() == first_segment->second[0]);
+
+                        // rest of the current segment is unreadable
+                        for (auto i = 1; i < static_cast<int>(first_segment->second.size()); i++) {
+                            auto data_or = stream->read(i, ReadOptions{});
+                            REQUIRE(!data_or);
+                            REQUIRE(data_or.err().code == StreamErrorCode::RecordNotFound);
+                        }
+
+                        // reading data in next segment still works
+                        val_or = stream->read(first_segment->second.size(), ReadOptions{});
+                        REQUIRE(val_or);
+                        REQUIRE(val_or.val().data.string() == second_segment->second[0]);
+
+                        THEN("Reading data with may_return_later_records option will skip to the next segment") {
+                            // first entry isn't corrupted
+                            val_or = stream->read(0, ReadOptions{{}, true, {}});
+                            REQUIRE(val_or);
+                            REQUIRE(val_or.val().data.string() == first_segment->second[0]);
+
+                            // instead of reading next entry (which is corrupted), skip to next segment
+                            val_or = stream->read(1, ReadOptions{{}, true, {}});
+                            REQUIRE(val_or);
+                            REQUIRE(val_or.val().data.string() == second_segment->second[0]);
+                        }
+                    }
+                }
+            }
         }
     }
 }

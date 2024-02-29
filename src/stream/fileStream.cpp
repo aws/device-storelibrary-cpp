@@ -168,22 +168,31 @@ expected<OwnedRecord, StreamError> FileStream::read(uint64_t sequence_number,
     // We will continue to the next available record if any record is not found, data, or header corruption.
     bool find_exact = true;
     for (const auto &seg : _segments) {
-        bool have_exact_segment = sequence_number >= seg.getBaseSeqNum() && sequence_number <= seg.getHighestSeqNum();
+        const auto have_exact_segment =
+            sequence_number >= seg.getBaseSeqNum() && sequence_number <= seg.getHighestSeqNum();
+
+        // sequence_number may refer to a corrupted entry from the previous segment.
+        // this can happen when stream re-opened and the segment is truncated due to corruption
+        // (highest sequence number is changed).
+        //
+        // in such cases, we should attempt to return the next available record (if configured)
+        if (sequence_number < seg.getBaseSeqNum() && read_options.may_return_later_records) {
+            find_exact = false;
+        }
 
         if (have_exact_segment || !find_exact) {
             auto val_or = seg.read(sequence_number, read_options);
-
             if (val_or) {
                 return val_or;
-            } else if ((val_or.err().code == StreamErrorCode::RecordNotFound ||
-                        val_or.err().code == StreamErrorCode::RecordDataCorrupted ||
-                        val_or.err().code == StreamErrorCode::HeaderDataCorrupted) &&
-                       read_options.may_return_later_records) {
+            }
+            if ((val_or.err().code == StreamErrorCode::RecordNotFound ||
+                 val_or.err().code == StreamErrorCode::RecordDataCorrupted ||
+                 val_or.err().code == StreamErrorCode::HeaderDataCorrupted) &&
+                read_options.may_return_later_records) {
                 // Fallback to the next available record in the next segment (if any)
                 find_exact = false;
                 // Since we're skipping to a new segment, we should definitely start from the beginning of it
                 read_options.suggested_start = 0;
-                continue;
             }
         }
     }
