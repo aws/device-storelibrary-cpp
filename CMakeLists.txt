@@ -80,9 +80,10 @@ if (TARGET cmakeformat)
     add_dependencies(default cmakeformat)
 endif ()
 
+list(JOIN CMAKE_CXX_IMPLICIT_LINK_DIRECTORIES : DISCOVERED_LD_PATH)
 # Setup the 'release' target (which is run on Package Builder).
 add_custom_target(release
         COMMENT "Build and install the library, and run the unit tests."
-        COMMAND "${CMAKE_COMMAND}" -E chdir "${CMAKE_BINARY_DIR}/test" "./tests" * --durations yes
+        COMMAND "${CMAKE_COMMAND}" -E env LD_LIBRARY_PATH=${DISCOVERED_LD_PATH} "test/tests" --durations yes
         DEPENDS tests
         USES_TERMINAL)

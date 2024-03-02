@@ -8,13 +8,8 @@ package.AWSGreenlakeDBCpp = {
             CMake = 3.25.x;
             Ninja = 1.x;
 
-            # Use GGC
-            GCC = 13.x;
-            CFlagsGCC = 13.x;
-
-            # Or use Clang
-            #Clang = 15.x;
-            #CFlagsClang = 15.x;
+            GCC = 10.x;
+            CFlagsGCC = 10.x
         };
     };
 
@@ -29,4 +24,9 @@ package.AWSGreenlakeDBCpp = {
         };
     };
 
+    test-dependencies = {
+        1.0 = {
+            Catch2 = 3.x;
+        };
+    };
 };
