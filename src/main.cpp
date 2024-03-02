@@ -35,7 +35,7 @@ int main() {
     srand(static_cast<uint32_t>(time(nullptr)));
     auto data = std::array<char, 128>{};
     for (char &i : data) {
-        i = (rand() % 64) + 64;
+        i = static_cast<char>((rand() % 64) + 64);
     }
 
     constexpr int NUM_RECORDS = 100000;

@@ -6,12 +6,12 @@ namespace aws {
 namespace gg {
 static constexpr const char *const RecordNotFoundErrorStr = "Record not found";
 
-std::shared_ptr<MemoryStream> MemoryStream::openOrCreate(StreamOptions &&opts) {
+std::shared_ptr<MemoryStream> MemoryStream::openOrCreate(StreamOptions &&opts) noexcept {
     return std::shared_ptr<MemoryStream>(new MemoryStream(std::move(opts)));
 }
 
-expected<uint64_t, StreamError> MemoryStream::append(BorrowedSlice d, const AppendOptions &) {
-    auto record_size = d.size();
+expected<uint64_t, StreamError> MemoryStream::append(BorrowedSlice d, const AppendOptions &) noexcept {
+    const auto record_size = d.size();
     auto ok = remove_records_if_new_record_beyond_max_size(record_size);
     if (!ok) {
         return ok;
@@ -23,7 +23,7 @@ expected<uint64_t, StreamError> MemoryStream::append(BorrowedSlice d, const Appe
     return seq;
 }
 
-StreamError MemoryStream::remove_records_if_new_record_beyond_max_size(uint32_t record_size) {
+StreamError MemoryStream::remove_records_if_new_record_beyond_max_size(uint32_t record_size) noexcept {
     if (record_size > _opts.maximum_size_bytes) {
         return StreamError{StreamErrorCode::RecordTooLarge, {}};
     }
@@ -31,23 +31,24 @@ StreamError MemoryStream::remove_records_if_new_record_beyond_max_size(uint32_t 
     // Make room if we need more room
     if (_current_size_bytes + record_size > _opts.maximum_size_bytes) {
         // TODO: Bail out early if we have enough space
-        _records.erase(std::remove_if(_records.begin(), _records.end(),
-                                      [&](const auto &r) {
-                                          if (_current_size_bytes + record_size > _opts.maximum_size_bytes) {
-                                              _current_size_bytes -= r.data.size();
-                                              return true;
-                                          }
-                                          return false;
-                                      }),
-                       _records.end());
+        std::ignore =
+            _records.erase(std::remove_if(_records.begin(), _records.end(),
+                                          [&](const auto &r) {
+                                              if (_current_size_bytes + record_size > _opts.maximum_size_bytes) {
+                                                  _current_size_bytes -= r.data.size();
+                                                  return true;
+                                              }
+                                              return false;
+                                          }),
+                           _records.end());
         _first_sequence_number = _records.front().sequence_number;
     }
 
     return StreamError{StreamErrorCode::NoError, {}};
 }
 
-expected<uint64_t, StreamError> MemoryStream::append(OwnedSlice &&d, const AppendOptions &) {
-    auto record_size = d.size();
+expected<uint64_t, StreamError> MemoryStream::append(OwnedSlice &&d, const AppendOptions &) noexcept {
+    const auto record_size = d.size();
     auto ok = remove_records_if_new_record_beyond_max_size(record_size);
     if (!ok) {
         return ok;
@@ -59,7 +60,8 @@ expected<uint64_t, StreamError> MemoryStream::append(OwnedSlice &&d, const Appen
     return seq;
 }
 
-expected<OwnedRecord, StreamError> MemoryStream::read(uint64_t sequence_number, const ReadOptions &) const {
+expected<OwnedRecord, StreamError> MemoryStream::read(const uint64_t sequence_number,
+                                                      const ReadOptions &) const noexcept {
     if (sequence_number < _first_sequence_number) {
         return StreamError{StreamErrorCode::RecordNotFound, RecordNotFoundErrorStr};
     }
@@ -73,7 +75,7 @@ expected<OwnedRecord, StreamError> MemoryStream::read(uint64_t sequence_number, 
                 OwnedSlice{BorrowedSlice(r.data.data(), r.data.size())},
                 r.timestamp,
                 r.sequence_number,
-                0,
+                0U,
             };
         }
     }
@@ -81,17 +83,17 @@ expected<OwnedRecord, StreamError> MemoryStream::read(uint64_t sequence_number, 
     return StreamError{StreamErrorCode::RecordNotFound, RecordNotFoundErrorStr};
 }
 
-Iterator MemoryStream::openOrCreateIterator(const std::string &identifier, IteratorOptions) {
+Iterator MemoryStream::openOrCreateIterator(const std::string &identifier, IteratorOptions) noexcept {
     return Iterator{WEAK_FROM_THIS(), identifier,
-                    _iterators.count(identifier) ? _iterators[identifier] : _first_sequence_number.load()};
+                    _iterators.count(identifier) > 0U ? _iterators[identifier] : _first_sequence_number.load()};
 }
 
-StreamError MemoryStream::deleteIterator(const std::string &identifier) {
-    _iterators.erase(identifier);
+StreamError MemoryStream::deleteIterator(const std::string &identifier) noexcept {
+    std::ignore = _iterators.erase(identifier);
     return StreamError{StreamErrorCode::NoError, {}};
 }
 
-StreamError MemoryStream::setCheckpoint(const std::string &identifier, uint64_t sequence_number) {
+StreamError MemoryStream::setCheckpoint(const std::string &identifier, uint64_t sequence_number) noexcept {
     _iterators[identifier] = sequence_number;
     return StreamError{StreamErrorCode::NoError, {}};
 }

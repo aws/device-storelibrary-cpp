@@ -44,14 +44,14 @@ class FileSegment {
     std::unique_ptr<FileLike> _f;
     std::shared_ptr<FileSystemInterface> _file_implementation{};
     std::shared_ptr<logging::Logger> _logger;
-    std::uint64_t _base_seq_num{1};
-    std::uint64_t _highest_seq_num{0};
-    std::uint32_t _total_bytes{0};
+    std::uint64_t _base_seq_num{1U};
+    std::uint64_t _highest_seq_num{0U};
+    std::uint32_t _total_bytes{0U};
     std::string _segment_id;
 
     static LogEntryHeader convertSliceToHeader(const OwnedSlice &) noexcept;
 
-    void truncateAndLog(uint32_t truncate, const StreamError &err) const;
+    void truncateAndLog(uint32_t truncate, const StreamError &err) const noexcept;
 };
 
 class PersistentIterator {
@@ -61,12 +61,12 @@ class PersistentIterator {
     uint64_t getSequenceNumber() const noexcept { return _sequence_number; }
     const std::string &getIdentifier() const noexcept { return _id; }
     StreamError setCheckpoint(uint64_t) noexcept;
-    StreamError remove() noexcept;
+    StreamError remove() const noexcept;
 
   private:
     std::string _id;
     std::shared_ptr<kv::KV> _store;
-    uint64_t _sequence_number{0};
+    uint64_t _sequence_number{0U};
 };
 
 class __attribute__((visibility("default"))) FileStream final : public StreamInterface {
@@ -78,8 +78,8 @@ class __attribute__((visibility("default"))) FileStream final : public StreamInt
     std::vector<FileSegment> _segments{};
 
     explicit FileStream(StreamOptions &&o) noexcept : _opts(std::move(o)) {
-        _iterators.reserve(1);
-        _segments.reserve(1 + ((_opts.maximum_size_bytes - 1) / _opts.minimum_segment_size_bytes));
+        _iterators.reserve(1U);
+        _segments.reserve(1U + (_opts.maximum_size_bytes - 1U) / _opts.minimum_segment_size_bytes);
     }
 
     StreamError removeSegmentsIfNewRecordBeyondMaxSize(uint32_t record_size) noexcept;
@@ -90,15 +90,15 @@ class __attribute__((visibility("default"))) FileStream final : public StreamInt
   public:
     static expected<std::shared_ptr<FileStream>, StreamError> openOrCreate(StreamOptions &&) noexcept;
 
-    expected<uint64_t, StreamError> append(BorrowedSlice, const AppendOptions &) noexcept override;
-    expected<uint64_t, StreamError> append(OwnedSlice &&, const AppendOptions &) noexcept override;
+    virtual expected<uint64_t, StreamError> append(BorrowedSlice, const AppendOptions &) noexcept override;
+    virtual expected<uint64_t, StreamError> append(OwnedSlice &&, const AppendOptions &) noexcept override;
 
-    expected<OwnedRecord, StreamError> read(uint64_t, const ReadOptions &) const noexcept override;
+    virtual expected<OwnedRecord, StreamError> read(uint64_t, const ReadOptions &) const noexcept override;
 
-    Iterator openOrCreateIterator(const std::string &identifier, IteratorOptions) noexcept override;
-    StreamError deleteIterator(const std::string &identifier) noexcept override;
+    virtual Iterator openOrCreateIterator(const std::string &identifier, IteratorOptions) noexcept override;
+    virtual StreamError deleteIterator(const std::string &identifier) noexcept override;
 
-    StreamError setCheckpoint(const std::string &, uint64_t) noexcept override;
+    virtual StreamError setCheckpoint(const std::string &, uint64_t) noexcept override;
 };
 
 } // namespace gg

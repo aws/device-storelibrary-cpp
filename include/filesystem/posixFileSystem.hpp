@@ -13,9 +13,9 @@ namespace gg __attribute__((visibility("default"))) {
     static inline void sync(int fileno) {
         // Only sync data if available on this OS. Otherwise, just fsync.
 #if _POSIX_SYNCHRONIZED_IO > 0
-        fdatasync(fileno);
+        std::ignore = fdatasync(fileno);
 #else
-        fsync(fileno);
+        std::ignore = fsync(fileno);
 #endif
     }
 
@@ -62,8 +62,8 @@ namespace gg __attribute__((visibility("default"))) {
         PosixFileLike &operator=(PosixFileLike &&) = delete;
 
         ~PosixFileLike() override {
-            if (_f) {
-                std::fclose(_f);
+            if (_f != nullptr) {
+                std::ignore = std::fclose(_f);
             }
         }
 
@@ -88,19 +88,18 @@ namespace gg __attribute__((visibility("default"))) {
             if (std::fseek(_f, begin, SEEK_SET) != 0) {
                 return errnoToFileError(errno);
             }
-            if (std::fread((void *)d.data(), d.size(), 1, _f) != 1) {
+            if (std::fread(d.data(), d.size(), 1U, _f) != 1U) {
                 if (feof(_f) != 0) {
                     return {FileError{FileErrorCode::EndOfFile, {}}};
-                } else {
-                    return errnoToFileError(errno);
                 }
+                return errnoToFileError(errno);
             }
             return d;
         };
 
-        FileError append(BorrowedSlice data) override {
+        FileError append(const BorrowedSlice data) override {
             clearerr(_f);
-            if (fwrite(data.data(), data.size(), 1, _f) != 1) {
+            if (fwrite(data.data(), data.size(), 1U, _f) != 1U) {
                 return errnoToFileError(errno);
             }
             return {FileErrorCode::NoError, {}};
@@ -115,7 +114,7 @@ namespace gg __attribute__((visibility("default"))) {
 
         void sync() override { aws::gg::sync(fileno(_f)); }
 
-        FileError truncate(uint32_t max) override {
+        FileError truncate(const uint32_t max) override {
             if (ftruncate(fileno(_f), max) != 0) {
                 return errnoToFileError(errno);
             }
@@ -136,7 +135,7 @@ namespace gg __attribute__((visibility("default"))) {
         PosixUnbufferedFileLike &operator=(PosixUnbufferedFileLike &&) = delete;
 
         ~PosixUnbufferedFileLike() override {
-            if (_f) {
+            if (_f > 0) {
                 ::close(_f);
             }
         }
@@ -150,11 +149,11 @@ namespace gg __attribute__((visibility("default"))) {
             return FileError{FileErrorCode::NoError, {}};
         }
 
-        expected<OwnedSlice, FileError> read(uint32_t begin, uint32_t end) override {
+        expected<OwnedSlice, FileError> read(const uint32_t begin, const uint32_t end) override {
             if (end < begin) {
                 return FileError{FileErrorCode::InvalidArguments, "End must be after the beginning"};
             } else if (end == begin) {
-                return OwnedSlice{0};
+                return OwnedSlice{0U};
             }
 
             std::lock_guard<std::mutex> lock(_read_lock);
@@ -164,11 +163,11 @@ namespace gg __attribute__((visibility("default"))) {
                 return errnoToFileError(errno);
             }
 
-            uint8_t *read_pointer = d.data();
+            auto *read_pointer = static_cast<uint8_t *>(d.data());
             uint32_t read_remaining = d.size();
 
-            while (read_remaining > 0) {
-                auto did_read = ::read(_f, read_pointer, read_remaining);
+            while (read_remaining > 0U) {
+                const auto did_read = ::read(_f, read_pointer, read_remaining);
 
                 if (did_read == 0) {
                     return {FileError{FileErrorCode::EndOfFile, {}}};
@@ -183,12 +182,12 @@ namespace gg __attribute__((visibility("default"))) {
             return d;
         };
 
-        FileError append(BorrowedSlice data) override {
-            const uint8_t *write_pointer = data.data();
+        FileError append(const BorrowedSlice data) override {
+            const auto *write_pointer = static_cast<const uint8_t *>(data.data());
             uint32_t write_remaining = data.size();
 
-            while (write_remaining > 0) {
-                auto did_write = ::write(_f, write_pointer, write_remaining);
+            while (write_remaining > 0U) {
+                const auto did_write = ::write(_f, write_pointer, write_remaining);
                 if (did_write <= 0) {
                     return errnoToFileError(errno);
                 }
@@ -204,7 +203,7 @@ namespace gg __attribute__((visibility("default"))) {
 
         void sync() override { aws::gg::sync(_f); }
 
-        FileError truncate(uint32_t max) override {
+        FileError truncate(const uint32_t max) override {
             if (ftruncate(_f, max) != 0) {
                 return errnoToFileError(errno);
             }
@@ -245,7 +244,7 @@ namespace gg __attribute__((visibility("default"))) {
 
         FileError remove(const std::string &id) override {
             std::error_code ec;
-            std::filesystem::remove(_base_path / id, ec);
+            std::ignore = std::filesystem::remove(_base_path / id, ec);
             if (!ec) {
                 return {FileErrorCode::NoError, {}};
             }
@@ -255,7 +254,7 @@ namespace gg __attribute__((visibility("default"))) {
         expected<std::vector<std::string>, FileError> list() override {
             std::vector<std::string> output;
             for (const auto &entry : std::filesystem::directory_iterator(_base_path)) {
-                output.emplace_back(entry.path().filename().string());
+                std::ignore = output.emplace_back(entry.path().filename().string());
             }
             return output;
         };

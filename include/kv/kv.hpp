@@ -14,22 +14,20 @@ namespace aws {
 namespace gg {
 namespace kv __attribute__((visibility("default"))) {
     namespace detail {
-    constexpr uint8_t VERSION = 0x01;
-    constexpr uint8_t MAGIC = 0xB0;
-    constexpr uint8_t MAGIC_AND_VERSION = static_cast<uint8_t>(MAGIC << 4 | VERSION);
+    constexpr uint8_t MAGIC_AND_VERSION = 0xB1U;
 
     using value_length_type = uint32_t;
     using key_length_type = uint16_t;
-    constexpr auto VALUE_LENGTH_MAX = UINT32_MAX;
-    constexpr auto KEY_LENGTH_MAX = UINT16_MAX;
+    constexpr auto VALUE_LENGTH_MAX = UINT32_MAX / 2U;
+    constexpr uint16_t KEY_LENGTH_MAX = 0xFFFFU;
 
 #pragma pack(push, 4)
     struct KVHeader {
         uint8_t magic_and_version{MAGIC_AND_VERSION};
-        uint8_t flags{0};
-        key_length_type key_length{0};
-        uint32_t crc32{0};
-        value_length_type value_length{0};
+        uint8_t flags{0U};
+        key_length_type key_length{0U};
+        uint32_t crc32{0U};
+        value_length_type value_length{0U};
     };
 #pragma pack(pop)
 
@@ -65,8 +63,8 @@ namespace kv __attribute__((visibility("default"))) {
         std::string _shadow_name;
         std::vector<std::pair<std::string, uint32_t>> _key_pointers{};
         std::unique_ptr<FileLike> _f{nullptr};
-        std::uint32_t _byte_position{0};
-        std::uint32_t _added_bytes{0};
+        std::uint32_t _byte_position{0U};
+        std::uint32_t _added_bytes{0U};
         mutable std::mutex _lock{};
 
         expected<detail::KVHeader, KVError> readHeaderFrom(uint32_t) const noexcept;
@@ -96,7 +94,7 @@ namespace kv __attribute__((visibility("default"))) {
 
         inline KVError writeEntry(const std::string &key, BorrowedSlice data, uint8_t flags) const noexcept;
 
-        template <typename... Args> inline FileError appendMultiple(const Args &...args) const noexcept;
+        template <typename... Args> FileError appendMultiple(const Args &...args) const noexcept;
 
         KVError maybeCompact() noexcept;
 

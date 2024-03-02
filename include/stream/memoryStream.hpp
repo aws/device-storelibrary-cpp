@@ -18,15 +18,16 @@ namespace gg __attribute__((visibility("default"))) {
       public:
         static std::shared_ptr<MemoryStream> openOrCreate(StreamOptions &&) noexcept;
 
-        expected<uint64_t, StreamError> append(BorrowedSlice, const AppendOptions &) noexcept override;
-        expected<uint64_t, StreamError> append(OwnedSlice &&, const AppendOptions &) noexcept override;
+        virtual expected<uint64_t, StreamError> append(BorrowedSlice, const AppendOptions &) noexcept override;
+        virtual expected<uint64_t, StreamError> append(OwnedSlice &&, const AppendOptions &) noexcept override;
 
-        expected<OwnedRecord, StreamError> read(uint64_t sequence_number, const ReadOptions &) const noexcept override;
+        virtual expected<OwnedRecord, StreamError> read(uint64_t sequence_number,
+                                                        const ReadOptions &) const noexcept override;
 
-        Iterator openOrCreateIterator(const std::string &identifier, IteratorOptions) noexcept override;
-        StreamError deleteIterator(const std::string &identifier) noexcept override;
+        virtual Iterator openOrCreateIterator(const std::string &identifier, IteratorOptions) noexcept override;
+        virtual StreamError deleteIterator(const std::string &identifier) noexcept override;
 
-        StreamError setCheckpoint(const std::string &, uint64_t) noexcept override;
+        virtual StreamError setCheckpoint(const std::string &, uint64_t) noexcept override;
     };
 } // namespace gg
 } // namespace aws

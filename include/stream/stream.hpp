@@ -49,6 +49,7 @@ namespace gg __attribute__((visibility("default"))) {
     struct IteratorOptions {};
 
     class StreamInterface;
+    using StreamError = GenericError<StreamErrorCode>;
 
     class CheckpointableOwnedRecord : public OwnedRecord {
       private:
@@ -56,7 +57,7 @@ namespace gg __attribute__((visibility("default"))) {
 
       public:
         CheckpointableOwnedRecord() = default;
-        CheckpointableOwnedRecord(OwnedRecord &&o, std::function<void(void)> &&checkpoint) noexcept
+        CheckpointableOwnedRecord(OwnedRecord &&o, std::function<StreamError(void)> &&checkpoint) noexcept
             : OwnedRecord(std::move(o)), _checkpoint(std::move(checkpoint)){};
         CheckpointableOwnedRecord(CheckpointableOwnedRecord &) = delete;
         CheckpointableOwnedRecord(CheckpointableOwnedRecord &&) = default;
@@ -68,13 +69,11 @@ namespace gg __attribute__((visibility("default"))) {
         void checkpoint() const noexcept { _checkpoint(); }
     };
 
-    using StreamError = GenericError<StreamErrorCode>;
-
     class Iterator {
       private:
         std::weak_ptr<StreamInterface> _stream;
         std::string _id;
-        uint32_t _offset = 0;
+        uint32_t _offset = 0U;
 
         StreamError checkpoint() const noexcept;
 
@@ -89,9 +88,10 @@ namespace gg __attribute__((visibility("default"))) {
         Iterator(Iterator &&) = default;
 
         Iterator &operator=(Iterator &&) = default;
+        ~Iterator() = default;
 
         int64_t timestamp = 0;
-        uint64_t sequence_number = 0;
+        uint64_t sequence_number = 0U;
 
         // mutate in place and return this
         Iterator &operator++() noexcept {
@@ -115,7 +115,7 @@ namespace gg __attribute__((visibility("default"))) {
     struct ReadOptions {
         bool check_for_corruption{true};
         bool may_return_later_records{false};
-        std::uint32_t suggested_start{0};
+        std::uint32_t suggested_start{0U};
     };
 
     struct AppendOptions {
@@ -130,13 +130,13 @@ namespace gg __attribute__((visibility("default"))) {
 
     class StreamInterface : public std::enable_shared_from_this<StreamInterface> {
       protected:
-        std::atomic_uint64_t _first_sequence_number{0};
-        std::atomic_uint64_t _next_sequence_number{0};
-        std::atomic_uint64_t _current_size_bytes{0};
+        std::atomic_uint64_t _first_sequence_number{0U};
+        std::atomic_uint64_t _next_sequence_number{0U};
+        std::atomic_uint64_t _current_size_bytes{0U};
 
       public:
         std::uint64_t firstSequenceNumber() const noexcept { return _first_sequence_number; };
-        std::uint64_t highestSequenceNumber() const noexcept { return _next_sequence_number - 1; };
+        std::uint64_t highestSequenceNumber() const noexcept { return _next_sequence_number - 1U; };
         std::uint64_t currentSizeBytes() const noexcept { return _current_size_bytes; };
         StreamInterface(StreamInterface &) = delete;
 
@@ -197,8 +197,9 @@ namespace gg __attribute__((visibility("default"))) {
     };
 
     struct StreamOptions {
-        uint32_t minimum_segment_size_bytes = 16 * 1024 * 1024; // 16MB minimum segment size before making a new segment
-        uint32_t maximum_size_bytes = 128 * 1024 * 1024;        // 128MB max stream size
+        uint32_t minimum_segment_size_bytes =
+            16U * 1024U * 1024U;                            // 16MB minimum segment size before making a new segment
+        uint32_t maximum_size_bytes = 128U * 1024U * 1024U; // 128MB max stream size
         bool full_corruption_check_on_open = false;
         const std::shared_ptr<FileSystemInterface> file_implementation{};
         const std::shared_ptr<logging::Logger> logger{};
@@ -215,7 +216,7 @@ namespace gg __attribute__((visibility("default"))) {
             timestamp = x.timestamp;
             _offset = x.offset + x.data.size();
             sequence_number = x.sequence_number;
-            return CheckpointableOwnedRecord{std::move(x), [this] { checkpoint(); }};
+            return CheckpointableOwnedRecord{std::move(x), [this] { return checkpoint(); }};
         }
         return StreamError{StreamErrorCode::StreamClosed, "Unable to read from destroyed stream"};
     }

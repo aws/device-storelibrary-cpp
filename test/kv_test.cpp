@@ -127,7 +127,7 @@ SCENARIO("I create a KV map with manual compaction", "[kv]") {
     const std::string &value = GENERATE(take(1, random(1, 1 * 1024 * 1024)));
 
     // Put duplicated key-values so that we would benefit from compaction
-    for (int i = 0; i < 10; i++) {
+    for (unsigned int i = 0U; i < 10U; i++) {
         for (const auto &k : keys) {
             auto e = kv->put(k, BorrowedSlice{value});
             REQUIRE(e);
@@ -145,37 +145,27 @@ SCENARIO("I open a KV map from a shadow file", "[kv]") {
     GIVEN("A shadow file") {
         auto temp_dir = TempDir();
         std::filesystem::create_directories(temp_dir.path());
-        WHEN("My shadow file has a corrupted value") {
-
-            // map1 is a valid KV map which is truncated to 5K which makes the last value unreadable.
-            // This will verify that we're still able to load the file and read as much as is uncorrupted.
-            std::filesystem::copy_file(std::filesystem::path(__FILE__).parent_path() / "test_data" / "kv" / "map1.kv",
-                                       // identifier is test-kv-map, so the shadow file name is test-kv-maps
-                                       temp_dir.path() / "test-kv-maps");
-
+        WHEN("My shadow file is incomplete") {
             auto kv_or = open_kv(temp_dir.path());
             REQUIRE(kv_or);
-            auto kv = std::move(kv_or.val());
-
-            THEN("I can retrieve the uncorrupted key") {
-                auto keys_or = kv->listKeys();
-                REQUIRE(keys_or);
-                auto keys = keys_or.val();
-                REQUIRE(keys.size() == 1);
-                REQUIRE(keys.front() == "a"s);
+            for (int i = 0; i < 100; i++) {
+                REQUIRE(kv_or.val()->put("a", BorrowedSlice{"123456789"}));
             }
-        }
-        WHEN("My shadow file has a corrupted key") {
-            // map2 is a valid KV map which is truncated to 33 bytes which makes the last key unreadable.
+            kv_or.val().reset();
+
+            // Truncate map file, making it corrupt
+            ::truncate((temp_dir.path() / "test-kv-map").c_str(), 150);
+
             // This will verify that we're still able to load the file and read as much as is uncorrupted.
-            std::filesystem::copy_file(std::filesystem::path(__FILE__).parent_path() / "test_data" / "kv" / "map2.kv",
-                                       // identifier is test-kv-map, so the shadow file name is test-kv-maps
-                                       temp_dir.path() / "test-kv-maps");
-            auto kv_or = open_kv(temp_dir.path());
+            std::filesystem::rename(temp_dir.path() / "test-kv-map",
+                                    // identifier is test-kv-map, so the shadow file name is test-kv-maps
+                                    temp_dir.path() / "test-kv-maps");
+
+            kv_or = open_kv(temp_dir.path());
             REQUIRE(kv_or);
             auto kv = std::move(kv_or.val());
 
-            THEN("I can retrieve the uncorrupted key") {
+            THEN("I can retrieve the uncorrupted keys") {
                 auto keys_or = kv->listKeys();
                 REQUIRE(keys_or);
                 auto keys = keys_or.val();
@@ -228,7 +218,8 @@ SCENARIO("I can detect a corrupt KV map value", "[kv]") {
             THEN("Retrieving next to last entry succeeds") {
                 auto v_or = kv->get(test_data[num_entries - 2].first);
                 REQUIRE(v_or);
-                REQUIRE(std::string_view{v_or.val().char_data(), v_or.val().size()} == test_data[num_entries - 2].second);
+                REQUIRE(std::string_view{v_or.val().char_data(), v_or.val().size()} ==
+                        test_data[num_entries - 2].second);
 
                 AND_WHEN("I reset the store") {
                     kv.reset();

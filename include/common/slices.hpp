@@ -1,4 +1,5 @@
 #pragma once
+#include <cassert>
 #include <cstring>
 #include <memory>
 #include <string>
@@ -7,19 +8,19 @@ namespace aws {
 namespace gg __attribute__((visibility("default"))) {
     class BorrowedSlice {
       private:
-        const uint8_t *_data;
+        const void *_data;
         const uint32_t _size;
 
       public:
-        BorrowedSlice() : _data(nullptr), _size(0){};
-        BorrowedSlice(const uint8_t *data, const uint32_t size) : _data(data), _size(size){};
-        BorrowedSlice(const void *data, const uint32_t size) : _data(static_cast<const uint8_t *>(data)), _size(size){};
-        BorrowedSlice(const char *data, const uint32_t size)
-            : _data(reinterpret_cast<const uint8_t *>(data)), _size(size){};
-        explicit BorrowedSlice(const std::string &s)
-            : _data(reinterpret_cast<const uint8_t *>(s.data())), _size(static_cast<uint32_t>(s.length())){};
+        BorrowedSlice() : _data(nullptr), _size(0U){};
+        BorrowedSlice(const void *data, const size_t size) : _data(data), _size(static_cast<uint32_t>(size)) {
+            assert(size <= UINT32_MAX);
+        };
+        explicit BorrowedSlice(const std::string &s) : _data(s.data()), _size(static_cast<uint32_t>(s.length())) {
+            assert(s.length() <= UINT32_MAX);
+        };
 
-        const uint8_t *data() const { return _data; };
+        const void *data() const { return _data; };
 
         const char *char_data() const { return reinterpret_cast<const char *>(_data); };
 
@@ -32,17 +33,17 @@ namespace gg __attribute__((visibility("default"))) {
 
     class OwnedSlice : private std::unique_ptr<uint8_t[]> {
       private:
-        uint32_t _size{0};
+        uint32_t _size{0U};
 
       public:
         OwnedSlice() = default;
-        explicit OwnedSlice(BorrowedSlice b) : _size(b.size()) {
+        explicit OwnedSlice(const BorrowedSlice b) : _size(b.size()) {
             std::unique_ptr<uint8_t[]> mem{new (std::nothrow) uint8_t[_size]};
-            memcpy(mem.get(), b.data(), b.size());
+            std::ignore = memcpy(mem.get(), b.data(), b.size());
             swap(mem);
         }
 
-        explicit OwnedSlice(uint32_t size) : _size(size) {
+        explicit OwnedSlice(const uint32_t size) : _size(size) {
             std::unique_ptr<uint8_t[]> mem{new (std::nothrow) uint8_t[_size]};
             swap(mem);
         }
@@ -56,7 +57,7 @@ namespace gg __attribute__((visibility("default"))) {
 
         ~OwnedSlice() = default;
 
-        uint8_t *data() const { return get(); };
+        void *data() const { return get(); };
 
         const char *char_data() const { return reinterpret_cast<const char *>(get()); };
 
