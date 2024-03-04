@@ -78,7 +78,9 @@
       "description": "Target Unix-like OS with the default compiler, debug build type",
       "inherits": "conf-unixlike-common",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug"
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_CXX_FLAGS": "-fcoverage-mapping -fprofile-instr-generate",
+        "CMAKE_C_FLAGS": "-fcoverage-mapping -fprofile-instr-generate"
       }
     },
     {

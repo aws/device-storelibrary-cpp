@@ -115,7 +115,8 @@ namespace gg __attribute__((visibility("default"))) {
         void sync() override { aws::gg::sync(fileno(_f)); }
 
         FileError truncate(const uint32_t max) override {
-            // Flush buffers before truncating since truncation is operating on the FD directly rather than the file stream
+            // Flush buffers before truncating since truncation is operating on the FD directly rather than the file
+            // stream
             std::ignore = flush();
             if (ftruncate(fileno(_f), max) != 0) {
                 return errnoToFileError(errno);
