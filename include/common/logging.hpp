@@ -16,24 +16,29 @@ namespace logging __attribute__((visibility("default"))) {
     };
 
     static std::string str(const LogLevel level) {
-        using namespace std::string_literals;
+        std::string v{};
         switch (level) {
         case LogLevel::Disabled:
-            return "Disabled"s;
+            v = "Disabled";
+            break;
         case LogLevel::Trace:
-            return "Trace"s;
+            v = "Trace";
+            break;
         case LogLevel::Debug:
-            return "Debug"s;
+            v = "Debug";
+            break;
         case LogLevel::Info:
-            return "Info"s;
+            v = "Info";
+            break;
         case LogLevel::Warning:
-            return "Warning"s;
+            v = "Warning";
+            break;
         case LogLevel::Error:
-            return "Error"s;
+            v = "Error";
+            break;
         }
 
-        // Unreachable, but makes gcc happy
-        return ""s;
+        return v;
     }
 
     inline std::ostream &operator<<(std::ostream &out, const LogLevel level) {

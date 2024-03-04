@@ -60,13 +60,13 @@ namespace gg __attribute__((visibility("default"))) {
         PosixFileLike &operator=(PosixFileLike &) = delete;
         PosixFileLike &operator=(PosixFileLike &&) = delete;
 
-        ~PosixFileLike() override {
+        virtual ~PosixFileLike() override {
             if (_f != nullptr) {
                 std::ignore = std::fclose(_f);
             }
         }
 
-        FileError open() noexcept {
+        virtual FileError open() noexcept {
             _f = std::fopen(_path.c_str(), "ab+");
             if (!_f) {
                 return errnoToFileError(errno);
@@ -74,7 +74,7 @@ namespace gg __attribute__((visibility("default"))) {
             return FileError{FileErrorCode::NoError, {}};
         }
 
-        expected<OwnedSlice, FileError> read(const uint32_t begin, const uint32_t end) override {
+        virtual expected<OwnedSlice, FileError> read(const uint32_t begin, const uint32_t end) override {
             if (end < begin) {
                 return FileError{FileErrorCode::InvalidArguments, "End must be after the beginning"};
             }
@@ -85,7 +85,7 @@ namespace gg __attribute__((visibility("default"))) {
             std::lock_guard lock{_read_lock};
             clearerr(_f);
             auto d = OwnedSlice{(end - begin)};
-            if (std::fseek(_f, begin, SEEK_SET) != 0) {
+            if (std::fseek(_f, static_cast<off_t>(begin), SEEK_SET) != 0) {
                 return errnoToFileError(errno);
             }
             if (std::fread(d.data(), d.size(), 1U, _f) != 1U) {
@@ -97,7 +97,7 @@ namespace gg __attribute__((visibility("default"))) {
             return d;
         };
 
-        FileError append(const BorrowedSlice data) override {
+        virtual FileError append(const BorrowedSlice data) override {
             clearerr(_f);
             if (fwrite(data.data(), data.size(), 1U, _f) != 1U) {
                 return errnoToFileError(errno);
@@ -105,20 +105,20 @@ namespace gg __attribute__((visibility("default"))) {
             return {FileErrorCode::NoError, {}};
         };
 
-        FileError flush() override {
+        virtual FileError flush() override {
             if (fflush(_f) == 0) {
                 return FileError{FileErrorCode::NoError, {}};
             }
             return errnoToFileError(errno);
         }
 
-        void sync() override { aws::gg::sync(fileno(_f)); }
+        virtual void sync() override { aws::gg::sync(fileno(_f)); }
 
-        FileError truncate(const uint32_t max) override {
+        virtual FileError truncate(const uint32_t max) override {
             // Flush buffers before truncating since truncation is operating on the FD directly rather than the file
             // stream
             std::ignore = flush();
-            if (ftruncate(fileno(_f), max) != 0) {
+            if (ftruncate(fileno(_f), static_cast<off_t>(max)) != 0) {
                 return errnoToFileError(errno);
             }
             return flush();
@@ -137,13 +137,13 @@ namespace gg __attribute__((visibility("default"))) {
         PosixUnbufferedFileLike &operator=(PosixUnbufferedFileLike &) = delete;
         PosixUnbufferedFileLike &operator=(PosixUnbufferedFileLike &&) = delete;
 
-        ~PosixUnbufferedFileLike() override {
+        virtual ~PosixUnbufferedFileLike() override {
             if (_f > 0) {
-                ::close(_f);
+                std::ignore = ::close(_f);
             }
         }
 
-        FileError open() noexcept {
+        virtual FileError open() noexcept {
             // open file or create with permissions 660
             _f = ::open(_path.c_str(), O_RDWR | O_CREAT | O_APPEND, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
             if (_f <= 0) {
@@ -152,7 +152,7 @@ namespace gg __attribute__((visibility("default"))) {
             return FileError{FileErrorCode::NoError, {}};
         }
 
-        expected<OwnedSlice, FileError> read(const uint32_t begin, const uint32_t end) override {
+        virtual expected<OwnedSlice, FileError> read(const uint32_t begin, const uint32_t end) override {
             if (end < begin) {
                 return FileError{FileErrorCode::InvalidArguments, "End must be after the beginning"};
             }
@@ -163,7 +163,7 @@ namespace gg __attribute__((visibility("default"))) {
             std::lock_guard lock{_read_lock};
             auto d = OwnedSlice{(end - begin)};
 
-            if (lseek(_f, begin, SEEK_SET) < 0) {
+            if (lseek(_f, static_cast<off_t>(begin), SEEK_SET) < 0) {
                 return errnoToFileError(errno);
             }
 
@@ -186,7 +186,7 @@ namespace gg __attribute__((visibility("default"))) {
             return d;
         };
 
-        FileError append(const BorrowedSlice data) override {
+        virtual FileError append(const BorrowedSlice data) override {
             const auto *write_pointer = static_cast<const uint8_t *>(data.data());
             uint32_t write_remaining = data.size();
 
@@ -203,12 +203,12 @@ namespace gg __attribute__((visibility("default"))) {
             return FileError{FileErrorCode::NoError, {}};
         };
 
-        FileError flush() override { return FileError{FileErrorCode::NoError, {}}; }
+        virtual FileError flush() override { return FileError{FileErrorCode::NoError, {}}; }
 
-        void sync() override { aws::gg::sync(_f); }
+        virtual void sync() override { aws::gg::sync(_f); }
 
-        FileError truncate(const uint32_t max) override {
-            if (ftruncate(_f, max) != 0) {
+        virtual FileError truncate(const uint32_t max) override {
+            if (ftruncate(_f, static_cast<off_t>(max)) != 0) {
                 return errnoToFileError(errno);
             }
             return {FileErrorCode::NoError, {}};
@@ -224,7 +224,7 @@ namespace gg __attribute__((visibility("default"))) {
             std::filesystem::create_directories(_base_path);
         };
 
-        expected<std::unique_ptr<FileLike>, FileError> open(const std::string &identifier) override {
+        virtual expected<std::unique_ptr<FileLike>, FileError> open(const std::string &identifier) override {
             auto f = std::make_unique<PosixFileLike>(_base_path / identifier);
             auto res = f->open();
             if (res.ok()) {
@@ -233,11 +233,11 @@ namespace gg __attribute__((visibility("default"))) {
             return res;
         };
 
-        bool exists(const std::string &identifier) override {
+        virtual bool exists(const std::string &identifier) override {
             return std::filesystem::exists(_base_path / identifier);
         };
 
-        FileError rename(const std::string &old_id, const std::string &new_id) override {
+        virtual FileError rename(const std::string &old_id, const std::string &new_id) override {
             std::error_code ec;
             std::filesystem::rename(_base_path / old_id, _base_path / new_id, ec);
             if (!ec) {
@@ -246,7 +246,7 @@ namespace gg __attribute__((visibility("default"))) {
             return errnoToFileError(ec.value(), ec.message());
         };
 
-        FileError remove(const std::string &id) override {
+        virtual FileError remove(const std::string &id) override {
             std::error_code ec;
             std::ignore = std::filesystem::remove(_base_path / id, ec);
             if (!ec) {
@@ -255,7 +255,7 @@ namespace gg __attribute__((visibility("default"))) {
             return errnoToFileError(ec.value(), ec.message());
         };
 
-        expected<std::vector<std::string>, FileError> list() override {
+        virtual expected<std::vector<std::string>, FileError> list() override {
             std::vector<std::string> output;
             for (const auto &entry : std::filesystem::directory_iterator(_base_path)) {
                 std::ignore = output.emplace_back(entry.path().filename().string());
@@ -268,7 +268,7 @@ namespace gg __attribute__((visibility("default"))) {
       public:
         explicit PosixUnbufferedFileSystem(std::filesystem::path base_path) : PosixFileSystem(std::move(base_path)){};
 
-        expected<std::unique_ptr<FileLike>, FileError> open(const std::string &identifier) override {
+        virtual expected<std::unique_ptr<FileLike>, FileError> open(const std::string &identifier) override {
             auto f = std::make_unique<PosixUnbufferedFileLike>(_base_path / identifier);
             auto res = f->open();
             if (res.ok()) {

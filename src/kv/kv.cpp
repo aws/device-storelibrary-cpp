@@ -147,7 +147,7 @@ KVError KV::initialize() noexcept {
 // Only use this method during KV::initialize.
 void inline KV::addOrRemoveKeyInInitialization(const std::string &key, const uint32_t beginning_pointer,
                                                const uint32_t added_size, const uint8_t flags) noexcept {
-    const bool isDeleted = flags & DELETED_FLAG;
+    const bool isDeleted = static_cast<int8_t>(flags) & static_cast<int8_t>(DELETED_FLAG);
     if (isDeleted) {
         std::ignore = removeKey(key);
         // Count deleted entry as added because compaction would be helpful in shrinking the map.
@@ -216,7 +216,7 @@ expected<KVHeader, KVError> KV::readHeaderFrom(const uint32_t begin) const noexc
     // Use memcpy instead of reinterpret cast to avoid UB.
     std::ignore = memcpy(&ret, header_or.val().data(), sizeof(KVHeader));
 
-    if (ret.magic_and_version != MAGIC_AND_VERSION) {
+    if (static_cast<int8_t>(ret.magic_and_version) != static_cast<int8_t>(MAGIC_AND_VERSION)) {
         return KVError{KVErrorCodes::HeaderCorrupted, "Invalid magic and version"};
     }
 
@@ -317,7 +317,8 @@ KVError KV::put(const std::string &key, const BorrowedSlice data) noexcept {
         return KVError{KVErrorCodes::InvalidArguments, "Key cannot be empty"};
     }
     if (key.length() >= static_cast<size_t>(KEY_LENGTH_MAX)) {
-        return KVError{KVErrorCodes::InvalidArguments, "Key length cannot exceed " + std::to_string(KEY_LENGTH_MAX)};
+        return KVError{KVErrorCodes::InvalidArguments,
+                       "Key length cannot exceed " + std::to_string(static_cast<int32_t>(KEY_LENGTH_MAX))};
     }
     if (data.size() >= VALUE_LENGTH_MAX) {
         return KVError{KVErrorCodes::InvalidArguments,
