@@ -113,7 +113,7 @@ void FileSegment::truncateAndLog(uint32_t truncate, const StreamError &err) cons
 
 StreamError FileSegment::open(const bool full_corruption_check_on_open) noexcept {
     auto file_or = _file_implementation->open(_segment_id);
-    if (!file_or) {
+    if (!file_or.ok()) {
         return StreamError{StreamErrorCode::WriteError, file_or.err().msg};
     }
 
@@ -122,7 +122,7 @@ StreamError FileSegment::open(const bool full_corruption_check_on_open) noexcept
 
     while (true) {
         const auto header_data_or = _f->read(offset, offset + HEADER_SIZE);
-        if (!header_data_or) {
+        if (!header_data_or.ok()) {
             if (header_data_or.err().code == FileErrorCode::EndOfFile) {
                 // If we reached the end of the file, there could have been extra data at the end, but less
                 // than what we were hoping to read. Truncate the file now so that everything before this point
@@ -143,7 +143,7 @@ StreamError FileSegment::open(const bool full_corruption_check_on_open) noexcept
         if (full_corruption_check_on_open) {
             auto value_or = read(static_cast<std::uint64_t>(header.relative_sequence_number) + _base_seq_num,
                                  ReadOptions{true, false, offset});
-            if (!value_or) {
+            if (!value_or.ok()) {
                 truncateAndLog(offset, value_or.err());
                 continue;
             }
@@ -192,17 +192,17 @@ expected<uint64_t, FileError> FileSegment::append(BorrowedSlice d, int64_t times
     // If an error happens when appending, truncate the file to the current size so that we don't have any
     // partial data in the file, and then return the error.
     auto e = _f->append(BorrowedSlice{&header, sizeof(header)});
-    if (!e) {
+    if (!e.ok()) {
         std::ignore = _f->truncate(_total_bytes);
         return e;
     }
     e = _f->append(d);
-    if (!e) {
+    if (!e.ok()) {
         std::ignore = _f->truncate(_total_bytes);
         return e;
     }
     e = _f->flush();
-    if (!e) {
+    if (!e.ok()) {
         std::ignore = _f->truncate(_total_bytes);
         return e;
     }
@@ -229,7 +229,7 @@ expected<OwnedRecord, StreamError> FileSegment::read(const uint64_t sequence_num
 
     while (true) {
         auto header_data_or = _f->read(offset, offset + HEADER_SIZE);
-        if (!header_data_or) {
+        if (!header_data_or.ok()) {
             if (suggested_start) {
                 offset = 0U;
                 suggested_start = false;
@@ -258,7 +258,7 @@ expected<OwnedRecord, StreamError> FileSegment::read(const uint64_t sequence_num
             (header.relative_sequence_number > expected_rel_seq_num && read_options.may_return_later_records)) {
             auto data_or = _f->read(offset + HEADER_SIZE,
                                     offset + HEADER_SIZE + static_cast<std::uint32_t>(header.payload_length_bytes));
-            if (!data_or) {
+            if (!data_or.ok()) {
                 return StreamError{StreamErrorCode::ReadError, header_data_or.err().msg};
             }
             auto data = std::move(data_or.val());
@@ -290,7 +290,7 @@ void FileSegment::remove() noexcept {
     // Close file handle, then delete file
     _f.reset(nullptr);
     const auto e = _file_implementation->remove(_segment_id);
-    if (!e && _logger->level <= logging::LogLevel::Warning) {
+    if (!e.ok() && _logger->level <= logging::LogLevel::Warning) {
         _logger->log(logging::LogLevel::Warning, "Issue deleting " + _segment_id + " due to: " + e.msg);
     }
 }

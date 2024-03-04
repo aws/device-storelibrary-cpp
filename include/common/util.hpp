@@ -8,7 +8,7 @@ namespace gg __attribute__((visibility("default"))) {
         E code;
         std::string msg;
 
-        explicit operator bool() const { return code == E::NoError; }
+        bool ok() const { return code == E::NoError; }
     };
 } // namespace gg
 } // namespace aws

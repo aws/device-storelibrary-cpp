@@ -59,7 +59,7 @@ int main() {
                 "m",
                 16 * 1024 * 1024,
             });
-            if (!kv_or) {
+            if (!kv_or.ok()) {
                 std::cerr << kv_or.err().msg << std::endl;
                 std::terminate();
             }
@@ -83,7 +83,7 @@ int main() {
                     512 * 1024,
                 },
             });
-            if (!s_or) {
+            if (!s_or.ok()) {
                 std::cerr << s_or.err().msg << std::endl;
                 std::terminate();
             }
@@ -98,14 +98,14 @@ int main() {
             }
 
             auto last_record_or = s->read(last_sequence_number.val(), ReadOptions{});
-            if (last_record_or) {
+            if (last_record_or.ok()) {
                 std::cout << last_record_or.val().data.string() << std::endl;
             } else {
                 std::cerr << last_record_or.err().msg << std::endl;
             }
 
             for (auto r : s->openOrCreateIterator("a", IteratorOptions{})) {
-                if (r) {
+                if (r.ok()) {
                     // Do something with the record....
                     // std::cout << r.val().sequence_number << std::endl;
                     r.val().checkpoint();

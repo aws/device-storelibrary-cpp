@@ -64,7 +64,7 @@ static const auto log_header_size = 32;
 static auto read_stream_values_by_segment(std::shared_ptr<SpyFileSystem> fs, std::filesystem::path temp_dir_path,
                                           int value_size) {
     auto files_or = fs->list();
-    REQUIRE(files_or);
+    REQUIRE(files_or.ok());
     auto files = std::move(files_or.val());
     std::sort(files.begin(), files.end());
     std::map<std::string, std::vector<std::string>> segments;
@@ -73,13 +73,13 @@ static auto read_stream_values_by_segment(std::shared_ptr<SpyFileSystem> fs, std
             continue;
         }
         auto file_or = fs->open(temp_dir_path / f);
-        REQUIRE(file_or);
+        REQUIRE(file_or.ok());
         std::vector<std::string> values;
         auto pos = 0;
         while (true) {
             pos += log_header_size;
             auto val_or = file_or.val()->read(pos, pos + value_size);
-            if (!val_or) {
+            if (!val_or.ok()) {
                 REQUIRE(val_or.err().code == FileErrorCode::EndOfFile);
                 break;
             }
@@ -103,11 +103,11 @@ SCENARIO("I cannot create a stream", "[stream]") {
                }});
 
     auto stream_or = open_stream(fs);
-    REQUIRE(!stream_or);
+    REQUIRE(!stream_or.ok());
     REQUIRE(stream_or.err().code == StreamErrorCode::ReadError);
 
     stream_or = open_stream(fs);
-    REQUIRE(stream_or);
+    REQUIRE(stream_or.ok());
 
     auto stream = std::move(stream_or.val());
     REQUIRE(stream->firstSequenceNumber() == 1);
@@ -129,7 +129,7 @@ SCENARIO("I create a stream with file failures", "[stream]") {
         ->when("list", SpyFileSystem::ListType{[]() { return std::vector<std::string>{"1.log"}; }});
 
     auto stream_or = open_stream(fs);
-    REQUIRE(stream_or);
+    REQUIRE(stream_or.ok());
 
     auto stream = std::move(stream_or.val());
     REQUIRE(stream->firstSequenceNumber() == 1);
@@ -140,12 +140,12 @@ SCENARIO("Stream validates data length", "[stream]") {
     auto temp_dir = TempDir();
     auto fs = std::make_shared<SpyFileSystem>(std::make_shared<PosixFileSystem>(temp_dir.path()));
     auto stream_or = open_stream(fs);
-    REQUIRE(stream_or);
+    REQUIRE(stream_or.ok());
     auto stream = std::move(stream_or.val());
 
     std::string value{};
     auto seq_or = stream->append(BorrowedSlice{value.data(), UINT32_MAX}, AppendOptions{});
-    REQUIRE(!seq_or);
+    REQUIRE(!seq_or.ok());
     REQUIRE(seq_or.err().code == StreamErrorCode::RecordTooLarge);
 }
 
@@ -153,14 +153,14 @@ SCENARIO("Stream deletes oldest data when full", "[stream]") {
     auto temp_dir = TempDir();
     auto fs = std::make_shared<SpyFileSystem>(std::make_shared<PosixFileSystem>(temp_dir.path()));
     auto stream_or = open_stream(fs);
-    REQUIRE(stream_or);
+    REQUIRE(stream_or.ok());
     auto stream = std::move(stream_or.val());
 
     OwnedSlice data{1 * 1024 * 1024};
 
     for (int i = 0; i < 30; i++) {
         auto seq_or = stream->append(BorrowedSlice{data.data(), data.size()}, AppendOptions{});
-        REQUIRE(seq_or);
+        REQUIRE(seq_or.ok());
     }
 
     // Check that it rolled over by look at the first sequence number and the total size now.
@@ -175,20 +175,20 @@ SCENARIO("I can delete an iterator") {
         auto temp_dir = TempDir();
         auto fs = std::make_shared<SpyFileSystem>(std::make_shared<PosixFileSystem>(temp_dir.path()));
         auto stream_or = open_stream(fs);
-        REQUIRE(stream_or);
+        REQUIRE(stream_or.ok());
         auto stream = std::move(stream_or.val());
         auto app_or = stream->append(BorrowedSlice{"val"}, AppendOptions{});
-        REQUIRE(app_or);
+        REQUIRE(app_or.ok());
 
         auto it = stream->openOrCreateIterator("ita", IteratorOptions{});
 
         THEN("I checkpoint the iterator") {
             (*it).val().checkpoint();
 
-            THEN("I can delete the iterator") { REQUIRE(stream->deleteIterator("ita")); }
+            THEN("I can delete the iterator") { REQUIRE(stream->deleteIterator("ita").ok()); }
         }
 
-        THEN("I can delete the iterator") { REQUIRE(stream->deleteIterator("ita")); }
+        THEN("I can delete the iterator") { REQUIRE(stream->deleteIterator("ita").ok()); }
     }
 }
 
@@ -196,30 +196,30 @@ SCENARIO("I can create a stream", "[stream]") {
     auto temp_dir = TempDir();
     auto fs = std::make_shared<SpyFileSystem>(std::make_shared<PosixFileSystem>(temp_dir.path()));
     auto stream_or = open_stream(fs);
-    REQUIRE(stream_or);
+    REQUIRE(stream_or.ok());
     auto stream = std::move(stream_or.val());
 
     const std::string &value = GENERATE(take(5, random(1, 1 * 1024 * 1024, 0, static_cast<char>(255))));
 
     WHEN("I append values") {
         auto seq_or = stream->append(BorrowedSlice{value}, AppendOptions{});
-        REQUIRE(seq_or);
+        REQUIRE(seq_or.ok());
         seq_or = stream->append(BorrowedSlice{value}, AppendOptions{});
-        REQUIRE(seq_or);
+        REQUIRE(seq_or.ok());
         seq_or = stream->append(BorrowedSlice{value}, AppendOptions{});
-        REQUIRE(seq_or);
+        REQUIRE(seq_or.ok());
 
         auto it = stream->openOrCreateIterator("ita", IteratorOptions{});
         REQUIRE(it.sequence_number == 0);
         auto v_or = *it;
-        REQUIRE(v_or);
+        REQUIRE(v_or.ok());
         REQUIRE(std::string_view{v_or.val().data.char_data(), v_or.val().data.size()} == value);
         v_or.val().checkpoint();
 
         ++it;
         REQUIRE(it.sequence_number == 1);
         v_or = *it;
-        REQUIRE(v_or);
+        REQUIRE(v_or.ok());
         v_or.val().checkpoint();
 
         // New iterator starts at 0
@@ -236,7 +236,7 @@ SCENARIO("I can create a stream", "[stream]") {
         // Close and reopen stream from FS. Verify that our iterator is where we left it.
         stream.reset();
         stream_or = open_stream(fs);
-        REQUIRE(stream_or);
+        REQUIRE(stream_or.ok());
         stream = std::move(stream_or.val());
 
         it = stream->openOrCreateIterator("ita", IteratorOptions{});
@@ -247,22 +247,22 @@ SCENARIO("I can create a stream", "[stream]") {
         ++it;
         REQUIRE(it.sequence_number == 3);
         v_or = *it;
-        REQUIRE(!v_or);
+        REQUIRE(!v_or.ok());
         REQUIRE(v_or.err().code == StreamErrorCode::RecordNotFound);
 
-        REQUIRE(stream->deleteIterator("ita"));
+        REQUIRE(stream->deleteIterator("ita").ok());
 
         AND_WHEN("I close and reopen the stream") {
             stream = nullptr;
 
             stream_or = open_stream(fs);
-            REQUIRE(stream_or);
+            REQUIRE(stream_or.ok());
             stream = std::move(stream_or.val());
 
             it = stream->openOrCreateIterator("ita", IteratorOptions{});
             REQUIRE(it.sequence_number == 0);
             v_or = *it;
-            REQUIRE(v_or);
+            REQUIRE(v_or.ok());
             REQUIRE(std::string_view{v_or.val().data.char_data(), v_or.val().data.size()} == value);
         }
     }
@@ -276,19 +276,19 @@ SCENARIO("Stream detects and recovers from corruption", "[stream]") {
     constexpr auto stream_value_size = 1024 * 1024 / 4;
 
     auto stream_or = open_stream(fs);
-    REQUIRE(stream_or);
+    REQUIRE(stream_or.ok());
 
     // create stream and populate with random values
     auto stream = std::move(stream_or.val());
     for (auto i = 0; i < num_stream_values; i++) {
         std::string value;
         random_string(value, stream_value_size);
-        REQUIRE(stream->append(BorrowedSlice{value}, AppendOptions{}));
+        REQUIRE(stream->append(BorrowedSlice{value}, AppendOptions{}).ok());
     }
 
     // sanity check: verify we can read all values in the stream
     for (auto i = 0; i < num_stream_values; i++) {
-        REQUIRE(stream->read(i, ReadOptions{}));
+        REQUIRE(stream->read(i, ReadOptions{}).ok());
     }
 
     std::map<std::string, std::vector<std::string>> segments =
@@ -310,64 +310,64 @@ SCENARIO("Stream detects and recovers from corruption", "[stream]") {
 
             // first entry isn't corrupted
             auto val_or = stream->read(0, ReadOptions{});
-            REQUIRE(val_or);
+            REQUIRE(val_or.ok());
             REQUIRE(val_or.val().data.string() == first_segment->second[0]);
 
             // rest of the current segment is unreadable
             for (auto i = 1; i < static_cast<int>(first_segment->second.size()); i++) {
                 auto data_or = stream->read(i, ReadOptions{});
-                REQUIRE(!data_or);
+                REQUIRE(!data_or.ok());
                 REQUIRE(data_or.err().code == StreamErrorCode::RecordNotFound);
             }
 
             // reading data in next segment still works
             val_or = stream->read(first_segment->second.size(), ReadOptions{});
-            REQUIRE(val_or);
+            REQUIRE(val_or.ok());
             REQUIRE(val_or.val().data.string() == second_segment->second[0]);
 
             THEN("Reading data with may_return_later_records option will skip to the next segment") {
                 // first entry isn't corrupted
-                val_or = stream->read(0, ReadOptions{{}, true, {}});
-                REQUIRE(val_or);
+                val_or = stream->read(0U, ReadOptions{{}, true, {}});
+                REQUIRE(val_or.ok());
                 REQUIRE(val_or.val().data.string() == first_segment->second[0]);
 
                 // instead of reading next entry (which is corrupted), skip to next segment
-                val_or = stream->read(1, ReadOptions{{}, true, {}});
-                REQUIRE(val_or);
+                val_or = stream->read(1U, ReadOptions{{}, true, {}});
+                REQUIRE(val_or.ok());
                 REQUIRE(val_or.val().data.string() == second_segment->second[0]);
 
                 AND_WHEN("I reopen the stream") {
                     stream_or = open_stream(fs);
-                    REQUIRE(stream_or);
+                    REQUIRE(stream_or.ok());
                     stream = std::move(stream_or.val());
 
                     THEN("Reading data in segment, starting at corrupted entry, fails") {
                         // first entry isn't corrupted
-                        val_or = stream->read(0, ReadOptions{});
-                        REQUIRE(val_or);
+                        val_or = stream->read(0U, ReadOptions{});
+                        REQUIRE(val_or.ok());
                         REQUIRE(val_or.val().data.string() == first_segment->second[0]);
 
                         // rest of the current segment is unreadable
                         for (auto i = 1; i < static_cast<int>(first_segment->second.size()); i++) {
                             auto data_or = stream->read(i, ReadOptions{});
-                            REQUIRE(!data_or);
+                            REQUIRE(!data_or.ok());
                             REQUIRE(data_or.err().code == StreamErrorCode::RecordNotFound);
                         }
 
                         // reading data in next segment still works
                         val_or = stream->read(first_segment->second.size(), ReadOptions{});
-                        REQUIRE(val_or);
+                        REQUIRE(val_or.ok());
                         REQUIRE(val_or.val().data.string() == second_segment->second[0]);
 
                         THEN("Reading data with may_return_later_records option will skip to the next segment") {
                             // first entry isn't corrupted
-                            val_or = stream->read(0, ReadOptions{{}, true, {}});
-                            REQUIRE(val_or);
+                            val_or = stream->read(0U, ReadOptions{{}, true, {}});
+                            REQUIRE(val_or.ok());
                             REQUIRE(val_or.val().data.string() == first_segment->second[0]);
 
                             // instead of reading next entry (which is corrupted), skip to next segment
-                            val_or = stream->read(1, ReadOptions{{}, true, {}});
-                            REQUIRE(val_or);
+                            val_or = stream->read(1U, ReadOptions{{}, true, {}});
+                            REQUIRE(val_or.ok());
                             REQUIRE(val_or.val().data.string() == second_segment->second[0]);
                         }
                     }

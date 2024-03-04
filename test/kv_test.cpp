@@ -69,7 +69,7 @@ SCENARIO("I cannot create a KV map with invalid inputs", "[kv]") {
         "test-kv-map",
         {},
     });
-    REQUIRE(!kv_or);
+    REQUIRE(!kv_or.ok());
     REQUIRE(kv_or.err().code == KVErrorCodes::InvalidArguments);
 
     auto temp_dir = TempDir();
@@ -80,14 +80,14 @@ SCENARIO("I cannot create a KV map with invalid inputs", "[kv]") {
         {},
         {},
     });
-    REQUIRE(!kv_or);
+    REQUIRE(!kv_or.ok());
     REQUIRE(kv_or.err().code == KVErrorCodes::InvalidArguments);
 }
 
 SCENARIO("I cannot put invalid inputs to the map", "[kv]") {
     auto temp_dir = TempDir();
     auto kv_or = open_kv(temp_dir.path());
-    REQUIRE(kv_or);
+    REQUIRE(kv_or.ok());
     auto kv = std::move(kv_or.val());
 
     {
@@ -115,7 +115,7 @@ SCENARIO("I cannot put invalid inputs to the map", "[kv]") {
 SCENARIO("I create a KV map with manual compaction", "[kv]") {
     auto temp_dir = TempDir();
     auto kv_or = open_kv_manual_compaction(temp_dir.path());
-    REQUIRE(kv_or);
+    REQUIRE(kv_or.ok());
     auto kv = std::move(kv_or.val());
 
     std::vector<std::string> keys{};
@@ -130,13 +130,13 @@ SCENARIO("I create a KV map with manual compaction", "[kv]") {
     for (unsigned int i = 0U; i < 10U; i++) {
         for (const auto &k : keys) {
             auto e = kv->put(k, BorrowedSlice{value});
-            REQUIRE(e);
+            REQUIRE(e.ok());
         }
     }
 
     auto size_now = kv->currentSizeBytes();
     auto e = kv->compact();
-    REQUIRE(e);
+    REQUIRE(e.ok());
     // Ensure we got smaller
     REQUIRE(kv->currentSizeBytes() < size_now);
 }
@@ -147,9 +147,9 @@ SCENARIO("I open a KV map from a shadow file", "[kv]") {
         std::filesystem::create_directories(temp_dir.path());
         WHEN("My shadow file is incomplete") {
             auto kv_or = open_kv(temp_dir.path());
-            REQUIRE(kv_or);
+            REQUIRE(kv_or.ok());
             for (int i = 0; i < 100; i++) {
-                REQUIRE(kv_or.val()->put("a", BorrowedSlice{"123456789"}));
+                REQUIRE(kv_or.val()->put("a", BorrowedSlice{"123456789"}).ok());
             }
             kv_or.val().reset();
 
@@ -162,12 +162,12 @@ SCENARIO("I open a KV map from a shadow file", "[kv]") {
                                     temp_dir.path() / "test-kv-maps");
 
             kv_or = open_kv(temp_dir.path());
-            REQUIRE(kv_or);
+            REQUIRE(kv_or.ok());
             auto kv = std::move(kv_or.val());
 
             THEN("I can retrieve the uncorrupted keys") {
                 auto keys_or = kv->listKeys();
-                REQUIRE(keys_or);
+                REQUIRE(keys_or.ok());
                 auto keys = keys_or.val();
                 REQUIRE(keys.size() == 1);
                 REQUIRE(keys.front() == "a"s);
@@ -180,7 +180,7 @@ SCENARIO("I can detect a corrupt KV map value", "[kv]") {
     GIVEN("I create a KV map with multiple entries") {
         auto temp_dir = TempDir();
         auto kv_or = open_kv(temp_dir.path());
-        REQUIRE(kv_or);
+        REQUIRE(kv_or.ok());
 
         auto kv = std::move(kv_or.val());
 
@@ -189,9 +189,9 @@ SCENARIO("I can detect a corrupt KV map value", "[kv]") {
         auto test_data = generate_key_values(num_entries);
         for (const auto &key_value : test_data) {
             auto e = kv->put(key_value.first, BorrowedSlice{key_value.second});
-            REQUIRE(e);
+            REQUIRE(e.ok());
             auto v_or = kv->get(key_value.first);
-            REQUIRE(v_or);
+            REQUIRE(v_or.ok());
             REQUIRE(std::string_view{v_or.val().char_data(), v_or.val().size()} == key_value.second);
         }
 
@@ -217,25 +217,25 @@ SCENARIO("I can detect a corrupt KV map value", "[kv]") {
 
             THEN("Retrieving next to last entry succeeds") {
                 auto v_or = kv->get(test_data[num_entries - 2].first);
-                REQUIRE(v_or);
+                REQUIRE(v_or.ok());
                 REQUIRE(std::string_view{v_or.val().char_data(), v_or.val().size()} ==
                         test_data[num_entries - 2].second);
 
                 AND_WHEN("I reset the store") {
                     kv.reset();
                     kv_or = open_kv(temp_dir.path());
-                    REQUIRE(kv_or);
+                    REQUIRE(kv_or.ok());
                     kv = std::move(kv_or.val());
 
                     THEN("KeyNotFound for corrupted Key and rest of the store is untouched") {
                         for (auto i = 0; i < num_entries; i++) {
                             if (i == num_entries - 2) {
                                 v_or = kv->get(test_data[i].first);
-                                REQUIRE(!v_or);
+                                REQUIRE(!v_or.ok());
                                 REQUIRE(v_or.err().code == KVErrorCodes::KeyNotFound);
                             } else {
                                 v_or = kv->get(test_data[i].first);
-                                REQUIRE(v_or);
+                                REQUIRE(v_or.ok());
                                 REQUIRE(v_or.val().string() == test_data[i].second);
                             }
                         }
@@ -264,26 +264,26 @@ SCENARIO("I can detect a corrupt KV map value", "[kv]") {
 
             THEN("Retrieving next to last entry fails") {
                 auto v_or = kv->get(test_data[num_entries - 2].first);
-                REQUIRE(!v_or);
+                REQUIRE(!v_or.ok());
                 REQUIRE(v_or.err().code == KVErrorCodes::DataCorrupted);
 
                 AND_WHEN("I reset the store") {
                     kv.reset();
                     kv_or = open_kv(temp_dir.path());
-                    REQUIRE(kv_or);
+                    REQUIRE(kv_or.ok());
                     kv = std::move(kv_or.val());
 
                     THEN("Corrupted entry and subsequent entries are removed") {
                         for (auto i = num_entries - 2; i < num_entries; i++) {
                             v_or = kv->get(test_data[i].first);
-                            REQUIRE(!v_or);
+                            REQUIRE(!v_or.ok());
                             REQUIRE(v_or.err().code == KVErrorCodes::KeyNotFound);
                         }
 
                         AND_THEN("Rest of store is untouched") {
                             for (auto i = 0; i < num_entries - 2; i++) {
                                 v_or = kv->get(test_data[i].first);
-                                REQUIRE(v_or);
+                                REQUIRE(v_or.ok());
                                 REQUIRE(v_or.val().string() == test_data[i].second);
                             }
                         }
@@ -298,7 +298,7 @@ SCENARIO("KV store with multiple values per key is corrupted", "[kv]") {
     GIVEN("I create an uncompacted KV map containing a key with multiple values") {
         auto temp_dir = TempDir();
         auto kv_or = open_kv(temp_dir.path());
-        REQUIRE(kv_or);
+        REQUIRE(kv_or.ok());
 
         auto kv = std::move(kv_or.val());
 
@@ -307,18 +307,18 @@ SCENARIO("KV store with multiple values per key is corrupted", "[kv]") {
         auto test_data = generate_key_values(num_unique_keys);
         for (const auto &key_value : test_data) {
             auto e = kv->put(key_value.first, BorrowedSlice{key_value.second});
-            REQUIRE(e);
+            REQUIRE(e.ok());
             auto v_or = kv->get(key_value.first);
-            REQUIRE(v_or);
+            REQUIRE(v_or.ok());
             REQUIRE(std::string_view{v_or.val().char_data(), v_or.val().size()} == key_value.second);
         }
 
         // overwrite the values for each key
         for (const auto &key_value : test_data) {
             auto e = kv->put(key_value.first, BorrowedSlice{"overwritten"});
-            REQUIRE(e);
+            REQUIRE(e.ok());
             auto v_or = kv->get(key_value.first);
-            REQUIRE(v_or);
+            REQUIRE(v_or.ok());
             REQUIRE(std::string_view{v_or.val().char_data(), v_or.val().size()} == "overwritten");
         }
 
@@ -342,29 +342,29 @@ SCENARIO("KV store with multiple values per key is corrupted", "[kv]") {
             AND_WHEN("I reset the store") {
                 kv.reset();
                 kv_or = open_kv(temp_dir.path());
-                REQUIRE(kv_or);
+                REQUIRE(kv_or.ok());
                 kv = std::move(kv_or.val());
 
                 THEN("Old values are returned for the keys") {
                     for (const auto &key_value : test_data) {
                         auto v_or = kv->get(key_value.first);
-                        REQUIRE(v_or);
+                        REQUIRE(v_or.ok());
                         REQUIRE(std::string_view{v_or.val().char_data(), v_or.val().size()} == key_value.second);
                     }
                 }
             }
 
             AND_WHEN("I compact the store") {
-                REQUIRE(kv->compact());
+                REQUIRE(kv->compact().ok());
 
                 THEN("The corrupted key is removed from the store") {
                     auto v_or = kv->get(test_data[0].first);
-                    REQUIRE(!v_or);
+                    REQUIRE(!v_or.ok());
                     REQUIRE(v_or.err().code == KVErrorCodes::KeyNotFound);
 
                     AND_THEN("The uncorrupted key is still in the store and points to newest value") {
                         v_or = kv->get(test_data[1].first);
-                        REQUIRE(v_or);
+                        REQUIRE(v_or.ok());
                         REQUIRE(v_or.val().string() == "overwritten");
                     }
                 }
@@ -377,7 +377,7 @@ SCENARIO("I can detect a corrupt KV map header", "[kv]") {
     GIVEN("I create a KV map with multiple entries") {
         auto temp_dir = TempDir();
         auto kv_or = open_kv(temp_dir.path());
-        REQUIRE(kv_or);
+        REQUIRE(kv_or.ok());
 
         auto kv = std::move(kv_or.val());
 
@@ -386,9 +386,9 @@ SCENARIO("I can detect a corrupt KV map header", "[kv]") {
         auto test_data = generate_key_values(num_entries);
         for (const auto &key_value : test_data) {
             auto e = kv->put(key_value.first, BorrowedSlice{key_value.second});
-            REQUIRE(e);
+            REQUIRE(e.ok());
             auto v_or = kv->get(key_value.first);
-            REQUIRE(v_or);
+            REQUIRE(v_or.ok());
             REQUIRE(std::string_view{v_or.val().char_data(), v_or.val().size()} == key_value.second);
         }
 
@@ -412,26 +412,26 @@ SCENARIO("I can detect a corrupt KV map header", "[kv]") {
 
             THEN("Retrieving next to last entry fails") {
                 auto v_or = kv->get(test_data[num_entries - 2].first);
-                REQUIRE(!v_or);
+                REQUIRE(!v_or.ok());
                 REQUIRE(v_or.err().code == KVErrorCodes::HeaderCorrupted);
 
                 AND_WHEN("I reset the store") {
                     kv.reset();
                     kv_or = open_kv(temp_dir.path());
-                    REQUIRE(kv_or);
+                    REQUIRE(kv_or.ok());
                     kv = std::move(kv_or.val());
 
                     THEN("Corrupted entry and subsequent entries are removed") {
                         for (auto i = num_entries - 2; i < num_entries; i++) {
                             v_or = kv->get(test_data[i].first);
-                            REQUIRE(!v_or);
+                            REQUIRE(!v_or.ok());
                             REQUIRE(v_or.err().code == KVErrorCodes::KeyNotFound);
                         }
 
                         AND_THEN("Rest of store is untouched") {
                             for (auto i = 0; i < num_entries - 2; i++) {
                                 v_or = kv->get(test_data[i].first);
-                                REQUIRE(v_or);
+                                REQUIRE(v_or.ok());
                                 REQUIRE(v_or.val().string() == test_data[i].second);
                             }
                         }
@@ -446,23 +446,23 @@ SCENARIO("I can create a KV map", "[kv]") {
     GIVEN("I create an empty KV map") {
         auto temp_dir = TempDir();
         auto kv_or = open_kv(temp_dir.path());
-        REQUIRE(kv_or);
+        REQUIRE(kv_or.ok());
 
         auto kv = std::move(kv_or.val());
 
         auto keys_or = kv->listKeys();
-        REQUIRE(keys_or);
+        REQUIRE(keys_or.ok());
         REQUIRE(keys_or.val().empty());
         auto e = kv->put("key", BorrowedSlice{"value"});
-        REQUIRE(e);
+        REQUIRE(e.ok());
 
         keys_or = kv->listKeys();
-        REQUIRE(keys_or);
+        REQUIRE(keys_or.ok());
         REQUIRE(!keys_or.val().empty());
         REQUIRE(keys_or.val()[0] == "key"s);
 
         e = kv->compact();
-        REQUIRE(e);
+        REQUIRE(e.ok());
 
         const std::string &key = GENERATE(take(10, random(1, 512)));
         const std::string &value = GENERATE(take(1, random(1, 1 * 1024 * 1024)));
@@ -470,44 +470,44 @@ SCENARIO("I can create a KV map", "[kv]") {
 
         WHEN("I add a value") {
             e = kv->put(key, BorrowedSlice{value});
-            REQUIRE(e);
+            REQUIRE(e.ok());
 
             THEN("I can get the value back") {
                 auto v_or = kv->get(key);
-                REQUIRE(v_or);
+                REQUIRE(v_or.ok());
                 REQUIRE(std::string_view{v_or.val().char_data(), v_or.val().size()} == value);
 
                 AND_WHEN("I update the value") {
                     e = kv->put(key, BorrowedSlice{new_value.data(), static_cast<uint32_t>(new_value.size())});
-                    REQUIRE(e);
+                    REQUIRE(e.ok());
                     THEN("I get the new value back") {
                         v_or = kv->get(key);
-                        REQUIRE(v_or);
+                        REQUIRE(v_or.ok());
                         REQUIRE(std::string_view{v_or.val().char_data(), v_or.val().size()} == new_value);
 
                         e = kv->put(key, BorrowedSlice{value});
-                        REQUIRE(e);
+                        REQUIRE(e.ok());
 
                         AND_WHEN("I close the KV and open it again") {
                             kv.reset();
 
                             kv_or = open_kv(temp_dir.path());
-                            REQUIRE(kv_or);
+                            REQUIRE(kv_or.ok());
 
                             kv = std::move(kv_or.val());
 
                             THEN("I can get the value back") {
                                 v_or = kv->get(key);
-                                REQUIRE(v_or);
+                                REQUIRE(v_or.ok());
                                 REQUIRE(std::string_view{v_or.val().char_data(), v_or.val().size()} == value);
 
                                 AND_WHEN("I remove the key") {
                                     e = kv->remove(key);
-                                    REQUIRE(e);
+                                    REQUIRE(e.ok());
 
                                     THEN("I can't get the value back") {
                                         v_or = kv->get(key);
-                                        REQUIRE(!v_or);
+                                        REQUIRE(!v_or.ok());
                                         REQUIRE(v_or.err().code == KVErrorCodes::KeyNotFound);
 
                                         e = kv->remove("non-existent-key");

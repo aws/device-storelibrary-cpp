@@ -209,7 +209,7 @@ namespace gg __attribute__((visibility("default"))) {
     inline expected<CheckpointableOwnedRecord, StreamError> Iterator::operator*() noexcept {
         if (auto stream = _stream.lock()) {
             auto record_or = stream->read(sequence_number, ReadOptions{true, true, _offset});
-            if (!record_or) {
+            if (!record_or.ok()) {
                 return record_or.err();
             }
             auto x = std::move(record_or.val());

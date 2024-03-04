@@ -14,7 +14,7 @@ namespace gg __attribute__((visibility("default"))) {
         expected(UnexpectedT &&unexpect) : _unexpected(std::move(unexpect)) {}
         expected(const ExpectedT &val) : _is_set(true), _val(val) {}
         expected(const UnexpectedT &unexpect) : _unexpected(unexpect) {}
-        explicit operator bool() const { return _is_set; }
+        bool ok() const { return _is_set; }
 
         const ExpectedT &val() const & { return _val; }
         ExpectedT &val() & { return _val; }

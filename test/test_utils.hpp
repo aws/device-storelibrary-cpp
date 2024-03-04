@@ -106,7 +106,7 @@ class SpyFileLike : public aws::gg::FileLike {
 
     static aws::gg::expected<std::unique_ptr<aws::gg::FileLike>, aws::gg::FileError>
     create(aws::gg::expected<std::unique_ptr<aws::gg::FileLike>, aws::gg::FileError> e) {
-        if (e) {
+        if (e.ok()) {
             return {std::make_unique<SpyFileLike>(std::move(e.val()))};
         }
         return std::move(e.err());

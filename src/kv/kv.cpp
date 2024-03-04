@@ -17,7 +17,7 @@ expected<std::shared_ptr<KV>, KVError> KV::openOrCreate(KVOptions &&opts) noexce
 
     auto kv = std::shared_ptr<KV>(new KV(std::move(opts)));
     auto ok = kv->initialize();
-    if (!ok) {
+    if (!ok.ok()) {
         return ok;
     }
     return kv;
@@ -74,7 +74,7 @@ KVError KV::openFile() noexcept {
     }
 
     auto e = _opts.filesystem_implementation->open(_opts.identifier);
-    if (!e) {
+    if (!e.ok()) {
         return KVError{KVErrorCodes::ReadError, e.err().msg};
     }
     _f = std::move(e.val());
@@ -86,15 +86,15 @@ template <typename T> static constexpr uint32_t smallSizeOf() { return static_ca
 KVError KV::initialize() noexcept {
     std::lock_guard<std::mutex> lock(_lock);
 
-    auto ok = openFile();
-    if (!ok) {
-        return ok;
+    auto err = openFile();
+    if (!err.ok()) {
+        return err;
     }
 
     while (true) {
         auto beginning_pointer = _byte_position;
         auto header_or = readHeaderFrom(beginning_pointer);
-        if (!header_or) {
+        if (!header_or.ok()) {
             if (header_or.err().code == KVErrorCodes::EndOfFile) {
                 // If we reached the end of the file, there could have been extra data at the end, but less
                 // than what we were hoping to read. Truncate the file now so that everything before this point
@@ -110,14 +110,14 @@ KVError KV::initialize() noexcept {
 
         // Checking key corruption is currently not supported. This can be added by computing crc32 on the key
         auto key_or = readKeyFrom(beginning_pointer, header.key_length);
-        if (!key_or) {
+        if (!key_or.ok()) {
             truncateAndLog(beginning_pointer, key_or.err());
             continue;
         }
 
         if (_opts.full_corruption_check_on_open) {
             auto value_or = readValueFrom(beginning_pointer, header);
-            if (!value_or) {
+            if (!value_or.ok()) {
                 truncateAndLog(beginning_pointer, value_or.err());
                 continue;
             }
@@ -137,7 +137,8 @@ KVError KV::initialize() noexcept {
 // Only use this method during KV::initialize.
 void inline KV::addOrRemoveKeyInInitialization(const std::string &key, const uint32_t beginning_pointer,
                                                const uint32_t added_size, const uint8_t flags) noexcept {
-    if (flags & DELETED_FLAG) {
+    const bool isDeleted = flags & DELETED_FLAG;
+    if (isDeleted) {
         std::ignore = removeKey(key);
         // Count deleted entry as added because compaction would be helpful in shrinking the map.
         _added_bytes += added_size;
@@ -184,7 +185,7 @@ static KVError fileErrorToKVError(const FileError &e) {
 
 expected<KVHeader, KVError> KV::readHeaderFrom(const uint32_t begin) const noexcept {
     auto header_or = _f->read(begin, begin + smallSizeOf<KVHeader>());
-    if (!header_or) {
+    if (!header_or.ok()) {
         return fileErrorToKVError(header_or.err());
     }
 
@@ -201,7 +202,7 @@ expected<KVHeader, KVError> KV::readHeaderFrom(const uint32_t begin) const noexc
 
 expected<std::string, KVError> KV::readKeyFrom(const uint32_t begin, const key_length_type key_length) const noexcept {
     auto key_or = _f->read(begin + smallSizeOf<KVHeader>(), begin + smallSizeOf<KVHeader>() + key_length);
-    if (!key_or) {
+    if (!key_or.ok()) {
         return fileErrorToKVError(key_or.err());
     }
     return key_or.val().string();
@@ -209,7 +210,7 @@ expected<std::string, KVError> KV::readKeyFrom(const uint32_t begin, const key_l
 
 expected<OwnedSlice, KVError> KV::readValueFrom(const uint32_t begin) const noexcept {
     auto header_or = readHeaderFrom(begin);
-    if (!header_or) {
+    if (!header_or.ok()) {
         return header_or.err();
     }
     return readValueFrom(begin, header_or.val());
@@ -218,7 +219,7 @@ expected<OwnedSlice, KVError> KV::readValueFrom(const uint32_t begin) const noex
 expected<OwnedSlice, KVError> KV::readValueFrom(const uint32_t begin, const KVHeader &header) const noexcept {
     auto value_or = _f->read(begin + smallSizeOf<KVHeader>() + header.key_length,
                              begin + smallSizeOf<KVHeader>() + header.key_length + header.value_length);
-    if (!value_or) {
+    if (!value_or.ok()) {
         return fileErrorToKVError(value_or.err());
     }
     const auto crc = crc32::crc32_of(BorrowedSlice{&header.flags, sizeof(header.flags)},
@@ -259,14 +260,14 @@ template <typename... Args> FileError KV::appendMultiple(const Args &...args) co
     for (auto arg : {args...}) {
         if (arg.size() > 0) {
             auto e = _f->append(arg);
-            if (!e) {
+            if (!e.ok()) {
                 std::ignore = _f->truncate(_byte_position);
                 return e;
             }
         }
     }
     auto e = _f->flush();
-    if (!e) {
+    if (!e.ok()) {
         std::ignore = _f->truncate(_byte_position);
         return e;
     }
@@ -302,7 +303,7 @@ KVError KV::put(const std::string &key, const BorrowedSlice data) noexcept {
 
     std::lock_guard<std::mutex> lock(_lock);
     auto e = writeEntry(key, data, 0U);
-    if (!e) {
+    if (!e.ok()) {
         return e;
     }
 
@@ -341,26 +342,26 @@ KVError KV::maybeCompact() noexcept {
 expected<uint32_t, KVError> KV::readWrite(const uint32_t begin, std::pair<std::string, uint32_t> &p,
                                           FileLike &f) noexcept {
     auto header_or = readHeaderFrom(p.second);
-    if (!header_or) {
+    if (!header_or.ok()) {
         return header_or.err();
     }
     const auto header = header_or.val();
     auto value_or = readValueFrom(p.second, header);
-    if (!value_or) {
+    if (!value_or.ok()) {
         return value_or.err();
     }
     const auto value = std::move(value_or.val());
 
     auto e = f.append(BorrowedSlice{&header, sizeof(header)});
-    if (!e) {
+    if (!e.ok()) {
         return fileErrorToKVError(e);
     }
     e = f.append(BorrowedSlice{p.first});
-    if (!e) {
+    if (!e.ok()) {
         return fileErrorToKVError(e);
     }
     e = f.append(BorrowedSlice{value.data(), value.size()});
-    if (!e) {
+    if (!e.ok()) {
         return fileErrorToKVError(e);
     }
 
@@ -372,7 +373,7 @@ KVError KV::compactNoLock() noexcept {
     // Remove any previous partially written shadow
     _opts.filesystem_implementation->remove(_shadow_name);
     auto shadow_or = _opts.filesystem_implementation->open(_shadow_name);
-    if (!shadow_or) {
+    if (!shadow_or.ok()) {
         return KVError{KVErrorCodes::WriteError, shadow_or.err().msg};
     }
 
@@ -384,7 +385,7 @@ KVError KV::compactNoLock() noexcept {
         for (const auto &in_point : _key_pointers) {
             auto point = in_point;
             auto err_or = readWrite(new_byte_pos, point, *shadow);
-            if (!err_or) {
+            if (!err_or.ok()) {
                 // if key is corrupted, remove it from the map
                 if (err_or.err().code == KVErrorCodes::HeaderCorrupted ||
                     err_or.err().code == KVErrorCodes::DataCorrupted) {
@@ -402,7 +403,7 @@ KVError KV::compactNoLock() noexcept {
         }
 
         auto e = shadow->flush();
-        if (!e) {
+        if (!e.ok()) {
             // Close and delete the partially written shadow
             shadow.reset();
             _opts.filesystem_implementation->remove(_shadow_name);
@@ -417,7 +418,7 @@ KVError KV::compactNoLock() noexcept {
     _opts.filesystem_implementation->rename(_shadow_name, _opts.identifier);
     // Open up the main file (which is the shadow that we just wrote)
     auto main_or = _opts.filesystem_implementation->open(_opts.identifier);
-    if (!main_or) {
+    if (!main_or.ok()) {
         return KVError{KVErrorCodes::ReadError, main_or.err().msg};
     }
     // Replace our internal filehandle to use the new main file
@@ -450,7 +451,7 @@ KVError KV::remove(const std::string &key) noexcept {
     }
 
     auto e = writeEntry(key, BorrowedSlice{}, DELETED_FLAG);
-    if (!e) {
+    if (!e.ok()) {
         return e;
     }
 

@@ -12,9 +12,9 @@ std::shared_ptr<MemoryStream> MemoryStream::openOrCreate(StreamOptions &&opts) n
 
 expected<uint64_t, StreamError> MemoryStream::append(BorrowedSlice d, const AppendOptions &) noexcept {
     const auto record_size = d.size();
-    auto ok = remove_records_if_new_record_beyond_max_size(record_size);
-    if (!ok) {
-        return ok;
+    auto err = remove_records_if_new_record_beyond_max_size(record_size);
+    if (!err.ok()) {
+        return err;
     }
 
     auto seq = _next_sequence_number++;
@@ -49,9 +49,9 @@ StreamError MemoryStream::remove_records_if_new_record_beyond_max_size(uint32_t 
 
 expected<uint64_t, StreamError> MemoryStream::append(OwnedSlice &&d, const AppendOptions &) noexcept {
     const auto record_size = d.size();
-    auto ok = remove_records_if_new_record_beyond_max_size(record_size);
-    if (!ok) {
-        return ok;
+    auto err = remove_records_if_new_record_beyond_max_size(record_size);
+    if (!err.ok()) {
+        return err;
     }
 
     uint64_t seq = _next_sequence_number++;

@@ -7,9 +7,9 @@ namespace aws {
 namespace gg {
 expected<std::shared_ptr<FileStream>, StreamError> FileStream::openOrCreate(StreamOptions &&opts) noexcept {
     auto stream = std::shared_ptr<FileStream>(new FileStream(std::move(opts)));
-    auto ok = stream->loadExistingSegments();
-    if (!ok) {
-        return ok;
+    auto err = stream->loadExistingSegments();
+    if (!err.ok()) {
+        return err;
     }
     return stream;
 }
@@ -47,13 +47,13 @@ static StreamError fileErrorToStreamError(const FileError &e) noexcept {
 
 StreamError FileStream::loadExistingSegments() noexcept {
     auto kv_err_or = kv::KV::openOrCreate(std::move(_opts.kv_options));
-    if (!kv_err_or) {
+    if (!kv_err_or.ok()) {
         return kvErrorToStreamError(kv_err_or.err());
     }
     _kv_store = std::move(kv_err_or.val());
 
     auto files_or = _opts.file_implementation->list();
-    if (!files_or) {
+    if (!files_or.ok()) {
         return fileErrorToStreamError(files_or.err());
     }
 
@@ -69,9 +69,9 @@ StreamError FileStream::loadExistingSegments() noexcept {
                 continue;
             }
             FileSegment segment{base, _opts.file_implementation, _opts.logger};
-            auto ok = segment.open(_opts.full_corruption_check_on_open);
-            if (!ok) {
-                return ok;
+            auto err = segment.open(_opts.full_corruption_check_on_open);
+            if (!err.ok()) {
+                return err;
             }
             _segments.push_back(std::move(segment));
         }
@@ -96,9 +96,9 @@ StreamError FileStream::loadExistingSegments() noexcept {
 StreamError FileStream::makeNextSegment() noexcept {
     FileSegment segment{_next_sequence_number, _opts.file_implementation, _opts.logger};
 
-    auto ok = segment.open(_opts.full_corruption_check_on_open);
-    if (!ok) {
-        return ok;
+    auto err = segment.open(_opts.full_corruption_check_on_open);
+    if (!err.ok()) {
+        return err;
     }
 
     _segments.push_back(std::move(segment));
@@ -108,16 +108,16 @@ StreamError FileStream::makeNextSegment() noexcept {
 expected<uint64_t, StreamError> FileStream::append(BorrowedSlice d, const AppendOptions &append_opts) noexcept {
     std::lock_guard<std::mutex> lock(_segments_lock);
 
-    auto ok = removeSegmentsIfNewRecordBeyondMaxSize(d.size());
-    if (!ok) {
-        return ok;
+    auto err = removeSegmentsIfNewRecordBeyondMaxSize(d.size());
+    if (!err.ok()) {
+        return err;
     }
 
     // Check if we need a new segment because we don't have any, or the last segment is getting too big.
     if (_segments.empty() || _segments.back().totalSizeBytes() >= _opts.minimum_segment_size_bytes) {
-        ok = makeNextSegment();
-        if (!ok) {
-            return ok;
+        err = makeNextSegment();
+        if (!err.ok()) {
+            return err;
         }
     }
 
@@ -126,7 +126,7 @@ expected<uint64_t, StreamError> FileStream::append(BorrowedSlice d, const Append
     auto seq = _next_sequence_number.fetch_add(1);
 
     auto e = seg.append(d, aws::gg::timestamp(), seq, append_opts.sync_on_append);
-    if (!e) {
+    if (!e.ok()) {
         return fileErrorToStreamError(e.err());
     }
     // Only increment the size if successful. On failure, we expect the segment to not keep any partially written
@@ -189,7 +189,7 @@ expected<OwnedRecord, StreamError> FileStream::read(uint64_t sequence_number,
 
         if (have_exact_segment || !find_exact) {
             auto val_or = seg.read(sequence_number, read_options);
-            if (val_or) {
+            if (val_or.ok()) {
                 return val_or;
             }
             if ((val_or.err().code == StreamErrorCode::RecordNotFound ||
@@ -246,7 +246,7 @@ StreamError FileStream::setCheckpoint(const std::string &identifier, uint64_t se
 PersistentIterator::PersistentIterator(std::string id, uint64_t start, std::shared_ptr<kv::KV> kv) noexcept
     : _id(std::move(id)), _store(std::move(kv)), _sequence_number(start) {
     auto value_or = _store->get(_id);
-    if (value_or) {
+    if (value_or.ok()) {
         uint64_t last_value;
         // Use memcpy instead of reinterpret cast to avoid UB.
         std::ignore = memcpy(&last_value, value_or.val().data(), sizeof(uint64_t));

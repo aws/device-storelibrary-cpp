@@ -226,7 +226,7 @@ namespace gg __attribute__((visibility("default"))) {
         expected<std::unique_ptr<FileLike>, FileError> open(const std::string &identifier) override {
             auto f = std::make_unique<PosixFileLike>(_base_path / identifier);
             auto res = f->open();
-            if (res) {
+            if (res.ok()) {
                 return {std::move(f)};
             }
             return res;
@@ -270,7 +270,7 @@ namespace gg __attribute__((visibility("default"))) {
         expected<std::unique_ptr<FileLike>, FileError> open(const std::string &identifier) override {
             auto f = std::make_unique<PosixUnbufferedFileLike>(_base_path / identifier);
             auto res = f->open();
-            if (res) {
+            if (res.ok()) {
                 return {std::move(f)};
             }
             return res;
