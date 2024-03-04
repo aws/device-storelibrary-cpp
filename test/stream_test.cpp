@@ -95,7 +95,7 @@ SCENARIO("I cannot create a stream", "[stream]") {
     auto temp_dir = TempDir();
     auto fs = std::make_shared<SpyFileSystem>(std::make_shared<PosixFileSystem>(temp_dir.path()));
 
-    fs->when("open", SpyFileSystem::OpenType{[](__attribute__((unused)) const std::string &s) {
+    fs->when("open", SpyFileSystem::OpenType{[](const std::string &) {
                  return FileError{FileErrorCode::AccessDenied, {}};
              }})
         ->when("list", SpyFileSystem::ListType{[]() {
@@ -112,6 +112,28 @@ SCENARIO("I cannot create a stream", "[stream]") {
     auto stream = std::move(stream_or.val());
     REQUIRE(stream->firstSequenceNumber() == 1);
     REQUIRE(stream->highestSequenceNumber() == 2);
+}
+
+SCENARIO("I create a stream with file failures", "[stream]") {
+    auto temp_dir = TempDir();
+    auto fs = std::make_shared<SpyFileSystem>(std::make_shared<PosixFileSystem>(temp_dir.path()));
+
+    fs->when("open", SpyFileSystem::OpenType{[&fs](const std::string &s) {
+                 auto fakeFile = std::make_unique<SpyFileLike>(std::move(fs->real->open(s).val()));
+                 fakeFile->when("read", SpyFileLike::ReadType{[](uint32_t, uint32_t) {
+                                    return FileError{FileErrorCode::Unknown, {}};
+                                }});
+                 std::unique_ptr<FileLike> fileLike{fakeFile.release()};
+                 return fileLike;
+             }})
+        ->when("list", SpyFileSystem::ListType{[]() { return std::vector<std::string>{"1.log"}; }});
+
+    auto stream_or = open_stream(fs);
+    REQUIRE(stream_or);
+
+    auto stream = std::move(stream_or.val());
+    REQUIRE(stream->firstSequenceNumber() == 1);
+    REQUIRE(stream->highestSequenceNumber() == 1);
 }
 
 SCENARIO("Stream validates data length", "[stream]") {

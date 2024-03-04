@@ -85,11 +85,25 @@ class TempDir {
     const std::filesystem::path &path() const { return _path; }
 };
 
+template <typename> struct RemoveMembership {};
+template <typename X, typename Y> struct RemoveMembership<X Y::*> {
+    using type = X;
+};
+
+struct CallRealMethod {};
+
 class SpyFileLike : public aws::gg::FileLike {
   private:
     std::unique_ptr<aws::gg::FileLike> _real;
+    std::list<std::pair<std::string, std::variant<CallRealMethod, std::any>>> _mocks{};
 
   public:
+    using ReadType = std::function<RemoveMembership<decltype(&aws::gg::FileLike::read)>::type>;
+    using AppendType = std::function<RemoveMembership<decltype(&aws::gg::FileLike::append)>::type>;
+    using FlushType = std::function<RemoveMembership<decltype(&aws::gg::FileLike::flush)>::type>;
+    using SyncType = std::function<RemoveMembership<decltype(&aws::gg::FileLike::sync)>::type>;
+    using TruncateType = std::function<RemoveMembership<decltype(&aws::gg::FileLike::truncate)>::type>;
+
     static aws::gg::expected<std::unique_ptr<aws::gg::FileLike>, aws::gg::FileError>
     create(aws::gg::expected<std::unique_ptr<aws::gg::FileLike>, aws::gg::FileError> e) {
         if (e) {
@@ -100,108 +114,160 @@ class SpyFileLike : public aws::gg::FileLike {
 
     SpyFileLike(std::unique_ptr<aws::gg::FileLike> f) : _real(std::move(f)) {}
 
-    aws::gg::expected<aws::gg::OwnedSlice, aws::gg::FileError> read(uint32_t begin, uint32_t end) override {
+    aws::gg::expected<aws::gg::OwnedSlice, aws::gg::FileError> read(const uint32_t begin, const uint32_t end) override {
+        if (!_mocks.empty() && _mocks.front().first == "read") {
+            const auto mock = _mocks.front();
+            _mocks.pop_front();
+            if (std::holds_alternative<std::any>(mock.second)) {
+                const auto f = std::any_cast<ReadType>(std::get<std::any>(mock.second));
+                return f(begin, end);
+            }
+        }
         return _real->read(begin, end);
     }
 
-    aws::gg::FileError append(aws::gg::BorrowedSlice data) override { return _real->append(data); }
+    aws::gg::FileError append(const aws::gg::BorrowedSlice data) override {
+        if (!_mocks.empty() && _mocks.front().first == "append") {
+            const auto mock = _mocks.front();
+            _mocks.pop_front();
+            if (std::holds_alternative<std::any>(mock.second)) {
+                const auto f = std::any_cast<AppendType>(std::get<std::any>(mock.second));
+                return f(data);
+            }
+        }
+        return _real->append(data);
+    }
 
-    aws::gg::FileError flush() override { return _real->flush(); }
+    aws::gg::FileError flush() override {
+        if (!_mocks.empty() && _mocks.front().first == "flush") {
+            const auto mock = _mocks.front();
+            _mocks.pop_front();
+            if (std::holds_alternative<std::any>(mock.second)) {
+                const auto f = std::any_cast<FlushType>(std::get<std::any>(mock.second));
+                return f();
+            }
+        }
+        return _real->flush();
+    }
 
-    void sync() override {}
+    void sync() override {
+        if (!_mocks.empty() && _mocks.front().first == "sync") {
+            const auto mock = _mocks.front();
+            _mocks.pop_front();
+            if (std::holds_alternative<std::any>(mock.second)) {
+                const auto f = std::any_cast<SyncType>(std::get<std::any>(mock.second));
+                return f();
+            }
+        }
+        _real->sync();
+    }
 
-    aws::gg::FileError truncate(uint32_t s) override { return _real->truncate(s); }
+    aws::gg::FileError truncate(const uint32_t s) override {
+        if (!_mocks.empty() && _mocks.front().first == "truncate") {
+            const auto mock = _mocks.front();
+            _mocks.pop_front();
+            if (std::holds_alternative<std::any>(mock.second)) {
+                const auto f = std::any_cast<TruncateType>(std::get<std::any>(mock.second));
+                return f(s);
+            }
+        }
+        return _real->truncate(s);
+    }
+
+    template <typename ret, typename... args> auto when(const std::string &method, std::function<ret(args...)> f) {
+        std::ignore = _mocks.emplace_back(method, f);
+        return this;
+    }
+
+    auto when(const std::string &method, CallRealMethod f) {
+        std::ignore = _mocks.emplace_back(method, f);
+        return this;
+    }
 };
-
-template <typename> struct RemoveMembership {};
-template <typename X, typename Y> struct RemoveMembership<X Y::*> {
-    using type = X;
-};
-
-struct CallRealMethod {};
 
 class SpyFileSystem : public aws::gg::FileSystemInterface {
   private:
-    std::shared_ptr<aws::gg::FileSystemInterface> _real;
     std::list<std::pair<std::string, std::variant<CallRealMethod, std::any>>> _mocks{};
 
   public:
+    std::shared_ptr<aws::gg::FileSystemInterface> real;
+
     using OpenType = std::function<RemoveMembership<decltype(&aws::gg::FileSystemInterface::open)>::type>;
     using ExistsType = std::function<RemoveMembership<decltype(&aws::gg::FileSystemInterface::exists)>::type>;
     using RenameType = std::function<RemoveMembership<decltype(&aws::gg::FileSystemInterface::rename)>::type>;
     using RemoveType = std::function<RemoveMembership<decltype(&aws::gg::FileSystemInterface::remove)>::type>;
     using ListType = std::function<RemoveMembership<decltype(&aws::gg::FileSystemInterface::list)>::type>;
 
-    SpyFileSystem(std::shared_ptr<aws::gg::FileSystemInterface> real) : _real(std::move(real)) {}
+    SpyFileSystem(std::shared_ptr<aws::gg::FileSystemInterface> real) : real(std::move(real)) {}
 
     aws::gg::expected<std::unique_ptr<aws::gg::FileLike>, aws::gg::FileError>
     open(const std::string &identifier) override {
         if (!_mocks.empty() && _mocks.front().first == "open") {
-            auto mock = _mocks.front();
+            const auto mock = _mocks.front();
             _mocks.pop_front();
             if (std::holds_alternative<std::any>(mock.second)) {
-                auto f = std::any_cast<OpenType>(std::get<std::any>(mock.second));
+                const auto f = std::any_cast<OpenType>(std::get<std::any>(mock.second));
                 return f(identifier);
             }
         }
-        return SpyFileLike::create(_real->open(identifier));
+        return SpyFileLike::create(real->open(identifier));
     };
 
     bool exists(const std::string &identifier) override {
         if (!_mocks.empty() && _mocks.front().first == "exists") {
-            auto mock = _mocks.front();
+            const auto mock = _mocks.front();
             _mocks.pop_front();
             if (std::holds_alternative<std::any>(mock.second)) {
-                auto f = std::any_cast<ExistsType>(std::get<std::any>(mock.second));
+                const auto f = std::any_cast<ExistsType>(std::get<std::any>(mock.second));
                 return f(identifier);
             }
         }
-        return _real->exists(identifier);
+        return real->exists(identifier);
     };
 
     aws::gg::FileError rename(const std::string &old_id, const std::string &new_id) override {
         if (!_mocks.empty() && _mocks.front().first == "rename") {
-            auto mock = _mocks.front();
+            const auto mock = _mocks.front();
             _mocks.pop_front();
             if (std::holds_alternative<std::any>(mock.second)) {
-                auto f = std::any_cast<RenameType>(std::get<std::any>(mock.second));
+                const auto f = std::any_cast<RenameType>(std::get<std::any>(mock.second));
                 return f(old_id, new_id);
             }
         }
-        return _real->rename(old_id, new_id);
+        return real->rename(old_id, new_id);
     };
 
     aws::gg::FileError remove(const std::string &id) override {
         if (!_mocks.empty() && _mocks.front().first == "remove") {
-            auto mock = _mocks.front();
+            const auto mock = _mocks.front();
             _mocks.pop_front();
             if (std::holds_alternative<std::any>(mock.second)) {
-                auto f = std::any_cast<RemoveType>(std::get<std::any>(mock.second));
+                const auto f = std::any_cast<RemoveType>(std::get<std::any>(mock.second));
                 return f(id);
             }
         }
-        return _real->remove(id);
+        return real->remove(id);
     };
 
     aws::gg::expected<std::vector<std::string>, aws::gg::FileError> list() override {
         if (!_mocks.empty() && _mocks.front().first == "list") {
-            auto mock = _mocks.front();
+            const auto mock = _mocks.front();
             _mocks.pop_front();
             if (std::holds_alternative<std::any>(mock.second)) {
-                auto f = std::any_cast<ListType>(std::get<std::any>(mock.second));
+                const auto f = std::any_cast<ListType>(std::get<std::any>(mock.second));
                 return f();
             }
         }
-        return _real->list();
+        return real->list();
     };
 
     template <typename ret, typename... args> auto when(const std::string &method, std::function<ret(args...)> f) {
-        _mocks.emplace_back(method, f);
+        std::ignore = _mocks.emplace_back(method, f);
         return this;
     }
 
     auto when(const std::string &method, CallRealMethod f) {
-        _mocks.emplace_back(method, f);
+        std::ignore = _mocks.emplace_back(method, f);
         return this;
     }
 };
