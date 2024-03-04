@@ -3,7 +3,7 @@
 #include <cstdint>
 
 namespace __attribute__((visibility("default"))) crc32 {
-    static constexpr const uint32_t table[256] = {
+    static constexpr uint32_t table[256] = {
         0x00000000U, 0x77073096U, 0xEE0E612CU, 0x990951BAU, 0x076DC419U, 0x706AF48FU, 0xE963A535U, 0x9E6495A3U,
         0x0EDB8832U, 0x79DCB8A4U, 0xE0D5E91EU, 0x97D2D988U, 0x09B64C2BU, 0x7EB17CBDU, 0xE7B82D07U, 0x90BF1D91U,
         0x1DB71064U, 0x6AB020F2U, 0xF3B97148U, 0x84BE41DEU, 0x1ADAD47DU, 0x6DDDE4EBU, 0xF4D4B551U, 0x83D385C7U,
@@ -37,17 +37,17 @@ namespace __attribute__((visibility("default"))) crc32 {
         0xBDBDF21CU, 0xCABAC28AU, 0x53B39330U, 0x24B4A3A6U, 0xBAD03605U, 0xCDD70693U, 0x54DE5729U, 0x23D967BFU,
         0xB3667A2EU, 0xC4614AB8U, 0x5D681B02U, 0x2A6F2B94U, 0xB40BBE37U, 0xC30C8EA1U, 0x5A05DF1BU, 0x2D02EF8DU};
 
-    static inline uint32_t update(uint32_t initial_value, const void *buf, size_t len) {
+    static uint32_t update(const uint32_t initial_value, const void *buf, const size_t len) {
         uint32_t c = initial_value ^ 0xFFFFFFFF;
         const auto *u = static_cast<const uint8_t *>(buf);
-        for (size_t i = 0; i < len; ++i) {
-            c = table[(c ^ u[i]) & 0xFF] ^ (c >> 8);
+        for (size_t i = 0U; i < len; ++i) {
+            c = table[(c ^ u[i]) & 0xFFU] ^ (c >> 8);
         }
         return c ^ 0xFFFFFFFF;
     }
 
-    template <typename... Args> static inline uint32_t crc32_of(Args && ...args) {
-        uint32_t crc{0};
+    template <typename... Args> static uint32_t crc32_of(Args && ...args) {
+        uint32_t crc{0U};
         for (auto arg : {args...}) {
             crc = update(crc, arg.data(), arg.size());
         }

@@ -4,13 +4,13 @@
 
 namespace aws {
 namespace gg {
-static constexpr const char *const RecordNotFoundErrorStr = "Record not found";
+static constexpr auto RecordNotFoundErrorStr = "Record not found";
 
 std::shared_ptr<MemoryStream> MemoryStream::openOrCreate(StreamOptions &&opts) noexcept {
     return std::shared_ptr<MemoryStream>(new MemoryStream(std::move(opts)));
 }
 
-expected<uint64_t, StreamError> MemoryStream::append(BorrowedSlice d, const AppendOptions &) noexcept {
+expected<uint64_t, StreamError> MemoryStream::append(const BorrowedSlice d, const AppendOptions &) noexcept {
     const auto record_size = d.size();
     auto err = remove_records_if_new_record_beyond_max_size(record_size);
     if (!err.ok()) {
@@ -23,7 +23,7 @@ expected<uint64_t, StreamError> MemoryStream::append(BorrowedSlice d, const Appe
     return seq;
 }
 
-StreamError MemoryStream::remove_records_if_new_record_beyond_max_size(uint32_t record_size) noexcept {
+StreamError MemoryStream::remove_records_if_new_record_beyond_max_size(const uint32_t record_size) noexcept {
     if (record_size > _opts.maximum_size_bytes) {
         return StreamError{StreamErrorCode::RecordTooLarge, {}};
     }
@@ -93,7 +93,7 @@ StreamError MemoryStream::deleteIterator(const std::string &identifier) noexcept
     return StreamError{StreamErrorCode::NoError, {}};
 }
 
-StreamError MemoryStream::setCheckpoint(const std::string &identifier, uint64_t sequence_number) noexcept {
+StreamError MemoryStream::setCheckpoint(const std::string &identifier, const uint64_t sequence_number) noexcept {
     _iterators[identifier] = sequence_number;
     return StreamError{StreamErrorCode::NoError, {}};
 }

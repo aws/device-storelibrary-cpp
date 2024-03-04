@@ -8,13 +8,15 @@
 #include <filesystem>
 #include <functional>
 #include <list>
-#include <memory>
+#include <memory> // for unique_ptr
 #include <random>
 #include <string>
 #include <variant>
 
-namespace {
-
+namespace aws {
+namespace gg {
+namespace test {
+namespace utils {
 static void random_string(std::string &s, const int len) {
     static std::random_device rd;
     static std::mt19937 mt(rd());
@@ -47,14 +49,11 @@ class RandomStringGenerator : public Catch::Generators::IGenerator<std::string> 
     std::string current_string;
 
   public:
-    RandomStringGenerator(int low, int high, char first, char last)
-        : m_length_dist(low, high), m_value_dist(first, last) {
-        static_cast<void>(next());
-    }
+    RandomStringGenerator(int low, int high, char first, char last);
 
-    std::string const &get() const override;
-    bool next() override {
-        auto length = m_length_dist(m_rand);
+    virtual const std::string &get() const override;
+    virtual bool next() override {
+        const auto length = m_length_dist(m_rand);
         current_string = std::string{};
         current_string.reserve(static_cast<size_t>(length));
         for (auto i = 0; i < length; i++) {
@@ -64,13 +63,11 @@ class RandomStringGenerator : public Catch::Generators::IGenerator<std::string> 
     }
 };
 
-std::string const &RandomStringGenerator::get() const { return current_string; }
-
-__attribute__((unused)) Catch::Generators::GeneratorWrapper<std::string> random(int min_len, int max_len) {
+static __attribute__((unused)) Catch::Generators::GeneratorWrapper<std::string> random(int min_len, int max_len) {
     return {Catch::Detail::make_unique<RandomStringGenerator>(min_len, max_len, ' ', '~')};
 }
 
-Catch::Generators::GeneratorWrapper<std::string> random(int min_len, int max_len, char first, char last) {
+static Catch::Generators::GeneratorWrapper<std::string> random(int min_len, int max_len, char first, char last) {
     return {Catch::Detail::make_unique<RandomStringGenerator>(min_len, max_len, first, last)};
 }
 
@@ -271,5 +268,7 @@ class SpyFileSystem : public aws::gg::FileSystemInterface {
         return this;
     }
 };
-
-} // namespace
+} // namespace utils
+} // namespace test
+} // namespace gg
+} // namespace aws

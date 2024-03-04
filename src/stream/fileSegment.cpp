@@ -1,5 +1,6 @@
 #include "common/crc32.hpp"
 #include "stream/fileStream.hpp"
+#include <climits>
 #include <iomanip>
 #include <sstream>
 #include <string>
@@ -7,7 +8,7 @@
 namespace aws {
 namespace gg {
 
-static constexpr const int UINT64_MAX_DECIMAL_COUNT = 19;
+static constexpr int UINT64_MAX_DECIMAL_COUNT = 19;
 
 #define IS_LITTLE_ENDIAN (*(uint16_t *)"\0\1" >> 8)
 
@@ -25,7 +26,7 @@ auto _htonll(std::uint64_t h) {
     return h;
 }
 
-auto _ntohll(std::uint64_t h) { return _htonll(h); }
+auto _ntohll(const std::uint64_t h) { return _htonll(h); }
 
 auto _htonl(std::uint32_t h) {
     if (IS_LITTLE_ENDIAN) {
@@ -34,7 +35,7 @@ auto _htonl(std::uint32_t h) {
     }
     return h;
 }
-auto _ntohl(std::uint32_t h) { return _htonl(h); }
+auto _ntohl(const std::uint32_t h) { return _htonl(h); }
 // NOLINTEND
 
 constexpr uint8_t HEADER_SIZE = 32U;
@@ -56,38 +57,50 @@ struct LogEntryHeader {
 static_assert(sizeof(LogEntryHeader) == HEADER_SIZE, "Header size must be 32 bytes!");
 
 static std::string string(const StreamErrorCode e) noexcept {
-    using namespace std::string_literals;
+    std::string v{};
     switch (e) {
     case StreamErrorCode::NoError:
-        return "NoError"s;
+        v = "NoError";
+        break;
     case StreamErrorCode::RecordNotFound:
-        return "RecordNotFound"s;
+        v = "RecordNotFound";
+        break;
     case StreamErrorCode::RecordDataCorrupted:
-        return "RecordDataCorrupted"s;
+        v = "RecordDataCorrupted";
+        break;
     case StreamErrorCode::HeaderDataCorrupted:
-        return "HeaderDataCorrupted"s;
+        v = "HeaderDataCorrupted";
+        break;
     case StreamErrorCode::RecordTooLarge:
-        return "RecordTooLarge"s;
+        v = "RecordTooLarge";
+        break;
     case StreamErrorCode::ReadError:
-        return "ReadError"s;
+        v = "ReadError";
+        break;
     case StreamErrorCode::WriteError:
-        return "WriteError"s;
+        v = "WriteError";
+        break;
     case StreamErrorCode::StreamClosed:
-        return "StreamClosed"s;
+        v = "StreamClosed";
+        break;
     case StreamErrorCode::InvalidArguments:
-        return "InvalidArguments"s;
+        v = "InvalidArguments";
+        break;
     case StreamErrorCode::Unknown:
-        return "Unknown"s;
+        v = "Unknown";
+        break;
     case StreamErrorCode::DiskFull:
-        return "DiskFull"s;
+        v = "DiskFull";
+        break;
     case StreamErrorCode::IteratorNotFound:
-        return "IteratorNotFound"s;
+        v = "IteratorNotFound";
+        break;
     }
-    // Unreachable.
-    return {};
+
+    return v;
 }
 
-FileSegment::FileSegment(uint64_t base, std::shared_ptr<FileSystemInterface> interface,
+FileSegment::FileSegment(const uint64_t base, std::shared_ptr<FileSystemInterface> interface,
                          std::shared_ptr<logging::Logger> logger) noexcept
     : _file_implementation(std::move(interface)), _logger(std::move(logger)), _base_seq_num(base),
       _highest_seq_num(base) {
@@ -97,7 +110,7 @@ FileSegment::FileSegment(uint64_t base, std::shared_ptr<FileSystemInterface> int
     _segment_id = oss.str();
 }
 
-void FileSegment::truncateAndLog(uint32_t truncate, const StreamError &err) const noexcept {
+void FileSegment::truncateAndLog(const uint32_t truncate, const StreamError &err) const noexcept {
     if (_logger && _logger->level <= logging::LogLevel::Warning) {
         using namespace std::string_literals;
         auto message = "Truncating "s + _segment_id + " to a length of "s + std::to_string(truncate);
@@ -172,8 +185,8 @@ LogEntryHeader FileSegment::convertSliceToHeader(const OwnedSlice &data) noexcep
     return header;
 }
 
-expected<uint64_t, FileError> FileSegment::append(BorrowedSlice d, int64_t timestamp_ms, uint64_t sequence_number,
-                                                  bool sync) noexcept {
+expected<uint64_t, FileError> FileSegment::append(BorrowedSlice d, const int64_t timestamp_ms,
+                                                  const uint64_t sequence_number, const bool sync) noexcept {
     const auto ts = static_cast<int64_t>(_htonll(static_cast<std::uint64_t>(timestamp_ms)));
     const auto data_len_swap = static_cast<int32_t>(_htonl(d.size()));
     const auto byte_position = static_cast<int32_t>(_htonl(_total_bytes));
@@ -288,7 +301,7 @@ expected<OwnedRecord, StreamError> FileSegment::read(const uint64_t sequence_num
 
 void FileSegment::remove() noexcept {
     // Close file handle, then delete file
-    _f.reset(nullptr);
+    _f.reset();
     const auto e = _file_implementation->remove(_segment_id);
     if (!e.ok() && _logger->level <= logging::LogLevel::Warning) {
         _logger->log(logging::LogLevel::Warning, "Issue deleting " + _segment_id + " due to: " + e.msg);

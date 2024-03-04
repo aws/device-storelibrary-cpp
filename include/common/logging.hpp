@@ -15,7 +15,7 @@ namespace logging __attribute__((visibility("default"))) {
         Error,
     };
 
-    static inline std::string str(LogLevel level) {
+    static std::string str(const LogLevel level) {
         using namespace std::string_literals;
         switch (level) {
         case LogLevel::Disabled:
@@ -36,7 +36,7 @@ namespace logging __attribute__((visibility("default"))) {
         return ""s;
     }
 
-    inline std::ostream &operator<<(std::ostream &out, LogLevel level) {
+    inline std::ostream &operator<<(std::ostream &out, const LogLevel level) {
         out << str(level);
         return out;
     }

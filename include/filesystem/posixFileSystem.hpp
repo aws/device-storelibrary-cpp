@@ -5,12 +5,11 @@
 #include <filesystem>
 #include <mutex>
 #include <unistd.h>
-#include <utility>
 
 namespace aws {
 namespace gg __attribute__((visibility("default"))) {
 
-    static inline void sync(int fileno) {
+    static void sync(int fileno) {
         // Only sync data if available on this OS. Otherwise, just fsync.
 #if _POSIX_SYNCHRONIZED_IO > 0
         std::ignore = fdatasync(fileno);
@@ -19,7 +18,7 @@ namespace gg __attribute__((visibility("default"))) {
 #endif
     }
 
-    static FileError errnoToFileError(int err, const std::string &str = {}) {
+    static FileError errnoToFileError(const int err, const std::string &str = {}) {
         using namespace std::string_literals;
         switch (err) {
         case EACCES:
@@ -75,14 +74,15 @@ namespace gg __attribute__((visibility("default"))) {
             return FileError{FileErrorCode::NoError, {}};
         }
 
-        expected<OwnedSlice, FileError> read(uint32_t begin, uint32_t end) override {
+        expected<OwnedSlice, FileError> read(const uint32_t begin, const uint32_t end) override {
             if (end < begin) {
                 return FileError{FileErrorCode::InvalidArguments, "End must be after the beginning"};
-            } else if (end == begin) {
-                return OwnedSlice{0};
+            }
+            if (end == begin) {
+                return OwnedSlice{0U};
             }
 
-            std::lock_guard<std::mutex> lock(_read_lock);
+            std::lock_guard lock{_read_lock};
             clearerr(_f);
             auto d = OwnedSlice{(end - begin)};
             if (std::fseek(_f, begin, SEEK_SET) != 0) {
@@ -155,11 +155,12 @@ namespace gg __attribute__((visibility("default"))) {
         expected<OwnedSlice, FileError> read(const uint32_t begin, const uint32_t end) override {
             if (end < begin) {
                 return FileError{FileErrorCode::InvalidArguments, "End must be after the beginning"};
-            } else if (end == begin) {
+            }
+            if (end == begin) {
                 return OwnedSlice{0U};
             }
 
-            std::lock_guard<std::mutex> lock(_read_lock);
+            std::lock_guard lock{_read_lock};
             auto d = OwnedSlice{(end - begin)};
 
             if (lseek(_f, begin, SEEK_SET) < 0) {

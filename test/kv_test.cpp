@@ -11,11 +11,12 @@
 
 using namespace aws::gg;
 using namespace aws::gg::kv;
+using namespace aws::gg::test::utils;
 using namespace std::string_view_literals;
 using namespace std::string_literals;
 
-class Logger : public logging::Logger {
-    void log(logging::LogLevel level, const std::string &msg) const override {
+class Logger final : public logging::Logger {
+    void log(const logging::LogLevel level, const std::string &msg) const override {
         switch (level) {
         case logging::LogLevel::Disabled:
             break;
@@ -466,7 +467,7 @@ SCENARIO("I can create a KV map", "[kv]") {
 
         const std::string &key = GENERATE(take(10, random(1, 512)));
         const std::string &value = GENERATE(take(1, random(1, 1 * 1024 * 1024)));
-        const std::string_view new_value = "new value"sv;
+        constexpr auto new_value = "new value"sv;
 
         WHEN("I add a value") {
             e = kv->put(key, BorrowedSlice{value});

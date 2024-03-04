@@ -12,14 +12,14 @@
 #include <sys/resource.h>
 
 void do_memory() {
-    struct rusage rusage {};
+    rusage rusage {};
     getrusage(RUSAGE_SELF, &rusage);
 
     printf("resident size max: %lu KB\n", (rusage.ru_maxrss) / 1024);
 }
 
-class MyLogger : public aws::gg::logging::Logger {
-    void log(aws::gg::logging::LogLevel l, const std::string &msg) const override {
+class MyLogger final : public aws::gg::logging::Logger {
+    void log(const aws::gg::logging::LogLevel l, const std::string &msg) const override {
         if (l < level) {
             return;
         }

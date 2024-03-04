@@ -16,39 +16,49 @@ expected<std::shared_ptr<KV>, KVError> KV::openOrCreate(KVOptions &&opts) noexce
     }
 
     auto kv = std::shared_ptr<KV>(new KV(std::move(opts)));
-    auto ok = kv->initialize();
-    if (!ok.ok()) {
-        return ok;
+    auto err = kv->initialize();
+    if (!err.ok()) {
+        return err;
     }
     return kv;
 }
 
 static std::string string(const KVErrorCodes e) {
-    using namespace std::string_literals;
+    std::string v{};
     switch (e) {
     case KVErrorCodes::NoError:
-        return "NoError"s;
+        v = "NoError";
+        break;
     case KVErrorCodes::KeyNotFound:
-        return "KeyNotFound"s;
+        v = "KeyNotFound";
+        break;
     case KVErrorCodes::ReadError:
-        return "ReadError"s;
+        v = "ReadError";
+        break;
     case KVErrorCodes::WriteError:
-        return "WriteError"s;
+        v = "WriteError";
+        break;
     case KVErrorCodes::HeaderCorrupted:
-        return "HeaderCorrupted"s;
+        v = "HeaderCorrupted";
+        break;
     case KVErrorCodes::DataCorrupted:
-        return "DataCorrupted"s;
+        v = "DataCorrupted";
+        break;
     case KVErrorCodes::EndOfFile:
-        return "EndOfFile"s;
+        v = "EndOfFile";
+        break;
     case KVErrorCodes::InvalidArguments:
-        return "InvalidArguments"s;
+        v = "InvalidArguments";
+        break;
     case KVErrorCodes::Unknown:
-        return "Unknown"s;
+        v = "Unknown";
+        break;
     case KVErrorCodes::DiskFull:
-        return "Disk full"s;
+        v = "Disk full";
+        break;
     }
-    // Unreachable.
-    return {};
+
+    return v;
 }
 
 void KV::truncateAndLog(const uint32_t truncate, const KVError &err) const noexcept {
@@ -162,25 +172,38 @@ void inline KV::addOrRemoveKeyInInitialization(const std::string &key, const uin
 }
 
 static KVError fileErrorToKVError(const FileError &e) {
+    auto v = KVError{KVErrorCodes::NoError, e.msg};
     switch (e.code) {
     case FileErrorCode::NoError:
-        return KVError{KVErrorCodes::NoError, e.msg};
+        v = KVError{KVErrorCodes::NoError, e.msg};
+        break;
     case FileErrorCode::InvalidArguments:
-        return KVError{KVErrorCodes::InvalidArguments, e.msg};
+        v = KVError{KVErrorCodes::InvalidArguments, e.msg};
+        break;
     case FileErrorCode::EndOfFile:
-        return KVError{KVErrorCodes::EndOfFile, e.msg};
-    case FileErrorCode::AccessDenied: // fallthrough
+        v = KVError{KVErrorCodes::EndOfFile, e.msg};
+        break;
+    case FileErrorCode::AccessDenied:
+        v = KVError{KVErrorCodes::WriteError, e.msg};
+        break;
     case FileErrorCode::TooManyOpenFiles:
-        return KVError{KVErrorCodes::WriteError, e.msg};
+        v = KVError{KVErrorCodes::WriteError, e.msg};
+        break;
     case FileErrorCode::DiskFull:
-        return KVError{KVErrorCodes::DiskFull, e.msg};
-    case FileErrorCode::FileDoesNotExist: // fallthrough
-    case FileErrorCode::IOError:          // fallthrough
+        v = KVError{KVErrorCodes::DiskFull, e.msg};
+        break;
+    case FileErrorCode::FileDoesNotExist:
+        v = KVError{KVErrorCodes::ReadError, e.msg};
+        break;
+    case FileErrorCode::IOError:
+        v = KVError{KVErrorCodes::ReadError, e.msg};
+        break;
     case FileErrorCode::Unknown:
-        return KVError{KVErrorCodes::ReadError, e.msg};
+        v = KVError{KVErrorCodes::ReadError, e.msg};
+        break;
     }
-    // Unreachable.
-    return {};
+
+    return v;
 }
 
 expected<KVHeader, KVError> KV::readHeaderFrom(const uint32_t begin) const noexcept {
@@ -193,7 +216,7 @@ expected<KVHeader, KVError> KV::readHeaderFrom(const uint32_t begin) const noexc
     // Use memcpy instead of reinterpret cast to avoid UB.
     std::ignore = memcpy(&ret, header_or.val().data(), sizeof(KVHeader));
 
-    if (ret.magic_and_version != static_cast<uint8_t>(MAGIC_AND_VERSION)) {
+    if (ret.magic_and_version != MAGIC_AND_VERSION) {
         return KVError{KVErrorCodes::HeaderCorrupted, "Invalid magic and version"};
     }
 

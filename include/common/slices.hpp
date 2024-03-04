@@ -1,7 +1,7 @@
 #pragma once
 #include <cassert>
 #include <cstring>
-#include <memory>
+#include <memory> // for unique_ptr
 #include <string>
 
 namespace aws {
@@ -22,7 +22,7 @@ namespace gg __attribute__((visibility("default"))) {
 
         const void *data() const { return _data; };
 
-        const char *char_data() const { return reinterpret_cast<const char *>(_data); };
+        const char *char_data() const { return static_cast<const char *>(_data); };
 
         uint32_t size() const { return _size; };
 

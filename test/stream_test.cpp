@@ -11,11 +11,12 @@
 #include <vector>
 
 using namespace aws::gg;
+using namespace aws::gg::test::utils;
 using namespace std::string_view_literals;
 using namespace std::string_literals;
 
-class Logger : public logging::Logger {
-    void log(logging::LogLevel level, const std::string &msg) const override {
+class Logger final : public logging::Logger {
+    void log(const logging::LogLevel level, const std::string &msg) const override {
         switch (level) {
         case logging::LogLevel::Disabled:
             break;
@@ -42,7 +43,7 @@ class Logger : public logging::Logger {
 
 static const auto logger = std::make_shared<Logger>();
 
-static auto open_stream(std::shared_ptr<FileSystemInterface> fs) {
+static auto open_stream(const std::shared_ptr<FileSystemInterface> &fs) {
     return FileStream::openOrCreate(StreamOptions{
         1024 * 1024,
         10 * 1024 * 1024,
@@ -59,7 +60,7 @@ static auto open_stream(std::shared_ptr<FileSystemInterface> fs) {
     });
 }
 
-static const auto log_header_size = 32;
+static constexpr auto log_header_size = 32;
 
 static auto read_stream_values_by_segment(std::shared_ptr<SpyFileSystem> fs, std::filesystem::path temp_dir_path,
                                           int value_size) {
@@ -253,7 +254,7 @@ SCENARIO("I can create a stream", "[stream]") {
         REQUIRE(stream->deleteIterator("ita").ok());
 
         AND_WHEN("I close and reopen the stream") {
-            stream = nullptr;
+            stream.reset();
 
             stream_or = open_stream(fs);
             REQUIRE(stream_or.ok());

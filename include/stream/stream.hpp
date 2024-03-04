@@ -7,16 +7,9 @@
 #include "filesystem/filesystem.hpp"
 #include "kv/kv.hpp"
 #include <atomic>
-#include <chrono>
 #include <cstdint>
-#include <cstdlib>
-#include <cstring>
 #include <functional>
-#include <memory>
-#include <stdexcept>
 #include <string>
-#include <utility>
-#include <vector>
 
 namespace aws {
 namespace gg __attribute__((visibility("default"))) {
@@ -27,7 +20,8 @@ namespace gg __attribute__((visibility("default"))) {
         uint64_t sequence_number{};
 
         OwnedRecord() = default;
-        OwnedRecord(OwnedSlice &&data, int64_t timestamp, uint64_t sequence_number, uint32_t offset) noexcept
+        OwnedRecord(OwnedSlice &&data, const int64_t timestamp, const uint64_t sequence_number,
+                    const uint32_t offset) noexcept
             : offset(offset), data(std::move(data)), timestamp(timestamp), sequence_number(sequence_number){};
     };
 
@@ -78,7 +72,7 @@ namespace gg __attribute__((visibility("default"))) {
         StreamError checkpoint() const noexcept;
 
       public:
-        explicit Iterator(std::weak_ptr<StreamInterface> s, std::string id, uint64_t seq) noexcept
+        explicit Iterator(std::weak_ptr<StreamInterface> s, std::string id, const uint64_t seq) noexcept
             : _stream(std::move(s)), _id(std::move(id)), sequence_number(seq){};
 
         Iterator(Iterator &) = delete;
@@ -207,7 +201,7 @@ namespace gg __attribute__((visibility("default"))) {
     };
 
     inline expected<CheckpointableOwnedRecord, StreamError> Iterator::operator*() noexcept {
-        if (auto stream = _stream.lock()) {
+        if (const auto stream = _stream.lock()) {
             auto record_or = stream->read(sequence_number, ReadOptions{true, true, _offset});
             if (!record_or.ok()) {
                 return record_or.err();
@@ -222,10 +216,11 @@ namespace gg __attribute__((visibility("default"))) {
     }
 
     inline StreamError Iterator::checkpoint() const noexcept {
-        if (auto stream = _stream.lock()) {
-            return stream->setCheckpoint(_id, sequence_number);
+        auto e = StreamError{StreamErrorCode::StreamClosed, "Unable to read from destroyed stream"};
+        if (const auto stream = _stream.lock()) {
+            e = stream->setCheckpoint(_id, sequence_number);
         }
-        return StreamError{StreamErrorCode::StreamClosed, "Unable to read from destroyed stream"};
+        return e;
     }
 
     inline int64_t timestamp() {

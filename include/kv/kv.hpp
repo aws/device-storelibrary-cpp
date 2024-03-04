@@ -2,10 +2,8 @@
 
 #include <cstdint>
 #include <mutex>
-#include <utility>
 #include <vector>
 
-#include "common/crc32.hpp"
 #include "common/logging.hpp"
 #include "common/slices.hpp"
 #include "filesystem/filesystem.hpp"

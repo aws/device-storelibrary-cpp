@@ -1,14 +1,13 @@
 #pragma once
 #include "kv/kv.hpp"
 #include "stream.hpp"
-#include <climits>
 #include <mutex>
 #include <string>
 #include <vector>
 
 namespace aws {
 namespace gg {
-static constexpr const char *const RecordNotFoundErrorStr = "Record not found";
+static constexpr auto RecordNotFoundErrorStr = "Record not found";
 
 struct LogEntryHeader;
 class FileSegment {
@@ -79,7 +78,8 @@ class __attribute__((visibility("default"))) FileStream final : public StreamInt
 
     explicit FileStream(StreamOptions &&o) noexcept : _opts(std::move(o)) {
         _iterators.reserve(1U);
-        _segments.reserve(1U + (_opts.maximum_size_bytes - 1U) / _opts.minimum_segment_size_bytes);
+        const auto toReserve = 1U + (_opts.maximum_size_bytes - 1U) / _opts.minimum_segment_size_bytes;
+        _segments.reserve(toReserve);
     }
 
     StreamError removeSegmentsIfNewRecordBeyondMaxSize(uint32_t record_size) noexcept;

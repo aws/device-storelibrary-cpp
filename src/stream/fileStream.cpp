@@ -105,7 +105,7 @@ StreamError FileStream::makeNextSegment() noexcept {
     return StreamError{StreamErrorCode::NoError, {}};
 }
 
-expected<uint64_t, StreamError> FileStream::append(BorrowedSlice d, const AppendOptions &append_opts) noexcept {
+expected<uint64_t, StreamError> FileStream::append(const BorrowedSlice d, const AppendOptions &append_opts) noexcept {
     std::lock_guard<std::mutex> lock(_segments_lock);
 
     auto err = removeSegmentsIfNewRecordBeyondMaxSize(d.size());
@@ -123,7 +123,7 @@ expected<uint64_t, StreamError> FileStream::append(BorrowedSlice d, const Append
 
     // Now append the record into the last segment
     auto &seg = _segments.back();
-    auto seq = _next_sequence_number.fetch_add(1);
+    auto seq = _next_sequence_number.fetch_add(1U);
 
     auto e = seg.append(d, aws::gg::timestamp(), seq, append_opts.sync_on_append);
     if (!e.ok()) {
@@ -137,13 +137,13 @@ expected<uint64_t, StreamError> FileStream::append(BorrowedSlice d, const Append
     return seq;
 }
 
-StreamError FileStream::removeSegmentsIfNewRecordBeyondMaxSize(uint32_t record_size) noexcept {
+StreamError FileStream::removeSegmentsIfNewRecordBeyondMaxSize(const uint32_t record_size) noexcept {
     if (record_size > _opts.maximum_size_bytes) {
         return StreamError{StreamErrorCode::RecordTooLarge, {}};
     }
 
     // Make room if we need more room
-    while (_current_size_bytes + record_size > _opts.maximum_size_bytes) {
+    while (_current_size_bytes > _opts.maximum_size_bytes - record_size) {
         auto &to_delete = _segments.front();
         _current_size_bytes -= to_delete.totalSizeBytes();
         to_delete.remove();
@@ -159,7 +159,7 @@ expected<uint64_t, StreamError> FileStream::append(OwnedSlice &&d, const AppendO
     return append(BorrowedSlice(x.data(), x.size()), append_opts);
 }
 
-expected<OwnedRecord, StreamError> FileStream::read(uint64_t sequence_number,
+expected<OwnedRecord, StreamError> FileStream::read(const uint64_t sequence_number,
                                                     const ReadOptions &provided_options) const noexcept {
     if (sequence_number < _first_sequence_number || sequence_number >= _next_sequence_number) {
         return StreamError{StreamErrorCode::RecordNotFound, RecordNotFoundErrorStr};
@@ -199,7 +199,7 @@ expected<OwnedRecord, StreamError> FileStream::read(uint64_t sequence_number,
                 // Fallback to the next available record in the next segment (if any)
                 find_exact = false;
                 // Since we're skipping to a new segment, we should definitely start from the beginning of it
-                read_options.suggested_start = 0;
+                read_options.suggested_start = 0U;
             }
         }
     }
@@ -221,29 +221,32 @@ Iterator FileStream::openOrCreateIterator(const std::string &identifier, Iterato
 }
 
 StreamError FileStream::deleteIterator(const std::string &identifier) noexcept {
+    auto e = StreamError{StreamErrorCode::IteratorNotFound, {}};
     for (size_t i = 0U; i < _iterators.size(); i++) {
         auto iter = _iterators[i];
         if (iter.getIdentifier() == identifier) {
-            auto e = iter.remove();
+            e = iter.remove();
             auto it = _iterators.begin();
             std::advance(it, i);
             std::ignore = _iterators.erase(it);
-            return e;
+            break;
         }
     }
-    return StreamError{StreamErrorCode::IteratorNotFound, {}};
+    return e;
 }
 
-StreamError FileStream::setCheckpoint(const std::string &identifier, uint64_t sequence_number) noexcept {
+StreamError FileStream::setCheckpoint(const std::string &identifier, const uint64_t sequence_number) noexcept {
+    auto e = StreamError{StreamErrorCode::IteratorNotFound, {}};
     for (auto &iter : _iterators) {
         if (iter.getIdentifier() == identifier) {
-            return iter.setCheckpoint(sequence_number);
+            e = iter.setCheckpoint(sequence_number);
+            break;
         }
     }
-    return StreamError{StreamErrorCode::IteratorNotFound, {}};
+    return e;
 }
 
-PersistentIterator::PersistentIterator(std::string id, uint64_t start, std::shared_ptr<kv::KV> kv) noexcept
+PersistentIterator::PersistentIterator(std::string id, const uint64_t start, std::shared_ptr<kv::KV> kv) noexcept
     : _id(std::move(id)), _store(std::move(kv)), _sequence_number(start) {
     auto value_or = _store->get(_id);
     if (value_or.ok()) {
@@ -254,7 +257,7 @@ PersistentIterator::PersistentIterator(std::string id, uint64_t start, std::shar
     }
 }
 
-StreamError PersistentIterator::setCheckpoint(uint64_t sequence_number) noexcept {
+StreamError PersistentIterator::setCheckpoint(const uint64_t sequence_number) noexcept {
     _sequence_number =
         sequence_number + 1U; // Set the sequence number to the next in line, so that we
                               // point to where we'd want to resume reading (ie. the first unread record).
