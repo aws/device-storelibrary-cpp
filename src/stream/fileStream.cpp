@@ -1,6 +1,14 @@
 #include "stream/fileStream.hpp"
+#include "common/util.hpp"
+#include "stream/stream.hpp"
 #include <algorithm>
+#include <atomic>
+#include <cerrno>
+#include <cstdint>
+#include <cstring>
+#include <iterator>
 #include <string>
+#include <tuple>
 #include <utility>
 
 namespace aws {
@@ -61,7 +69,7 @@ StreamError FileStream::loadExistingSegments() noexcept {
     for (const auto &f : files) {
         auto idx = f.rfind(".log");
         if (idx != std::string::npos) {
-            char *end_ptr = nullptr;
+            char *end_ptr = nullptr; // NOLINT(cppcoreguidelines-pro-type-vararg)
             errno = 0;
             auto base = strtoull(f.c_str(), &end_ptr, BASE_10);
             // Ignore files whose names are not parsable as u64.

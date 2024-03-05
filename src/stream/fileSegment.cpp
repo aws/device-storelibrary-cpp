@@ -1,20 +1,31 @@
 #include "common/crc32.hpp"
+#include "common/logging.hpp"
+#include "filesystem/filesystem.hpp"
 #include "stream/fileStream.hpp"
+#include "stream/stream.hpp"
+#include <algorithm>
 #include <climits>
+#include <cstdint>
+#include <cstring>
 #include <iomanip>
 #include <sstream>
 #include <string>
+#include <tuple>
+#include <utility>
 
 namespace aws {
 namespace gg {
 
 static constexpr int UINT64_MAX_DECIMAL_COUNT = 19;
 
-#define IS_LITTLE_ENDIAN (*(uint16_t *)"\0\1" >> 8)
+// coverity[misra_cpp_2008_rule_2_13_2_violation] need to check for edianness
+// NOLINTNEXTLINE(cppcoreguidelines-macro-usage)
+#define IS_LITTLE_ENDIAN (*(const uint16_t *)"\0\1" >> 8)
 
-// NOLINTBEGIN
 auto _htonll(std::uint64_t h) {
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
     if (IS_LITTLE_ENDIAN) {
+        // NOLINTNEXTLINE(cppcoreguidelines-avoid-magic-numbers)
         static_assert(CHAR_BIT == 8, "Char must be 8 bits");
         constexpr auto shift_bytes1{8};
         constexpr auto shift_bytes2{16};
@@ -29,14 +40,16 @@ auto _htonll(std::uint64_t h) {
 auto _ntohll(const std::uint64_t h) { return _htonll(h); }
 
 auto _htonl(std::uint32_t h) {
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
     if (IS_LITTLE_ENDIAN) {
+        // NOLINTNEXTLINE(cppcoreguidelines-avoid-magic-numbers)
         h = (((h & 0xff000000u) >> 24) | ((h & 0x00ff0000u) >> 8) | ((h & 0x0000ff00u) << 8) |
+             // NOLINTNEXTLINE(cppcoreguidelines-avoid-magic-numbers)
              ((h & 0x000000ffu) << 24));
     }
     return h;
 }
 auto _ntohl(const std::uint32_t h) { return _htonl(h); }
-// NOLINTEND
 
 constexpr uint8_t HEADER_SIZE = 32U;
 constexpr int32_t MAGIC_BYTES = 0xAAAAAA;

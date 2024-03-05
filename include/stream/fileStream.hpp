@@ -1,8 +1,15 @@
 #pragma once
+#include "common/expected.hpp"
+#include "common/logging.hpp"
+#include "common/slices.hpp"
+#include "filesystem/filesystem.hpp"
 #include "kv/kv.hpp"
 #include "stream.hpp"
+#include <cstdint>
+#include <memory>
 #include <mutex>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace aws {
@@ -12,7 +19,7 @@ static constexpr auto RecordNotFoundErrorStr = "Record not found";
 struct LogEntryHeader;
 class FileSegment {
   public:
-    FileSegment(uint64_t base, std::shared_ptr<FileSystemInterface>, std::shared_ptr<logging::Logger>) noexcept;
+    FileSegment(const uint64_t base, std::shared_ptr<FileSystemInterface>, std::shared_ptr<logging::Logger>) noexcept;
 
     FileSegment(FileSegment &&s) = default;
     FileSegment &operator=(FileSegment &&s) = default;
@@ -22,14 +29,14 @@ class FileSegment {
 
     ~FileSegment() = default;
 
-    StreamError open(bool full_corruption_check_on_open) noexcept;
+    StreamError open(const bool full_corruption_check_on_open) noexcept;
 
     bool operator<(const FileSegment &other) const noexcept { return _base_seq_num < other._base_seq_num; }
 
-    expected<uint64_t, FileError> append(BorrowedSlice d, int64_t timestamp_ms, uint64_t sequence_number,
-                                         bool sync) noexcept;
+    expected<uint64_t, FileError> append(const BorrowedSlice d, const int64_t timestamp_ms,
+                                         const uint64_t sequence_number, const bool sync) noexcept;
 
-    expected<OwnedRecord, StreamError> read(uint64_t sequence_number, const ReadOptions &) const noexcept;
+    expected<OwnedRecord, StreamError> read(const uint64_t sequence_number, const ReadOptions &) const noexcept;
 
     void remove() noexcept;
 
@@ -50,16 +57,16 @@ class FileSegment {
 
     static LogEntryHeader convertSliceToHeader(const OwnedSlice &) noexcept;
 
-    void truncateAndLog(uint32_t truncate, const StreamError &err) const noexcept;
+    void truncateAndLog(const uint32_t truncate, const StreamError &err) const noexcept;
 };
 
 class PersistentIterator {
   public:
-    PersistentIterator(std::string id, uint64_t start, std::shared_ptr<kv::KV>) noexcept;
+    PersistentIterator(std::string id, const uint64_t start, std::shared_ptr<kv::KV>) noexcept;
 
     uint64_t getSequenceNumber() const noexcept { return _sequence_number; }
     const std::string &getIdentifier() const noexcept { return _id; }
-    StreamError setCheckpoint(uint64_t) noexcept;
+    StreamError setCheckpoint(const uint64_t) noexcept;
     StreamError remove() const noexcept;
 
   private:
@@ -82,7 +89,7 @@ class __attribute__((visibility("default"))) FileStream final : public StreamInt
         _segments.reserve(toReserve);
     }
 
-    StreamError removeSegmentsIfNewRecordBeyondMaxSize(uint32_t record_size) noexcept;
+    StreamError removeSegmentsIfNewRecordBeyondMaxSize(const uint32_t record_size) noexcept;
 
     StreamError makeNextSegment() noexcept;
     StreamError loadExistingSegments() noexcept;
@@ -90,15 +97,15 @@ class __attribute__((visibility("default"))) FileStream final : public StreamInt
   public:
     static expected<std::shared_ptr<FileStream>, StreamError> openOrCreate(StreamOptions &&) noexcept;
 
-    virtual expected<uint64_t, StreamError> append(BorrowedSlice, const AppendOptions &) noexcept override;
+    virtual expected<uint64_t, StreamError> append(const BorrowedSlice, const AppendOptions &) noexcept override;
     virtual expected<uint64_t, StreamError> append(OwnedSlice &&, const AppendOptions &) noexcept override;
 
-    virtual expected<OwnedRecord, StreamError> read(uint64_t, const ReadOptions &) const noexcept override;
+    virtual expected<OwnedRecord, StreamError> read(const uint64_t, const ReadOptions &) const noexcept override;
 
     virtual Iterator openOrCreateIterator(const std::string &identifier, IteratorOptions) noexcept override;
     virtual StreamError deleteIterator(const std::string &identifier) noexcept override;
 
-    virtual StreamError setCheckpoint(const std::string &, uint64_t) noexcept override;
+    virtual StreamError setCheckpoint(const std::string &, const uint64_t) noexcept override;
 };
 
 } // namespace gg

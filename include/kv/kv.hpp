@@ -65,15 +65,15 @@ namespace kv __attribute__((visibility("default"))) {
         std::uint32_t _added_bytes{0U};
         mutable std::mutex _lock{};
 
-        expected<detail::KVHeader, KVError> readHeaderFrom(uint32_t) const noexcept;
+        expected<detail::KVHeader, KVError> readHeaderFrom(const uint32_t) const noexcept;
 
-        expected<std::string, KVError> readKeyFrom(uint32_t, detail::key_length_type) const noexcept;
+        expected<std::string, KVError> readKeyFrom(const uint32_t, const detail::key_length_type) const noexcept;
 
-        expected<OwnedSlice, KVError> readValueFrom(uint32_t, const detail::KVHeader &) const noexcept;
+        expected<OwnedSlice, KVError> readValueFrom(const uint32_t, const detail::KVHeader &) const noexcept;
 
-        expected<OwnedSlice, KVError> readValueFrom(uint32_t) const noexcept;
+        expected<OwnedSlice, KVError> readValueFrom(const uint32_t) const noexcept;
 
-        expected<uint32_t, KVError> readWrite(uint32_t, std::pair<std::string, uint32_t> &, FileLike &) noexcept;
+        expected<uint32_t, KVError> readWrite(const uint32_t, std::pair<std::string, uint32_t> &, FileLike &) noexcept;
 
         KV(KVOptions &&opts) noexcept : _opts(std::move(opts)), _shadow_name(_opts.identifier + "s") {}
 
@@ -83,14 +83,14 @@ namespace kv __attribute__((visibility("default"))) {
 
         bool removeKey(const std::string &key) noexcept;
 
-        void truncateAndLog(uint32_t truncate, const KVError &) const noexcept;
+        void truncateAndLog(const uint32_t truncate, const KVError &) const noexcept;
 
         KVError openFile() noexcept;
 
-        void inline addOrRemoveKeyInInitialization(const std::string &key, uint32_t beginning_pointer,
-                                                   uint32_t added_size, uint8_t flags) noexcept;
+        void inline addOrRemoveKeyInInitialization(const std::string &key, const uint32_t beginning_pointer,
+                                                   const uint32_t added_size, const uint8_t flags) noexcept;
 
-        inline KVError writeEntry(const std::string &key, BorrowedSlice data, uint8_t flags) const noexcept;
+        inline KVError writeEntry(const std::string &key, BorrowedSlice data, const uint8_t flags) const noexcept;
 
         template <typename... Args> FileError appendMultiple(const Args &...args) const noexcept;
 
@@ -101,7 +101,7 @@ namespace kv __attribute__((visibility("default"))) {
 
         expected<OwnedSlice, KVError> get(const std::string &) const noexcept;
 
-        KVError put(const std::string &, BorrowedSlice) noexcept;
+        KVError put(const std::string &, const BorrowedSlice) noexcept;
 
         KVError remove(const std::string &) noexcept;
 

@@ -12,7 +12,7 @@
 #include <sys/resource.h>
 
 void do_memory() {
-    rusage rusage {};
+    rusage rusage{};
     getrusage(RUSAGE_SELF, &rusage);
 
     printf("resident size max: %lu KB\n", (rusage.ru_maxrss) / 1024);
@@ -86,12 +86,13 @@ int main() {
             }
             auto s = s_or.val();
 
-            std::cout << "loaded checkpoint: " << s->openOrCreateIterator("a", aws::gg::IteratorOptions{}).sequence_number
-                      << std::endl;
+            std::cout << "loaded checkpoint: "
+                      << s->openOrCreateIterator("a", aws::gg::IteratorOptions{}).sequence_number << std::endl;
 
             aws::gg::expected<uint64_t, aws::gg::StreamError> last_sequence_number{0};
             for (int i = 0; i < NUM_RECORDS; i++) {
-                last_sequence_number = s->append(aws::gg::BorrowedSlice{data.data(), data.size()}, aws::gg::AppendOptions{});
+                last_sequence_number =
+                    s->append(aws::gg::BorrowedSlice{data.data(), data.size()}, aws::gg::AppendOptions{});
             }
 
             auto last_record_or = s->read(last_sequence_number.val(), aws::gg::ReadOptions{});
@@ -115,8 +116,8 @@ int main() {
             std::cout << "last checkpoint: " << s->openOrCreateIterator("a", aws::gg::IteratorOptions{}).sequence_number
                       << std::endl;
             (void)s->deleteIterator("a");
-            std::cout << "after deleting iterator: " << s->openOrCreateIterator("a", aws::gg::IteratorOptions{}).sequence_number
-                      << std::endl;
+            std::cout << "after deleting iterator: "
+                      << s->openOrCreateIterator("a", aws::gg::IteratorOptions{}).sequence_number << std::endl;
         }
     }
 

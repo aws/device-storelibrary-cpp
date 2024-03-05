@@ -13,7 +13,7 @@ if(NOT EXISTS ${CLANGTIDY_EXECUTABLE})
     endif()
 endif()
 
-function (target_clangtidy_setup target_name)
+function(target_clangtidy_setup target_name)
     if(EXISTS ${CLANGTIDY_EXECUTABLE})
         set_target_properties(${target_name} PROPERTIES CXX_CLANG_TIDY ${CLANGTIDY_EXECUTABLE})
     endif()

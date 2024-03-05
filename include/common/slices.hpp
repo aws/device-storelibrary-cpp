@@ -26,7 +26,10 @@ namespace gg __attribute__((visibility("default"))) {
 
         uint32_t size() const { return _size; };
 
-        std::string string() const { return {char_data(), _size}; };
+        std::string string() const {
+            const auto d = char_data();
+            return d == nullptr ? std::string{} : std::string{d, _size};
+        };
 
         static_assert(sizeof(uint8_t) == sizeof(char), "Char and uint8 must be the same size");
     };
@@ -48,7 +51,7 @@ namespace gg __attribute__((visibility("default"))) {
             swap(mem);
         }
 
-        OwnedSlice(uint8_t d[], const uint32_t size) : _size(size) { reset(d); };
+        OwnedSlice(uint8_t *d, const uint32_t size) : _size(size) { reset(d); };
 
         OwnedSlice(OwnedSlice &&) = default;
         OwnedSlice(OwnedSlice &) = delete;
@@ -63,7 +66,10 @@ namespace gg __attribute__((visibility("default"))) {
 
         uint32_t size() const { return _size; };
 
-        std::string string() const { return {char_data(), _size}; };
+        std::string string() const {
+            const auto d = char_data();
+            return d == nullptr ? std::string{} : std::string{d, _size};
+        };
     };
 } // namespace gg
 } // namespace aws

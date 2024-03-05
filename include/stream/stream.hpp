@@ -103,7 +103,7 @@ namespace gg __attribute__((visibility("default"))) {
          */
         static int end() noexcept { return 0; }
 
-        bool operator!=(const int) const noexcept { return true; }
+        bool operator!=(__attribute__((unused)) const int x) const noexcept { return true; }
     };
 
     struct ReadOptions {

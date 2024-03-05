@@ -1,6 +1,8 @@
 #include "stream/memoryStream.hpp"
+#include "stream/stream.hpp"
 #include <algorithm>
-#include <iostream>
+#include <atomic>
+#include <tuple>
 
 namespace aws {
 namespace gg {

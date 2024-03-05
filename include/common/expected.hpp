@@ -6,8 +6,8 @@ namespace gg __attribute__((visibility("default"))) {
     template <class ExpectedT, class UnexpectedT> class expected {
       private:
         bool _is_set{false};
-        ExpectedT _val;
-        UnexpectedT _unexpected;
+        ExpectedT _val{};
+        UnexpectedT _unexpected{};
 
       public:
         expected(ExpectedT &&val) : _is_set(true), _val(std::move(val)) {}

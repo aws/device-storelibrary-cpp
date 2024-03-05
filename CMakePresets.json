@@ -12,7 +12,11 @@
       "hidden": true,
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build/cmake-build-${presetName}/build",
-      "installDir": "${sourceDir}/build/cmake-build-${presetName}/install"
+      "installDir": "${sourceDir}/build/cmake-build-${presetName}/install",
+      "cacheVariables": {
+        "STORE_BUILD_EXAMPLE": "ON",
+        "STORE_BUILD_TESTS": "ON"
+      }
     },
     {
       "name": "conf-windows-common",

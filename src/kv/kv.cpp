@@ -1,5 +1,13 @@
 #include "kv/kv.hpp"
 #include "common/crc32.hpp"
+#include "common/expected.hpp"
+#include "common/util.hpp"
+#include <cstring>
+#include <iterator>
+#include <memory>
+#include <string>
+#include <tuple>
+#include <utility>
 
 namespace aws {
 namespace gg {
