@@ -17,18 +17,18 @@
 #include <tuple>
 #include <utility>
 
+// coverity[misra_cpp_2008_rule_2_13_2_violation] need to check for edianness
+// NOLINTNEXTLINE(cppcoreguidelines-macro-usage)
+#define IS_LITTLE_ENDIAN (*(const uint16_t *)"\0\1" >> 8)
+
 namespace aws {
 namespace gg {
 
 static constexpr int UINT64_MAX_DECIMAL_COUNT = 19;
 
-// coverity[misra_cpp_2008_rule_2_13_2_violation] need to check for edianness
-// NOLINTNEXTLINE(cppcoreguidelines-macro-usage)
-#define IS_LITTLE_ENDIAN (*(const uint16_t *)"\0\1" >> 8)
-
-auto _htonll(std::uint64_t h) {
+auto my_htonll(std::uint64_t h) {
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
-    if (IS_LITTLE_ENDIAN) {
+    if (IS_LITTLE_ENDIAN > 0) {
         // NOLINTNEXTLINE(cppcoreguidelines-avoid-magic-numbers)
         static_assert(CHAR_BIT == 8, "Char must be 8 bits");
         constexpr auto shift_bytes1{8};
@@ -41,19 +41,19 @@ auto _htonll(std::uint64_t h) {
     return h;
 }
 
-auto _ntohll(const std::uint64_t h) { return _htonll(h); }
+auto my_ntohll(const std::uint64_t h) { return my_htonll(h); }
 
-auto _htonl(std::uint32_t h) {
+auto my_htonl(std::uint32_t h) {
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
-    if (IS_LITTLE_ENDIAN) {
+    if (IS_LITTLE_ENDIAN > 0) {
         // NOLINTNEXTLINE(cppcoreguidelines-avoid-magic-numbers)
-        h = (((h & 0xff000000u) >> 24) | ((h & 0x00ff0000u) >> 8) | ((h & 0x0000ff00u) << 8) |
+        h = (((h & 0xff000000U) >> 24) | ((h & 0x00ff0000U) >> 8) | ((h & 0x0000ff00U) << 8) |
              // NOLINTNEXTLINE(cppcoreguidelines-avoid-magic-numbers)
-             ((h & 0x000000ffu) << 24));
+             ((h & 0x000000ffU) << 24));
     }
     return h;
 }
-auto _ntohl(const std::uint32_t h) { return _htonl(h); }
+auto my_ntohl(const std::uint32_t h) { return my_htonl(h); }
 
 constexpr uint8_t HEADER_SIZE = 32U;
 constexpr int32_t MAGIC_BYTES = 0xAAAAAA;
@@ -62,7 +62,7 @@ constexpr int32_t MAGIC_AND_VERSION = MAGIC_BYTES << 8 | static_cast<int8_t>(VER
 
 #pragma pack(push, 4)
 struct LogEntryHeader {
-    int32_t magic_and_version = static_cast<int32_t>(_htonl(static_cast<std::uint32_t>(MAGIC_AND_VERSION)));
+    int32_t magic_and_version = static_cast<int32_t>(my_htonl(static_cast<std::uint32_t>(MAGIC_AND_VERSION)));
     int32_t relative_sequence_number = 0;
     int32_t byte_position = 0;
     int64_t crc = 0;
@@ -191,31 +191,32 @@ LogEntryHeader FileSegment::convertSliceToHeader(const OwnedSlice &data) noexcep
     // Use memcpy instead of reinterpret cast to avoid UB.
     std::ignore = memcpy(&header, data.data(), sizeof(LogEntryHeader));
 
-    header.payload_length_bytes = static_cast<int32_t>(_ntohl(static_cast<std::uint32_t>(header.payload_length_bytes)));
+    header.payload_length_bytes =
+        static_cast<int32_t>(my_ntohl(static_cast<std::uint32_t>(header.payload_length_bytes)));
     header.relative_sequence_number =
-        static_cast<int32_t>(_ntohl(static_cast<std::uint32_t>(header.relative_sequence_number)));
-    header.byte_position = static_cast<int32_t>(_ntohl(static_cast<std::uint32_t>(header.byte_position)));
-    header.crc = static_cast<int64_t>(_ntohll(static_cast<std::uint64_t>(header.crc)));
-    header.timestamp = static_cast<int64_t>(_ntohll(static_cast<std::uint64_t>(header.timestamp)));
-    header.magic_and_version = static_cast<int32_t>(_ntohl(static_cast<std::uint32_t>(header.magic_and_version)));
+        static_cast<int32_t>(my_ntohl(static_cast<std::uint32_t>(header.relative_sequence_number)));
+    header.byte_position = static_cast<int32_t>(my_ntohl(static_cast<std::uint32_t>(header.byte_position)));
+    header.crc = static_cast<int64_t>(my_ntohll(static_cast<std::uint64_t>(header.crc)));
+    header.timestamp = static_cast<int64_t>(my_ntohll(static_cast<std::uint64_t>(header.timestamp)));
+    header.magic_and_version = static_cast<int32_t>(my_ntohl(static_cast<std::uint32_t>(header.magic_and_version)));
     return header;
 }
 
-expected<uint64_t, FileError> FileSegment::append(BorrowedSlice d, const int64_t timestamp_ms,
+expected<uint64_t, FileError> FileSegment::append(const BorrowedSlice d, const int64_t timestamp_ms,
                                                   const uint64_t sequence_number, const bool sync) noexcept {
-    const auto ts = static_cast<int64_t>(_htonll(static_cast<std::uint64_t>(timestamp_ms)));
-    const auto data_len_swap = static_cast<int32_t>(_htonl(d.size()));
-    const auto byte_position = static_cast<int32_t>(_htonl(_total_bytes));
+    const auto ts = static_cast<int64_t>(my_htonll(static_cast<std::uint64_t>(timestamp_ms)));
+    const auto data_len_swap = static_cast<int32_t>(my_htonl(d.size()));
+    const auto byte_position = static_cast<int32_t>(my_htonl(_total_bytes));
 
-    const auto crc = static_cast<int64_t>(_htonll(
+    const auto crc = static_cast<int64_t>(my_htonll(
         crc32::crc32_of(BorrowedSlice{&ts, sizeof(ts)}, BorrowedSlice{&data_len_swap, sizeof(data_len_swap)}, d)));
     const auto header = LogEntryHeader{
-        static_cast<int32_t>(_htonl(static_cast<std::uint32_t>(MAGIC_AND_VERSION))),
-        static_cast<int32_t>(_htonl(static_cast<std::uint32_t>(sequence_number - _base_seq_num))),
+        static_cast<int32_t>(my_htonl(static_cast<std::uint32_t>(MAGIC_AND_VERSION))),
+        static_cast<int32_t>(my_htonl(static_cast<std::uint32_t>(sequence_number - _base_seq_num))),
         byte_position,
         crc,
         ts,
-        static_cast<int32_t>(_htonl(d.size())),
+        static_cast<int32_t>(my_htonl(d.size())),
     };
 
     // If an error happens when appending, truncate the file to the current size so that we don't have any
@@ -275,7 +276,8 @@ expected<OwnedRecord, StreamError> FileSegment::read(const uint64_t sequence_num
             return StreamError{StreamErrorCode::HeaderDataCorrupted, {}};
         }
 
-        const auto expected_rel_seq_num = static_cast<int32_t>(sequence_number - _base_seq_num);
+        const auto rel = sequence_number - _base_seq_num;
+        const auto expected_rel_seq_num = static_cast<int32_t>(rel);
 
         // If the record we read is after the one we wanted, and we're not allowed to return later records, we must fail
         if ((header.relative_sequence_number > expected_rel_seq_num) && (!read_options.may_return_later_records)) {
@@ -292,8 +294,8 @@ expected<OwnedRecord, StreamError> FileSegment::read(const uint64_t sequence_num
             }
             auto data = std::move(data_or.val());
             const auto data_len_swap =
-                static_cast<int32_t>(_htonl(static_cast<std::uint32_t>(header.payload_length_bytes)));
-            const auto ts_swap = static_cast<int64_t>(_htonll(static_cast<std::uint64_t>(header.timestamp)));
+                static_cast<int32_t>(my_htonl(static_cast<std::uint32_t>(header.payload_length_bytes)));
+            const auto ts_swap = static_cast<int64_t>(my_htonll(static_cast<std::uint64_t>(header.timestamp)));
 
             if (read_options.check_for_corruption &&
                 (header.crc !=

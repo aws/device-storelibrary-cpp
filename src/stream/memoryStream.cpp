@@ -19,7 +19,7 @@ expected<uint64_t, StreamError> MemoryStream::append(const BorrowedSlice d, cons
         return err;
     }
 
-    auto seq = _next_sequence_number++;
+    auto seq = _next_sequence_number.fetch_add(1U);
     _current_size_bytes += d.size();
     _records.emplace_back(OwnedSlice(d), timestamp(), seq, 0);
     return seq;
@@ -56,7 +56,7 @@ expected<uint64_t, StreamError> MemoryStream::append(OwnedSlice &&d, const Appen
         return err;
     }
 
-    uint64_t seq = _next_sequence_number++;
+    uint64_t seq = _next_sequence_number.fetch_add(1U);
     _current_size_bytes += d.size();
     _records.emplace_back(std::move(d), timestamp(), seq, 0);
     return seq;

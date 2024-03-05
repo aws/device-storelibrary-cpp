@@ -14,9 +14,11 @@ namespace gg __attribute__((visibility("default"))) {
       public:
         BorrowedSlice() : _data(nullptr), _size(0U){};
         BorrowedSlice(const void *data, const size_t size) : _data(data), _size(static_cast<uint32_t>(size)) {
+            // coverity[misra_cpp_2008_rule_5_2_12_violation] false positive
             assert(size <= UINT32_MAX);
         };
         explicit BorrowedSlice(const std::string &s) : _data(s.data()), _size(static_cast<uint32_t>(s.length())) {
+            // coverity[misra_cpp_2008_rule_5_2_12_violation] false positive
             assert(s.length() <= UINT32_MAX);
         };
 

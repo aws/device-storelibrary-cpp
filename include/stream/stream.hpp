@@ -11,6 +11,12 @@
 #include <functional>
 #include <string>
 
+#if __cplusplus >= 201703L
+#define WEAK_FROM_THIS weak_from_this
+#else
+#define WEAK_FROM_THIS shared_from_this
+#endif
+
 namespace aws {
 namespace gg __attribute__((visibility("default"))) {
     struct OwnedRecord {
@@ -20,9 +26,9 @@ namespace gg __attribute__((visibility("default"))) {
         uint64_t sequence_number{};
 
         OwnedRecord() = default;
-        OwnedRecord(OwnedSlice &&data, const int64_t timestamp, const uint64_t sequence_number,
-                    const uint32_t offset) noexcept
-            : offset(offset), data(std::move(data)), timestamp(timestamp), sequence_number(sequence_number){};
+        OwnedRecord(OwnedSlice &&idata, const int64_t itimestamp, const uint64_t isequence_number,
+                    const uint32_t ioffset) noexcept
+            : offset(ioffset), data(std::move(idata)), timestamp(itimestamp), sequence_number(isequence_number){};
     };
 
     enum class StreamErrorCode : std::uint8_t {
@@ -103,6 +109,8 @@ namespace gg __attribute__((visibility("default"))) {
          */
         static int end() noexcept { return 0; }
 
+        // coverity[misra_cpp_2008_rule_0_1_11_violation] interface requires a parameter, but our implementation does
+        // not
         bool operator!=(__attribute__((unused)) const int x) const noexcept { return true; }
     };
 
@@ -115,12 +123,6 @@ namespace gg __attribute__((visibility("default"))) {
     struct AppendOptions {
         bool sync_on_append{false};
     };
-
-#if __cplusplus >= 201703L
-#define WEAK_FROM_THIS weak_from_this
-#else
-#define WEAK_FROM_THIS shared_from_this
-#endif
 
     class StreamInterface : public std::enable_shared_from_this<StreamInterface> {
       protected:
@@ -139,7 +141,7 @@ namespace gg __attribute__((visibility("default"))) {
          *
          * @return the sequence number of the record appended.
          */
-        virtual expected<uint64_t, StreamError> append(BorrowedSlice, const AppendOptions &) noexcept = 0;
+        virtual expected<uint64_t, StreamError> append(const BorrowedSlice, const AppendOptions &) noexcept = 0;
 
         /**
          * Append data into the stream.
@@ -154,7 +156,7 @@ namespace gg __attribute__((visibility("default"))) {
          * @param sequence_number the sequence number of the record to read.
          * @return the Record.
          */
-        virtual expected<OwnedRecord, StreamError> read(uint64_t sequence_number,
+        virtual expected<OwnedRecord, StreamError> read(const uint64_t sequence_number,
                                                         const ReadOptions &) const noexcept = 0;
 
         /**
@@ -183,7 +185,7 @@ namespace gg __attribute__((visibility("default"))) {
          * @param sequence_number sequence number of the record. When opening an existing iterator it will start from
          * this record.
          */
-        virtual StreamError setCheckpoint(const std::string &identifier, uint64_t sequence_number) noexcept = 0;
+        virtual StreamError setCheckpoint(const std::string &identifier, const uint64_t sequence_number) noexcept = 0;
 
         StreamInterface() noexcept = default;
 
