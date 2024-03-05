@@ -86,7 +86,7 @@ class PersistentIterator {
     uint64_t _sequence_number{0U};
 };
 
-class __attribute__((visibility("default"))) FileStream final : public StreamInterface {
+class __attribute__((visibility("default"))) FileStream : public StreamInterface {
   private:
     mutable std::mutex _segments_lock{}; // TODO: would like this to be a shared_mutex, but that is c++17.
     StreamOptions _opts;
@@ -117,6 +117,8 @@ class __attribute__((visibility("default"))) FileStream final : public StreamInt
     StreamError deleteIterator(const std::string &identifier) noexcept override;
 
     StreamError setCheckpoint(const std::string &, const uint64_t) noexcept override;
+
+    ~FileStream() override = default;
 };
 
 } // namespace gg

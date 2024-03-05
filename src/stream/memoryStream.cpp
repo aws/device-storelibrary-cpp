@@ -7,6 +7,7 @@
 namespace aws {
 namespace gg {
 std::shared_ptr<MemoryStream> MemoryStream::openOrCreate(StreamOptions &&opts) noexcept {
+    // coverity[autosar_cpp14_a20_8_6_violation] constructor is private, cannot use make_shared
     return std::shared_ptr<MemoryStream>(new MemoryStream(std::move(opts)));
 }
 
@@ -31,9 +32,10 @@ StreamError MemoryStream::remove_records_if_new_record_beyond_max_size(const uin
     // Make room if we need more room
     if (_current_size_bytes + record_size > _opts.maximum_size_bytes) {
         // TODO: Bail out early if we have enough space
+        // coverity[autosar_cpp14_a23_0_1_violation] we want the implicit iterator conversion
         std::ignore =
             _records.erase(std::remove_if(_records.begin(), _records.end(),
-                                          [&](const auto &r) {
+                                          [&](const auto &r) -> bool {
                                               if (_current_size_bytes + record_size > _opts.maximum_size_bytes) {
                                                   _current_size_bytes -= r.data.size();
                                                   return true;

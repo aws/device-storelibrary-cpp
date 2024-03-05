@@ -41,6 +41,7 @@ namespace logging __attribute__((visibility("default"))) {
         return v;
     }
 
+    // coverity[autosar_cpp14_a13_2_2_violation] The design of << is such that we should return a reference
     inline std::ostream &operator<<(std::ostream &out, const LogLevel level) {
         out << str(level);
         // coverity[misra_cpp_2008_rule_7_5_3_violation] The design of << is such that we should return a reference

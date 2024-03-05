@@ -18,6 +18,7 @@
 #include <utility>
 
 // coverity[misra_cpp_2008_rule_2_13_2_violation] need to check for edianness
+// coverity[autosar_cpp14_m2_13_2_violation] need to check for edianness
 // NOLINTNEXTLINE(cppcoreguidelines-macro-usage)
 #define IS_LITTLE_ENDIAN (*(const uint16_t *)"\0\1" >> 8)
 
@@ -31,9 +32,9 @@ static auto my_htonll(std::uint64_t h) {
     if (IS_LITTLE_ENDIAN > 0) {
         // NOLINTNEXTLINE(cppcoreguidelines-avoid-magic-numbers)
         static_assert(CHAR_BIT == 8, "Char must be 8 bits");
-        constexpr auto shift_bytes1{8};
-        constexpr auto shift_bytes2{16};
-        constexpr auto shift_bytes4{32};
+        constexpr int shift_bytes1 = 8;
+        constexpr int shift_bytes2 = 16;
+        constexpr int shift_bytes4 = 32;
         h = ((h & UINT64_C(0x00FF00FF00FF00FF)) << shift_bytes1) | ((h & UINT64_C(0xFF00FF00FF00FF00)) >> shift_bytes1);
         h = ((h & UINT64_C(0x0000FFFF0000FFFF)) << shift_bytes2) | ((h & UINT64_C(0xFFFF0000FFFF0000)) >> shift_bytes2);
         h = ((h & UINT64_C(0x00000000FFFFFFFF)) << shift_bytes4) | ((h & UINT64_C(0xFFFFFFFF00000000)) >> shift_bytes4);
@@ -194,7 +195,7 @@ StreamError FileSegment::open(const bool full_corruption_check_on_open) noexcept
 
 LogEntryHeader FileSegment::convertSliceToHeader(const OwnedSlice &data) noexcept {
     LogEntryHeader header{};
-    // Use memcpy instead of reinterpret cast to avoid UB.
+    // coverity[autosar_cpp14_a12_0_2_violation] Use memcpy instead of reinterpret cast to avoid UB.
     std::ignore = memcpy(&header, data.data(), sizeof(LogEntryHeader));
 
     header.payload_length_bytes =

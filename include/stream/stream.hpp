@@ -65,7 +65,7 @@ namespace gg __attribute__((visibility("default"))) {
         ~CheckpointableOwnedRecord() = default;
 
         CheckpointableOwnedRecord &operator=(CheckpointableOwnedRecord &&o) = default;
-        CheckpointableOwnedRecord operator=(CheckpointableOwnedRecord &) = delete;
+        CheckpointableOwnedRecord &operator=(CheckpointableOwnedRecord &) = delete;
 
         void checkpoint() const noexcept {
             _checkpoint();
@@ -116,8 +116,8 @@ namespace gg __attribute__((visibility("default"))) {
             return 0;
         }
 
-        // coverity[misra_cpp_2008_rule_0_1_11_violation] interface requires a parameter, but our implementation does
-        // not
+        // coverity[misra_cpp_2008_rule_0_1_11_violation] iterator interface requires a parameter
+        // coverity[autosar_cpp14_a0_1_4_violation] iterator interface requires a parameter
         bool operator!=(__attribute__((unused)) const int x) const noexcept {
             return true;
         }
@@ -228,7 +228,8 @@ namespace gg __attribute__((visibility("default"))) {
             timestamp = x.timestamp;
             _offset = x.offset + x.data.size();
             sequence_number = x.sequence_number;
-            return CheckpointableOwnedRecord{std::move(x), [this] { return checkpoint(); }};
+            // coverity[autosar_cpp14_a7_1_7_violation] defining lambda inline
+            return CheckpointableOwnedRecord{std::move(x), [this]() -> StreamError { return checkpoint(); }};
         }
         return StreamError{StreamErrorCode::StreamClosed, "Unable to read from destroyed stream"};
     }

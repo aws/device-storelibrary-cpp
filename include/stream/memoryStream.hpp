@@ -11,7 +11,7 @@
 
 namespace aws {
 namespace gg __attribute__((visibility("default"))) {
-    class MemoryStream final : public StreamInterface {
+    class MemoryStream : public StreamInterface {
       private:
         StreamOptions _opts;
         std::vector<OwnedRecord> _records{};
@@ -35,6 +35,8 @@ namespace gg __attribute__((visibility("default"))) {
         StreamError deleteIterator(const std::string &identifier) noexcept override;
 
         StreamError setCheckpoint(const std::string &, const uint64_t) noexcept override;
+
+        ~MemoryStream() override = default;
     };
 } // namespace gg
 } // namespace aws

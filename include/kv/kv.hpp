@@ -92,7 +92,7 @@ namespace kv __attribute__((visibility("default"))) {
 
         KVError openFile() noexcept;
 
-        void inline addOrRemoveKeyInInitialization(const std::string &key, const uint32_t beginning_pointer,
+        inline void addOrRemoveKeyInInitialization(const std::string &key, const uint32_t beginning_pointer,
                                                    const uint32_t added_size, const uint8_t flags) noexcept;
 
         inline KVError writeEntry(const std::string &key, const BorrowedSlice data, const uint8_t flags) const noexcept;

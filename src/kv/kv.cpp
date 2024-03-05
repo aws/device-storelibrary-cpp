@@ -23,6 +23,7 @@ expected<std::shared_ptr<KV>, KVError> KV::openOrCreate(KVOptions &&o) noexcept 
         return KVError{KVErrorCodes::InvalidArguments, "Filesystem implementation cannot be null"};
     }
 
+    // coverity[autosar_cpp14_a20_8_6_violation] constructor is private, cannot use make_shared
     auto kv = std::shared_ptr<KV>(new KV(std::move(opts)));
     auto err = kv->initialize();
     if (!err.ok()) {
@@ -98,7 +99,7 @@ KVError KV::openFile() noexcept {
     return KVError{KVErrorCodes::NoError, {}};
 }
 
-template <typename T> static inline constexpr uint32_t smallSizeOf() {
+template <typename T> inline constexpr uint32_t smallSizeOf() {
     return static_cast<uint32_t>(sizeof(T));
 }
 
@@ -154,7 +155,7 @@ KVError KV::initialize() noexcept {
 }
 
 // Only use this method during KV::initialize.
-void inline KV::addOrRemoveKeyInInitialization(const std::string &key, const uint32_t beginning_pointer,
+inline void KV::addOrRemoveKeyInInitialization(const std::string &key, const uint32_t beginning_pointer,
                                                const uint32_t added_size, const uint8_t flags) noexcept {
     const bool isDeleted = static_cast<int8_t>(flags) & static_cast<int8_t>(DELETED_FLAG);
     if (isDeleted) {
@@ -222,7 +223,7 @@ expected<detail::KVHeader, KVError> KV::readHeaderFrom(const uint32_t begin) con
     }
 
     detail::KVHeader ret{};
-    // Use memcpy instead of reinterpret cast to avoid UB.
+    // coverity[autosar_cpp14_a12_0_2_violation] Use memcpy instead of reinterpret cast to avoid UB
     std::ignore = memcpy(&ret, header_or.val().data(), sizeof(detail::KVHeader));
 
     if (static_cast<int8_t>(ret.magic_and_version) != static_cast<int8_t>(detail::MAGIC_AND_VERSION)) {
