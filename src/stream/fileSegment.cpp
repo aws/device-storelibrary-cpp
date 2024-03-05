@@ -1,5 +1,8 @@
 #include "common/crc32.hpp"
+#include "common/expected.hpp"
 #include "common/logging.hpp"
+#include "common/slices.hpp"
+#include "common/util.hpp"
 #include "filesystem/filesystem.hpp"
 #include "stream/fileStream.hpp"
 #include "stream/stream.hpp"
@@ -8,6 +11,7 @@
 #include <cstdint>
 #include <cstring>
 #include <iomanip>
+#include <memory>
 #include <sstream>
 #include <string>
 #include <tuple>
