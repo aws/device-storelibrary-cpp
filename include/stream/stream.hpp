@@ -43,6 +43,7 @@ namespace gg __attribute__((visibility("default"))) {
         InvalidArguments,
         DiskFull,
         IteratorNotFound,
+        StreamFull,
         Unknown,
     };
 
@@ -130,6 +131,7 @@ namespace gg __attribute__((visibility("default"))) {
 
     struct AppendOptions {
         bool sync_on_append{false};
+        bool remove_oldest_segments_if_full{true};
     };
 
     class StreamInterface : public std::enable_shared_from_this<StreamInterface> {

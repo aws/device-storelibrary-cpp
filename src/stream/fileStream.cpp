@@ -121,7 +121,7 @@ StreamError FileStream::makeNextSegment() noexcept {
 expected<uint64_t, StreamError> FileStream::append(const BorrowedSlice d, const AppendOptions &append_opts) noexcept {
     std::lock_guard<std::mutex> lock(_segments_lock);
 
-    auto err = removeSegmentsIfNewRecordBeyondMaxSize(d.size());
+    auto err = removeSegmentsIfNewRecordBeyondMaxSize(d.size(), append_opts.remove_oldest_segments_if_full);
     if (!err.ok()) {
         return err;
     }
@@ -150,13 +150,19 @@ expected<uint64_t, StreamError> FileStream::append(const BorrowedSlice d, const 
     return seq;
 }
 
-StreamError FileStream::removeSegmentsIfNewRecordBeyondMaxSize(const uint32_t record_size) noexcept {
+StreamError FileStream::removeSegmentsIfNewRecordBeyondMaxSize(const uint32_t record_size,
+                                                               const bool remove_oldest_segments_if_full) noexcept {
     if (record_size > _opts.maximum_size_bytes) {
         return StreamError{StreamErrorCode::RecordTooLarge, {}};
     }
 
-    // Make room if we need more room
-    while (_current_size_bytes > _opts.maximum_size_bytes - record_size) {
+    // if we need more room but can't make more room, error
+    if ((_current_size_bytes > (_opts.maximum_size_bytes - record_size)) && (!remove_oldest_segments_if_full)) {
+        return StreamError{StreamErrorCode::StreamFull,{}};
+    }
+
+    // Make room while we need more room
+    while (_current_size_bytes > (_opts.maximum_size_bytes - record_size)) {
         auto &to_delete = _segments.front();
         _current_size_bytes -= to_delete.totalSizeBytes();
         to_delete.remove();

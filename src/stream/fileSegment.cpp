@@ -116,8 +116,10 @@ static std::string string(const StreamErrorCode e) noexcept {
     case StreamErrorCode::IteratorNotFound:
         v = "IteratorNotFound";
         break;
+    case StreamErrorCode::StreamFull:
+        v = "StreamFull";
+        break;
     }
-
     return v;
 }
 

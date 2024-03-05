@@ -101,8 +101,8 @@ class __attribute__((visibility("default"))) FileStream final : public StreamInt
         _segments.reserve(toReserve);
     }
 
-    StreamError removeSegmentsIfNewRecordBeyondMaxSize(const uint32_t record_size) noexcept;
-
+    StreamError removeSegmentsIfNewRecordBeyondMaxSize(const uint32_t record_size,
+                                                       const bool remove_oldest_segments_if_full) noexcept;
     StreamError makeNextSegment() noexcept;
     StreamError loadExistingSegments() noexcept;
 

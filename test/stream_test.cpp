@@ -150,26 +150,60 @@ SCENARIO("Stream validates data length", "[stream]") {
     REQUIRE(seq_or.err().code == aws::gg::StreamErrorCode::RecordTooLarge);
 }
 
-SCENARIO("Stream deletes oldest data when full", "[stream]") {
-    auto temp_dir = aws::gg::test::utils::TempDir();
-    auto fs = std::make_shared<aws::gg::test::utils::SpyFileSystem>(
-        std::make_shared<aws::gg::PosixFileSystem>(temp_dir.path()));
-    auto stream_or = open_stream(fs);
-    REQUIRE(stream_or.ok());
-    auto stream = std::move(stream_or.val());
+SCENARIO("I can append data to a stream", "[stream]") {
+    WHEN("Eviction of oldest data is opted for") {
+        auto append_opts = aws::gg::AppendOptions{{}, true};
 
-    aws::gg::OwnedSlice data{1 * 1024 * 1024};
+        THEN("Stream deletes oldest data when appending to a full stream") {
+            auto temp_dir = aws::gg::test::utils::TempDir();
+            auto fs = std::make_shared<aws::gg::test::utils::SpyFileSystem>(std::make_shared<aws::gg::PosixFileSystem>(temp_dir.path()));
+            auto stream_or = open_stream(fs);
+            REQUIRE(stream_or.ok());
+            auto stream = std::move(stream_or.val());
 
-    for (int i = 0; i < 30; i++) {
-        auto seq_or = stream->append(aws::gg::BorrowedSlice{data.data(), data.size()}, aws::gg::AppendOptions{});
-        REQUIRE(seq_or.ok());
+            aws::gg::OwnedSlice data{1 * 1024 * 1024};
+
+            for (int i = 0; i < 30; i++) {
+                auto seq_or = stream->append(aws::gg::BorrowedSlice{data.data(), data.size()}, append_opts);
+                REQUIRE(seq_or.ok());
+            }
+
+            // Check that it rolled over by look at the first sequence number and the total size now.
+            REQUIRE(stream->firstSequenceNumber() > 0);
+            // Stream can fit 9 records since each record is 1MB and there is 32B overhead per record
+            REQUIRE(stream->highestSequenceNumber() - stream->firstSequenceNumber() + 1 == 9);
+            REQUIRE(stream->currentSizeBytes() < 10 * 1024 * 1024);
+        }
     }
+    WHEN("Eviction of oldest data is not opted for") {
+        auto append_opts = aws::gg::AppendOptions{{}, false};
 
-    // Check that it rolled over by look at the first sequence number and the total size now.
-    REQUIRE(stream->firstSequenceNumber() > 0);
-    // Stream can fit 9 records since each record is 1MB and there is 32B overhead per record
-    REQUIRE(stream->highestSequenceNumber() - stream->firstSequenceNumber() + 1 == 9);
-    REQUIRE(stream->currentSizeBytes() < 10 * 1024 * 1024);
+        THEN("Stream fails when appending to a full stream") {
+            auto temp_dir = aws::gg::test::utils::TempDir();
+            auto fs = std::make_shared<aws::gg::test::utils::SpyFileSystem>(std::make_shared<aws::gg::PosixFileSystem>(temp_dir.path()));
+            auto stream_or = open_stream(fs);
+            REQUIRE(stream_or.ok());
+            auto stream = std::move(stream_or.val());
+
+            aws::gg::OwnedSlice data{1 * 1024 * 1024};
+
+            // fill the stream with 9 records since each record is 1MB and there is 32B overhead per record
+            for (int i = 0; i < 9; i++) {
+                auto seq_or = stream->append(aws::gg::BorrowedSlice{data.data(), data.size()}, append_opts);
+                REQUIRE(seq_or.ok());
+            }
+            // Check that it has filled by looking at the total size now
+            REQUIRE(stream->highestSequenceNumber() - stream->firstSequenceNumber() + 1 == 9);
+            REQUIRE(stream->currentSizeBytes() < 10 * 1024 * 1024);
+
+            // fail when trying to add another record
+            auto seq_or = stream->append(aws::gg::BorrowedSlice{data.data(), data.size()}, append_opts);
+            REQUIRE(!seq_or.ok());
+            REQUIRE(seq_or.err().code == aws::gg::StreamErrorCode::StreamFull);
+            // Check that it hasn't rolled over by looking at the first sequence number
+            REQUIRE(stream->firstSequenceNumber() == 0);
+        }
+    }
 }
 
 SCENARIO("I can delete an iterator") {
