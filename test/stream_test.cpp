@@ -10,30 +10,25 @@
 #include <string_view>
 #include <vector>
 
-using namespace aws::gg;
-using namespace aws::gg::test::utils;
-using namespace std::string_view_literals;
-using namespace std::string_literals;
-
-class Logger final : public logging::Logger {
-    void log(const logging::LogLevel level, const std::string &msg) const override {
+class Logger final : public aws::gg::logging::Logger {
+    void log(const aws::gg::logging::LogLevel level, const std::string &msg) const override {
         switch (level) {
-        case logging::LogLevel::Disabled:
+        case aws::gg::logging::LogLevel::Disabled:
             break;
 
-        case logging::LogLevel::Trace:
+        case aws::gg::logging::LogLevel::Trace:
             break;
-        case logging::LogLevel::Debug:
+        case aws::gg::logging::LogLevel::Debug:
             break;
-        case logging::LogLevel::Info: {
+        case aws::gg::logging::LogLevel::Info: {
             INFO(msg);
             break;
         }
-        case logging::LogLevel::Warning: {
+        case aws::gg::logging::LogLevel::Warning: {
             WARN(msg);
             break;
         }
-        case logging::LogLevel::Error: {
+        case aws::gg::logging::LogLevel::Error: {
             WARN(msg);
             break;
         }
@@ -43,14 +38,14 @@ class Logger final : public logging::Logger {
 
 static const auto logger = std::make_shared<Logger>();
 
-static auto open_stream(const std::shared_ptr<FileSystemInterface> &fs) {
-    return FileStream::openOrCreate(StreamOptions{
+static auto open_stream(const std::shared_ptr<aws::gg::FileSystemInterface> &fs) {
+    return aws::gg::FileStream::openOrCreate(aws::gg::StreamOptions{
         1024 * 1024,
         10 * 1024 * 1024,
         true,
         fs,
         logger,
-        kv::KVOptions{
+        aws::gg::kv::KVOptions{
             true,
             fs,
             logger,
@@ -62,8 +57,8 @@ static auto open_stream(const std::shared_ptr<FileSystemInterface> &fs) {
 
 static constexpr auto log_header_size = 32;
 
-static auto read_stream_values_by_segment(std::shared_ptr<SpyFileSystem> fs, std::filesystem::path temp_dir_path,
-                                          int value_size) {
+static auto read_stream_values_by_segment(std::shared_ptr<aws::gg::test::utils::SpyFileSystem> fs,
+                                          std::filesystem::path temp_dir_path, int value_size) {
     auto files_or = fs->list();
     REQUIRE(files_or.ok());
     auto files = std::move(files_or.val());
@@ -81,7 +76,7 @@ static auto read_stream_values_by_segment(std::shared_ptr<SpyFileSystem> fs, std
             pos += log_header_size;
             auto val_or = file_or.val()->read(pos, pos + value_size);
             if (!val_or.ok()) {
-                REQUIRE(val_or.err().code == FileErrorCode::EndOfFile);
+                REQUIRE(val_or.err().code == aws::gg::FileErrorCode::EndOfFile);
                 break;
             }
             values.emplace_back(val_or.val().string());
@@ -93,19 +88,20 @@ static auto read_stream_values_by_segment(std::shared_ptr<SpyFileSystem> fs, std
 }
 
 SCENARIO("I cannot create a stream", "[stream]") {
-    auto temp_dir = TempDir();
-    auto fs = std::make_shared<SpyFileSystem>(std::make_shared<PosixFileSystem>(temp_dir.path()));
+    auto temp_dir = aws::gg::test::utils::TempDir();
+    auto fs = std::make_shared<aws::gg::test::utils::SpyFileSystem>(
+        std::make_shared<aws::gg::PosixFileSystem>(temp_dir.path()));
 
-    fs->when("open", SpyFileSystem::OpenType{[](const std::string &) {
-                 return FileError{FileErrorCode::AccessDenied, {}};
+    fs->when("open", aws::gg::test::utils::SpyFileSystem::OpenType{[](const std::string &) {
+                 return aws::gg::FileError{aws::gg::FileErrorCode::AccessDenied, {}};
              }})
-        ->when("list", SpyFileSystem::ListType{[]() {
+        ->when("list", aws::gg::test::utils::SpyFileSystem::ListType{[]() {
                    return std::vector<std::string>{"a.log", "b.log", "1.log", "2.log"};
                }});
 
     auto stream_or = open_stream(fs);
     REQUIRE(!stream_or.ok());
-    REQUIRE(stream_or.err().code == StreamErrorCode::ReadError);
+    REQUIRE(stream_or.err().code == aws::gg::StreamErrorCode::ReadError);
 
     stream_or = open_stream(fs);
     REQUIRE(stream_or.ok());
@@ -116,18 +112,21 @@ SCENARIO("I cannot create a stream", "[stream]") {
 }
 
 SCENARIO("I create a stream with file failures", "[stream]") {
-    auto temp_dir = TempDir();
-    auto fs = std::make_shared<SpyFileSystem>(std::make_shared<PosixFileSystem>(temp_dir.path()));
+    auto temp_dir = aws::gg::test::utils::TempDir();
+    auto fs = std::make_shared<aws::gg::test::utils::SpyFileSystem>(
+        std::make_shared<aws::gg::PosixFileSystem>(temp_dir.path()));
 
-    fs->when("open", SpyFileSystem::OpenType{[&fs](const std::string &s) {
-                 auto fakeFile = std::make_unique<SpyFileLike>(std::move(fs->real->open(s).val()));
-                 fakeFile->when("read", SpyFileLike::ReadType{[](uint32_t, uint32_t) {
-                                    return FileError{FileErrorCode::Unknown, {}};
+    fs->when("open", aws::gg::test::utils::SpyFileSystem::OpenType{[&fs](const std::string &s) {
+                 auto fakeFile =
+                     std::make_unique<aws::gg::test::utils::SpyFileLike>(std::move(fs->real->open(s).val()));
+                 fakeFile->when("read", aws::gg::test::utils::SpyFileLike::ReadType{[](uint32_t, uint32_t) {
+                                    return aws::gg::FileError{aws::gg::FileErrorCode::Unknown, {}};
                                 }});
-                 std::unique_ptr<FileLike> fileLike{fakeFile.release()};
+                 std::unique_ptr<aws::gg::FileLike> fileLike{fakeFile.release()};
                  return fileLike;
              }})
-        ->when("list", SpyFileSystem::ListType{[]() { return std::vector<std::string>{"1.log"}; }});
+        ->when("list",
+               aws::gg::test::utils::SpyFileSystem::ListType{[]() { return std::vector<std::string>{"1.log"}; }});
 
     auto stream_or = open_stream(fs);
     REQUIRE(stream_or.ok());
@@ -138,29 +137,31 @@ SCENARIO("I create a stream with file failures", "[stream]") {
 }
 
 SCENARIO("Stream validates data length", "[stream]") {
-    auto temp_dir = TempDir();
-    auto fs = std::make_shared<SpyFileSystem>(std::make_shared<PosixFileSystem>(temp_dir.path()));
+    auto temp_dir = aws::gg::test::utils::TempDir();
+    auto fs = std::make_shared<aws::gg::test::utils::SpyFileSystem>(
+        std::make_shared<aws::gg::PosixFileSystem>(temp_dir.path()));
     auto stream_or = open_stream(fs);
     REQUIRE(stream_or.ok());
     auto stream = std::move(stream_or.val());
 
     std::string value{};
-    auto seq_or = stream->append(BorrowedSlice{value.data(), UINT32_MAX}, AppendOptions{});
+    auto seq_or = stream->append(aws::gg::BorrowedSlice{value.data(), UINT32_MAX}, aws::gg::AppendOptions{});
     REQUIRE(!seq_or.ok());
-    REQUIRE(seq_or.err().code == StreamErrorCode::RecordTooLarge);
+    REQUIRE(seq_or.err().code == aws::gg::StreamErrorCode::RecordTooLarge);
 }
 
 SCENARIO("Stream deletes oldest data when full", "[stream]") {
-    auto temp_dir = TempDir();
-    auto fs = std::make_shared<SpyFileSystem>(std::make_shared<PosixFileSystem>(temp_dir.path()));
+    auto temp_dir = aws::gg::test::utils::TempDir();
+    auto fs = std::make_shared<aws::gg::test::utils::SpyFileSystem>(
+        std::make_shared<aws::gg::PosixFileSystem>(temp_dir.path()));
     auto stream_or = open_stream(fs);
     REQUIRE(stream_or.ok());
     auto stream = std::move(stream_or.val());
 
-    OwnedSlice data{1 * 1024 * 1024};
+    aws::gg::OwnedSlice data{1 * 1024 * 1024};
 
     for (int i = 0; i < 30; i++) {
-        auto seq_or = stream->append(BorrowedSlice{data.data(), data.size()}, AppendOptions{});
+        auto seq_or = stream->append(aws::gg::BorrowedSlice{data.data(), data.size()}, aws::gg::AppendOptions{});
         REQUIRE(seq_or.ok());
     }
 
@@ -173,15 +174,16 @@ SCENARIO("Stream deletes oldest data when full", "[stream]") {
 
 SCENARIO("I can delete an iterator") {
     WHEN("I create an iterator") {
-        auto temp_dir = TempDir();
-        auto fs = std::make_shared<SpyFileSystem>(std::make_shared<PosixFileSystem>(temp_dir.path()));
+        auto temp_dir = aws::gg::test::utils::TempDir();
+        auto fs = std::make_shared<aws::gg::test::utils::SpyFileSystem>(
+            std::make_shared<aws::gg::PosixFileSystem>(temp_dir.path()));
         auto stream_or = open_stream(fs);
         REQUIRE(stream_or.ok());
         auto stream = std::move(stream_or.val());
-        auto app_or = stream->append(BorrowedSlice{"val"}, AppendOptions{});
+        auto app_or = stream->append(aws::gg::BorrowedSlice{"val"}, aws::gg::AppendOptions{});
         REQUIRE(app_or.ok());
 
-        auto it = stream->openOrCreateIterator("ita", IteratorOptions{});
+        auto it = stream->openOrCreateIterator("ita", aws::gg::IteratorOptions{});
 
         THEN("I checkpoint the iterator") {
             (*it).val().checkpoint();
@@ -194,23 +196,25 @@ SCENARIO("I can delete an iterator") {
 }
 
 SCENARIO("I can create a stream", "[stream]") {
-    auto temp_dir = TempDir();
-    auto fs = std::make_shared<SpyFileSystem>(std::make_shared<PosixFileSystem>(temp_dir.path()));
+    auto temp_dir = aws::gg::test::utils::TempDir();
+    auto fs = std::make_shared<aws::gg::test::utils::SpyFileSystem>(
+        std::make_shared<aws::gg::PosixFileSystem>(temp_dir.path()));
     auto stream_or = open_stream(fs);
     REQUIRE(stream_or.ok());
     auto stream = std::move(stream_or.val());
 
-    const std::string &value = GENERATE(take(5, random(1, 1 * 1024 * 1024, 0, static_cast<char>(255))));
+    const std::string &value =
+        GENERATE(take(5, aws::gg::test::utils::random(1, 1 * 1024 * 1024, 0, static_cast<char>(255))));
 
     WHEN("I append values") {
-        auto seq_or = stream->append(BorrowedSlice{value}, AppendOptions{});
+        auto seq_or = stream->append(aws::gg::BorrowedSlice{value}, aws::gg::AppendOptions{});
         REQUIRE(seq_or.ok());
-        seq_or = stream->append(BorrowedSlice{value}, AppendOptions{});
+        seq_or = stream->append(aws::gg::BorrowedSlice{value}, aws::gg::AppendOptions{});
         REQUIRE(seq_or.ok());
-        seq_or = stream->append(BorrowedSlice{value}, AppendOptions{});
+        seq_or = stream->append(aws::gg::BorrowedSlice{value}, aws::gg::AppendOptions{});
         REQUIRE(seq_or.ok());
 
-        auto it = stream->openOrCreateIterator("ita", IteratorOptions{});
+        auto it = stream->openOrCreateIterator("ita", aws::gg::IteratorOptions{});
         REQUIRE(it.sequence_number == 0);
         auto v_or = *it;
         REQUIRE(v_or.ok());
@@ -224,13 +228,13 @@ SCENARIO("I can create a stream", "[stream]") {
         v_or.val().checkpoint();
 
         // New iterator starts at 0
-        auto other_it = stream->openOrCreateIterator("other", IteratorOptions{});
+        auto other_it = stream->openOrCreateIterator("other", aws::gg::IteratorOptions{});
         REQUIRE(other_it.sequence_number == 0);
         // Reopening the existing iterator does not move it forward
-        other_it = stream->openOrCreateIterator("other", IteratorOptions{});
+        other_it = stream->openOrCreateIterator("other", aws::gg::IteratorOptions{});
         REQUIRE(other_it.sequence_number == 0);
 
-        it = stream->openOrCreateIterator("ita", IteratorOptions{});
+        it = stream->openOrCreateIterator("ita", aws::gg::IteratorOptions{});
         // Pointing at the first unread record which is 2 because we checkpointed after we read 1.
         REQUIRE(it.sequence_number == 2);
 
@@ -240,16 +244,16 @@ SCENARIO("I can create a stream", "[stream]") {
         REQUIRE(stream_or.ok());
         stream = std::move(stream_or.val());
 
-        it = stream->openOrCreateIterator("ita", IteratorOptions{});
+        it = stream->openOrCreateIterator("ita", aws::gg::IteratorOptions{});
         REQUIRE(it.sequence_number == 2);
-        other_it = stream->openOrCreateIterator("other", IteratorOptions{});
+        other_it = stream->openOrCreateIterator("other", aws::gg::IteratorOptions{});
         REQUIRE(other_it.sequence_number == 0);
 
         ++it;
         REQUIRE(it.sequence_number == 3);
         v_or = *it;
         REQUIRE(!v_or.ok());
-        REQUIRE(v_or.err().code == StreamErrorCode::RecordNotFound);
+        REQUIRE(v_or.err().code == aws::gg::StreamErrorCode::RecordNotFound);
 
         REQUIRE(stream->deleteIterator("ita").ok());
 
@@ -260,7 +264,7 @@ SCENARIO("I can create a stream", "[stream]") {
             REQUIRE(stream_or.ok());
             stream = std::move(stream_or.val());
 
-            it = stream->openOrCreateIterator("ita", IteratorOptions{});
+            it = stream->openOrCreateIterator("ita", aws::gg::IteratorOptions{});
             REQUIRE(it.sequence_number == 0);
             v_or = *it;
             REQUIRE(v_or.ok());
@@ -270,8 +274,9 @@ SCENARIO("I can create a stream", "[stream]") {
 }
 
 SCENARIO("Stream detects and recovers from corruption", "[stream]") {
-    auto temp_dir = TempDir();
-    auto fs = std::make_shared<SpyFileSystem>(std::make_shared<PosixFileSystem>(temp_dir.path()));
+    auto temp_dir = aws::gg::test::utils::TempDir();
+    auto fs = std::make_shared<aws::gg::test::utils::SpyFileSystem>(
+        std::make_shared<aws::gg::PosixFileSystem>(temp_dir.path()));
 
     constexpr auto num_stream_values = 10;
     constexpr auto stream_value_size = 1024 * 1024 / 4;
@@ -283,13 +288,13 @@ SCENARIO("Stream detects and recovers from corruption", "[stream]") {
     auto stream = std::move(stream_or.val());
     for (auto i = 0; i < num_stream_values; i++) {
         std::string value;
-        random_string(value, stream_value_size);
-        REQUIRE(stream->append(BorrowedSlice{value}, AppendOptions{}).ok());
+        aws::gg::test::utils::random_string(value, stream_value_size);
+        REQUIRE(stream->append(aws::gg::BorrowedSlice{value}, aws::gg::AppendOptions{}).ok());
     }
 
     // sanity check: verify we can read all values in the stream
     for (auto i = 0; i < num_stream_values; i++) {
-        REQUIRE(stream->read(i, ReadOptions{}).ok());
+        REQUIRE(stream->read(i, aws::gg::ReadOptions{}).ok());
     }
 
     std::map<std::string, std::vector<std::string>> segments =
@@ -310,30 +315,30 @@ SCENARIO("Stream detects and recovers from corruption", "[stream]") {
         THEN("Reading data in segment, starting at corrupted entry, fails") {
 
             // first entry isn't corrupted
-            auto val_or = stream->read(0, ReadOptions{});
+            auto val_or = stream->read(0, aws::gg::ReadOptions{});
             REQUIRE(val_or.ok());
             REQUIRE(val_or.val().data.string() == first_segment->second[0]);
 
             // rest of the current segment is unreadable
             for (auto i = 1; i < static_cast<int>(first_segment->second.size()); i++) {
-                auto data_or = stream->read(i, ReadOptions{});
+                auto data_or = stream->read(i, aws::gg::ReadOptions{});
                 REQUIRE(!data_or.ok());
-                REQUIRE(data_or.err().code == StreamErrorCode::RecordNotFound);
+                REQUIRE(data_or.err().code == aws::gg::StreamErrorCode::RecordNotFound);
             }
 
             // reading data in next segment still works
-            val_or = stream->read(first_segment->second.size(), ReadOptions{});
+            val_or = stream->read(first_segment->second.size(), aws::gg::ReadOptions{});
             REQUIRE(val_or.ok());
             REQUIRE(val_or.val().data.string() == second_segment->second[0]);
 
             THEN("Reading data with may_return_later_records option will skip to the next segment") {
                 // first entry isn't corrupted
-                val_or = stream->read(0U, ReadOptions{{}, true, {}});
+                val_or = stream->read(0U, aws::gg::ReadOptions{{}, true, {}});
                 REQUIRE(val_or.ok());
                 REQUIRE(val_or.val().data.string() == first_segment->second[0]);
 
                 // instead of reading next entry (which is corrupted), skip to next segment
-                val_or = stream->read(1U, ReadOptions{{}, true, {}});
+                val_or = stream->read(1U, aws::gg::ReadOptions{{}, true, {}});
                 REQUIRE(val_or.ok());
                 REQUIRE(val_or.val().data.string() == second_segment->second[0]);
 
@@ -344,30 +349,30 @@ SCENARIO("Stream detects and recovers from corruption", "[stream]") {
 
                     THEN("Reading data in segment, starting at corrupted entry, fails") {
                         // first entry isn't corrupted
-                        val_or = stream->read(0U, ReadOptions{});
+                        val_or = stream->read(0U, aws::gg::ReadOptions{});
                         REQUIRE(val_or.ok());
                         REQUIRE(val_or.val().data.string() == first_segment->second[0]);
 
                         // rest of the current segment is unreadable
                         for (auto i = 1; i < static_cast<int>(first_segment->second.size()); i++) {
-                            auto data_or = stream->read(i, ReadOptions{});
+                            auto data_or = stream->read(i, aws::gg::ReadOptions{});
                             REQUIRE(!data_or.ok());
-                            REQUIRE(data_or.err().code == StreamErrorCode::RecordNotFound);
+                            REQUIRE(data_or.err().code == aws::gg::StreamErrorCode::RecordNotFound);
                         }
 
                         // reading data in next segment still works
-                        val_or = stream->read(first_segment->second.size(), ReadOptions{});
+                        val_or = stream->read(first_segment->second.size(), aws::gg::ReadOptions{});
                         REQUIRE(val_or.ok());
                         REQUIRE(val_or.val().data.string() == second_segment->second[0]);
 
                         THEN("Reading data with may_return_later_records option will skip to the next segment") {
                             // first entry isn't corrupted
-                            val_or = stream->read(0U, ReadOptions{{}, true, {}});
+                            val_or = stream->read(0U, aws::gg::ReadOptions{{}, true, {}});
                             REQUIRE(val_or.ok());
                             REQUIRE(val_or.val().data.string() == first_segment->second[0]);
 
                             // instead of reading next entry (which is corrupted), skip to next segment
-                            val_or = stream->read(1U, ReadOptions{{}, true, {}});
+                            val_or = stream->read(1U, aws::gg::ReadOptions{{}, true, {}});
                             REQUIRE(val_or.ok());
                             REQUIRE(val_or.val().data.string() == second_segment->second[0]);
                         }

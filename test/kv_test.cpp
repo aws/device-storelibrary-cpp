@@ -9,30 +9,24 @@
 #include <string_view>
 #include <vector>
 
-using namespace aws::gg;
-using namespace aws::gg::kv;
-using namespace aws::gg::test::utils;
-using namespace std::string_view_literals;
-using namespace std::string_literals;
-
-class Logger final : public logging::Logger {
-    void log(const logging::LogLevel level, const std::string &msg) const override {
+class Logger final : public aws::gg::logging::Logger {
+    void log(const aws::gg::logging::LogLevel level, const std::string &msg) const override {
         switch (level) {
-        case logging::LogLevel::Disabled:
+        case aws::gg::logging::LogLevel::Disabled:
             break;
-        case logging::LogLevel::Trace:
+        case aws::gg::logging::LogLevel::Trace:
             break;
-        case logging::LogLevel::Debug:
+        case aws::gg::logging::LogLevel::Debug:
             break;
-        case logging::LogLevel::Info: {
+        case aws::gg::logging::LogLevel::Info: {
             INFO(msg);
             break;
         }
-        case logging::LogLevel::Warning: {
+        case aws::gg::logging::LogLevel::Warning: {
             WARN(msg);
             break;
         }
-        case logging::LogLevel::Error: {
+        case aws::gg::logging::LogLevel::Error: {
             WARN(msg);
             break;
         }
@@ -43,9 +37,9 @@ class Logger final : public logging::Logger {
 static const auto logger = std::make_shared<Logger>();
 
 static auto open_kv(const std::string &path) {
-    return KV::openOrCreate(KVOptions{
+    return aws::gg::kv::KV::openOrCreate(aws::gg::kv::KVOptions{
         true,
-        std::make_shared<SpyFileSystem>(std::make_shared<PosixFileSystem>(path)),
+        std::make_shared<aws::gg::test::utils::SpyFileSystem>(std::make_shared<aws::gg::PosixFileSystem>(path)),
         logger,
         "test-kv-map",
         0,
@@ -53,9 +47,9 @@ static auto open_kv(const std::string &path) {
 }
 
 static auto open_kv_manual_compaction(const std::string &path) {
-    return KV::openOrCreate(KVOptions{
+    return aws::gg::kv::KV::openOrCreate(aws::gg::kv::KVOptions{
         true,
-        std::make_shared<SpyFileSystem>(std::make_shared<PosixFileSystem>(path)),
+        std::make_shared<aws::gg::test::utils::SpyFileSystem>(std::make_shared<aws::gg::PosixFileSystem>(path)),
         logger,
         "test-kv-map",
         -1,
@@ -63,7 +57,7 @@ static auto open_kv_manual_compaction(const std::string &path) {
 }
 
 SCENARIO("I cannot create a KV map with invalid inputs", "[kv]") {
-    auto kv_or = KV::openOrCreate(KVOptions{
+    auto kv_or = aws::gg::kv::KV::openOrCreate(aws::gg::kv::KVOptions{
         {},
         {},
         {},
@@ -71,66 +65,67 @@ SCENARIO("I cannot create a KV map with invalid inputs", "[kv]") {
         {},
     });
     REQUIRE(!kv_or.ok());
-    REQUIRE(kv_or.err().code == KVErrorCodes::InvalidArguments);
+    REQUIRE(kv_or.err().code == aws::gg::kv::KVErrorCodes::InvalidArguments);
 
-    auto temp_dir = TempDir();
-    kv_or = KV::openOrCreate(KVOptions{
+    auto temp_dir = aws::gg::test::utils::TempDir();
+    kv_or = aws::gg::kv::KV::openOrCreate(aws::gg::kv::KVOptions{
         {},
-        {std::make_shared<SpyFileSystem>(std::make_shared<PosixFileSystem>(temp_dir.path()))},
+        {std::make_shared<aws::gg::test::utils::SpyFileSystem>(
+            std::make_shared<aws::gg::PosixFileSystem>(temp_dir.path()))},
         {},
         {},
         {},
     });
     REQUIRE(!kv_or.ok());
-    REQUIRE(kv_or.err().code == KVErrorCodes::InvalidArguments);
+    REQUIRE(kv_or.err().code == aws::gg::kv::KVErrorCodes::InvalidArguments);
 }
 
 SCENARIO("I cannot put invalid inputs to the map", "[kv]") {
-    auto temp_dir = TempDir();
+    auto temp_dir = aws::gg::test::utils::TempDir();
     auto kv_or = open_kv(temp_dir.path());
     REQUIRE(kv_or.ok());
     auto kv = std::move(kv_or.val());
 
     {
-        auto e = kv->put("", BorrowedSlice{""});
-        REQUIRE(e.code == KVErrorCodes::InvalidArguments);
+        auto e = kv->put("", aws::gg::BorrowedSlice{""});
+        REQUIRE(e.code == aws::gg::kv::KVErrorCodes::InvalidArguments);
         REQUIRE(e.msg.find("empty") != std::string::npos);
     }
 
     {
         std::string key{};
         key.resize(UINT32_MAX);
-        auto e = kv->put(key, BorrowedSlice{""});
-        REQUIRE(e.code == KVErrorCodes::InvalidArguments);
+        auto e = kv->put(key, aws::gg::BorrowedSlice{""});
+        REQUIRE(e.code == aws::gg::kv::KVErrorCodes::InvalidArguments);
         REQUIRE(e.msg.find("Key length") != std::string::npos);
     }
 
     {
         std::string key{};
-        auto e = kv->put("a", BorrowedSlice{key.data(), UINT32_MAX});
-        REQUIRE(e.code == KVErrorCodes::InvalidArguments);
+        auto e = kv->put("a", aws::gg::BorrowedSlice{key.data(), UINT32_MAX});
+        REQUIRE(e.code == aws::gg::kv::KVErrorCodes::InvalidArguments);
         REQUIRE(e.msg.find("Value length") != std::string::npos);
     }
 }
 
 SCENARIO("I create a KV map with manual compaction", "[kv]") {
-    auto temp_dir = TempDir();
+    auto temp_dir = aws::gg::test::utils::TempDir();
     auto kv_or = open_kv_manual_compaction(temp_dir.path());
     REQUIRE(kv_or.ok());
     auto kv = std::move(kv_or.val());
 
     std::vector<std::string> keys{};
-    auto key_gen = random(1, 512);
+    auto key_gen = aws::gg::test::utils::random(1, 512);
     for (int i = 0; i < 20; i++) {
         keys.emplace_back(key_gen.get());
         key_gen.next();
     }
-    const std::string &value = GENERATE(take(1, random(1, 1 * 1024 * 1024)));
+    const std::string &value = GENERATE(take(1, aws::gg::test::utils::random(1, 1 * 1024 * 1024)));
 
     // Put duplicated key-values so that we would benefit from compaction
     for (unsigned int i = 0U; i < 10U; i++) {
         for (const auto &k : keys) {
-            auto e = kv->put(k, BorrowedSlice{value});
+            auto e = kv->put(k, aws::gg::BorrowedSlice{value});
             REQUIRE(e.ok());
         }
     }
@@ -144,13 +139,13 @@ SCENARIO("I create a KV map with manual compaction", "[kv]") {
 
 SCENARIO("I open a KV map from a shadow file", "[kv]") {
     GIVEN("A shadow file") {
-        auto temp_dir = TempDir();
+        auto temp_dir = aws::gg::test::utils::TempDir();
         std::filesystem::create_directories(temp_dir.path());
         WHEN("My shadow file is incomplete") {
             auto kv_or = open_kv(temp_dir.path());
             REQUIRE(kv_or.ok());
             for (int i = 0; i < 100; i++) {
-                REQUIRE(kv_or.val()->put("a", BorrowedSlice{"123456789"}).ok());
+                REQUIRE(kv_or.val()->put("a", aws::gg::BorrowedSlice{"123456789"}).ok());
             }
             kv_or.val().reset();
 
@@ -171,7 +166,7 @@ SCENARIO("I open a KV map from a shadow file", "[kv]") {
                 REQUIRE(keys_or.ok());
                 auto keys = keys_or.val();
                 REQUIRE(keys.size() == 1);
-                REQUIRE(keys.front() == "a"s);
+                REQUIRE(keys.front() == "a");
             }
         }
     }
@@ -179,7 +174,7 @@ SCENARIO("I open a KV map from a shadow file", "[kv]") {
 
 SCENARIO("I can detect a corrupt KV map value", "[kv]") {
     GIVEN("I create a KV map with multiple entries") {
-        auto temp_dir = TempDir();
+        auto temp_dir = aws::gg::test::utils::TempDir();
         auto kv_or = open_kv(temp_dir.path());
         REQUIRE(kv_or.ok());
 
@@ -187,9 +182,9 @@ SCENARIO("I can detect a corrupt KV map value", "[kv]") {
 
         // populate the map with random keys and values
         auto num_entries = 10;
-        auto test_data = generate_key_values(num_entries);
+        auto test_data = aws::gg::test::utils::generate_key_values(num_entries);
         for (const auto &key_value : test_data) {
-            auto e = kv->put(key_value.first, BorrowedSlice{key_value.second});
+            auto e = kv->put(key_value.first, aws::gg::BorrowedSlice{key_value.second});
             REQUIRE(e.ok());
             auto v_or = kv->get(key_value.first);
             REQUIRE(v_or.ok());
@@ -233,7 +228,7 @@ SCENARIO("I can detect a corrupt KV map value", "[kv]") {
                             if (i == num_entries - 2) {
                                 v_or = kv->get(test_data[i].first);
                                 REQUIRE(!v_or.ok());
-                                REQUIRE(v_or.err().code == KVErrorCodes::KeyNotFound);
+                                REQUIRE(v_or.err().code == aws::gg::kv::KVErrorCodes::KeyNotFound);
                             } else {
                                 v_or = kv->get(test_data[i].first);
                                 REQUIRE(v_or.ok());
@@ -266,7 +261,7 @@ SCENARIO("I can detect a corrupt KV map value", "[kv]") {
             THEN("Retrieving next to last entry fails") {
                 auto v_or = kv->get(test_data[num_entries - 2].first);
                 REQUIRE(!v_or.ok());
-                REQUIRE(v_or.err().code == KVErrorCodes::DataCorrupted);
+                REQUIRE(v_or.err().code == aws::gg::kv::KVErrorCodes::DataCorrupted);
 
                 AND_WHEN("I reset the store") {
                     kv.reset();
@@ -278,7 +273,7 @@ SCENARIO("I can detect a corrupt KV map value", "[kv]") {
                         for (auto i = num_entries - 2; i < num_entries; i++) {
                             v_or = kv->get(test_data[i].first);
                             REQUIRE(!v_or.ok());
-                            REQUIRE(v_or.err().code == KVErrorCodes::KeyNotFound);
+                            REQUIRE(v_or.err().code == aws::gg::kv::KVErrorCodes::KeyNotFound);
                         }
 
                         AND_THEN("Rest of store is untouched") {
@@ -297,7 +292,7 @@ SCENARIO("I can detect a corrupt KV map value", "[kv]") {
 
 SCENARIO("KV store with multiple values per key is corrupted", "[kv]") {
     GIVEN("I create an uncompacted KV map containing a key with multiple values") {
-        auto temp_dir = TempDir();
+        auto temp_dir = aws::gg::test::utils::TempDir();
         auto kv_or = open_kv(temp_dir.path());
         REQUIRE(kv_or.ok());
 
@@ -305,9 +300,9 @@ SCENARIO("KV store with multiple values per key is corrupted", "[kv]") {
 
         auto num_unique_keys = 2;
 
-        auto test_data = generate_key_values(num_unique_keys);
+        auto test_data = aws::gg::test::utils::generate_key_values(num_unique_keys);
         for (const auto &key_value : test_data) {
-            auto e = kv->put(key_value.first, BorrowedSlice{key_value.second});
+            auto e = kv->put(key_value.first, aws::gg::BorrowedSlice{key_value.second});
             REQUIRE(e.ok());
             auto v_or = kv->get(key_value.first);
             REQUIRE(v_or.ok());
@@ -316,7 +311,7 @@ SCENARIO("KV store with multiple values per key is corrupted", "[kv]") {
 
         // overwrite the values for each key
         for (const auto &key_value : test_data) {
-            auto e = kv->put(key_value.first, BorrowedSlice{"overwritten"});
+            auto e = kv->put(key_value.first, aws::gg::BorrowedSlice{"overwritten"});
             REQUIRE(e.ok());
             auto v_or = kv->get(key_value.first);
             REQUIRE(v_or.ok());
@@ -361,7 +356,7 @@ SCENARIO("KV store with multiple values per key is corrupted", "[kv]") {
                 THEN("The corrupted key is removed from the store") {
                     auto v_or = kv->get(test_data[0].first);
                     REQUIRE(!v_or.ok());
-                    REQUIRE(v_or.err().code == KVErrorCodes::KeyNotFound);
+                    REQUIRE(v_or.err().code == aws::gg::kv::KVErrorCodes::KeyNotFound);
 
                     AND_THEN("The uncorrupted key is still in the store and points to newest value") {
                         v_or = kv->get(test_data[1].first);
@@ -376,7 +371,7 @@ SCENARIO("KV store with multiple values per key is corrupted", "[kv]") {
 
 SCENARIO("I can detect a corrupt KV map header", "[kv]") {
     GIVEN("I create a KV map with multiple entries") {
-        auto temp_dir = TempDir();
+        auto temp_dir = aws::gg::test::utils::TempDir();
         auto kv_or = open_kv(temp_dir.path());
         REQUIRE(kv_or.ok());
 
@@ -384,9 +379,9 @@ SCENARIO("I can detect a corrupt KV map header", "[kv]") {
 
         // populate the map with random keys and values
         auto num_entries = 10;
-        auto test_data = generate_key_values(num_entries);
+        auto test_data = aws::gg::test::utils::generate_key_values(num_entries);
         for (const auto &key_value : test_data) {
-            auto e = kv->put(key_value.first, BorrowedSlice{key_value.second});
+            auto e = kv->put(key_value.first, aws::gg::BorrowedSlice{key_value.second});
             REQUIRE(e.ok());
             auto v_or = kv->get(key_value.first);
             REQUIRE(v_or.ok());
@@ -414,7 +409,7 @@ SCENARIO("I can detect a corrupt KV map header", "[kv]") {
             THEN("Retrieving next to last entry fails") {
                 auto v_or = kv->get(test_data[num_entries - 2].first);
                 REQUIRE(!v_or.ok());
-                REQUIRE(v_or.err().code == KVErrorCodes::HeaderCorrupted);
+                REQUIRE(v_or.err().code == aws::gg::kv::KVErrorCodes::HeaderCorrupted);
 
                 AND_WHEN("I reset the store") {
                     kv.reset();
@@ -426,7 +421,7 @@ SCENARIO("I can detect a corrupt KV map header", "[kv]") {
                         for (auto i = num_entries - 2; i < num_entries; i++) {
                             v_or = kv->get(test_data[i].first);
                             REQUIRE(!v_or.ok());
-                            REQUIRE(v_or.err().code == KVErrorCodes::KeyNotFound);
+                            REQUIRE(v_or.err().code == aws::gg::kv::KVErrorCodes::KeyNotFound);
                         }
 
                         AND_THEN("Rest of store is untouched") {
@@ -445,7 +440,7 @@ SCENARIO("I can detect a corrupt KV map header", "[kv]") {
 
 SCENARIO("I can create a KV map", "[kv]") {
     GIVEN("I create an empty KV map") {
-        auto temp_dir = TempDir();
+        auto temp_dir = aws::gg::test::utils::TempDir();
         auto kv_or = open_kv(temp_dir.path());
         REQUIRE(kv_or.ok());
 
@@ -454,23 +449,23 @@ SCENARIO("I can create a KV map", "[kv]") {
         auto keys_or = kv->listKeys();
         REQUIRE(keys_or.ok());
         REQUIRE(keys_or.val().empty());
-        auto e = kv->put("key", BorrowedSlice{"value"});
+        auto e = kv->put("key", aws::gg::BorrowedSlice{"value"});
         REQUIRE(e.ok());
 
         keys_or = kv->listKeys();
         REQUIRE(keys_or.ok());
         REQUIRE(!keys_or.val().empty());
-        REQUIRE(keys_or.val()[0] == "key"s);
+        REQUIRE(keys_or.val()[0] == "key");
 
         e = kv->compact();
         REQUIRE(e.ok());
 
-        const std::string &key = GENERATE(take(10, random(1, 512)));
-        const std::string &value = GENERATE(take(1, random(1, 1 * 1024 * 1024)));
-        constexpr auto new_value = "new value"sv;
+        const std::string &key = GENERATE(take(10, aws::gg::test::utils::random(1, 512)));
+        const std::string &value = GENERATE(take(1, aws::gg::test::utils::random(1, 1 * 1024 * 1024)));
+        constexpr auto new_value = std::string_view{"new value"};
 
         WHEN("I add a value") {
-            e = kv->put(key, BorrowedSlice{value});
+            e = kv->put(key, aws::gg::BorrowedSlice{value});
             REQUIRE(e.ok());
 
             THEN("I can get the value back") {
@@ -479,14 +474,14 @@ SCENARIO("I can create a KV map", "[kv]") {
                 REQUIRE(std::string_view{v_or.val().char_data(), v_or.val().size()} == value);
 
                 AND_WHEN("I update the value") {
-                    e = kv->put(key, BorrowedSlice{new_value.data(), static_cast<uint32_t>(new_value.size())});
+                    e = kv->put(key, aws::gg::BorrowedSlice{new_value.data(), static_cast<uint32_t>(new_value.size())});
                     REQUIRE(e.ok());
                     THEN("I get the new value back") {
                         v_or = kv->get(key);
                         REQUIRE(v_or.ok());
                         REQUIRE(std::string_view{v_or.val().char_data(), v_or.val().size()} == new_value);
 
-                        e = kv->put(key, BorrowedSlice{value});
+                        e = kv->put(key, aws::gg::BorrowedSlice{value});
                         REQUIRE(e.ok());
 
                         AND_WHEN("I close the KV and open it again") {
@@ -509,10 +504,10 @@ SCENARIO("I can create a KV map", "[kv]") {
                                     THEN("I can't get the value back") {
                                         v_or = kv->get(key);
                                         REQUIRE(!v_or.ok());
-                                        REQUIRE(v_or.err().code == KVErrorCodes::KeyNotFound);
+                                        REQUIRE(v_or.err().code == aws::gg::kv::KVErrorCodes::KeyNotFound);
 
                                         e = kv->remove("non-existent-key");
-                                        REQUIRE(e.code == KVErrorCodes::KeyNotFound);
+                                        REQUIRE(e.code == aws::gg::kv::KVErrorCodes::KeyNotFound);
                                     }
                                 }
                             }

@@ -112,12 +112,11 @@ FileSegment::FileSegment(const uint64_t base, std::shared_ptr<FileSystemInterfac
 
 void FileSegment::truncateAndLog(const uint32_t truncate, const StreamError &err) const noexcept {
     if (_logger && _logger->level <= logging::LogLevel::Warning) {
-        using namespace std::string_literals;
-        auto message = "Truncating "s + _segment_id + " to a length of "s + std::to_string(truncate);
+        auto message = std::string{"Truncating "} + _segment_id + " to a length of " + std::to_string(truncate);
         if (!err.msg.empty()) {
-            message += " because "s + err.msg;
+            message += " because " + err.msg;
         } else {
-            message += " because "s + string(err.code);
+            message += " because " + string(err.code);
         }
         _logger->log(logging::LogLevel::Warning, message);
     }

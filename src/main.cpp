@@ -45,14 +45,11 @@ int main() {
 
     auto start = std::chrono::high_resolution_clock::now();
     {
-        using namespace aws::gg;
-        using namespace aws::gg::kv;
-
-        auto fs = std::make_shared<PosixFileSystem>(std::filesystem::current_path() / "stream1");
+        auto fs = std::make_shared<aws::gg::PosixFileSystem>(std::filesystem::current_path() / "stream1");
         auto logger = std::make_shared<MyLogger>();
 
         if (use_kv) {
-            auto kv_or = KV::openOrCreate(KVOptions{
+            auto kv_or = aws::gg::kv::KV::openOrCreate(aws::gg::kv::KVOptions{
                 false,
                 fs,
                 logger,
@@ -65,17 +62,17 @@ int main() {
             }
             auto kv = kv_or.val();
             for (int i = 0; i < NUM_RECORDS; i++) {
-                auto x = kv->put("key" + std::to_string(i), BorrowedSlice{data.data(), data.size()});
+                auto x = kv->put("key" + std::to_string(i), aws::gg::BorrowedSlice{data.data(), data.size()});
             }
         } else {
             // auto s = MemoryStream::openOrCreate(StreamOptions{.maximum_size_bytes = 500 * 1024 * 1024});
-            auto s_or = FileStream::openOrCreate(StreamOptions{
+            auto s_or = aws::gg::FileStream::openOrCreate(aws::gg::StreamOptions{
                 1024 * 1024,
                 10 * 1024 * 1024,
                 false,
                 fs,
                 logger,
-                KVOptions{
+                aws::gg::kv::KVOptions{
                     false,
                     fs,
                     logger,
@@ -89,22 +86,22 @@ int main() {
             }
             auto s = s_or.val();
 
-            std::cout << "loaded checkpoint: " << s->openOrCreateIterator("a", IteratorOptions{}).sequence_number
+            std::cout << "loaded checkpoint: " << s->openOrCreateIterator("a", aws::gg::IteratorOptions{}).sequence_number
                       << std::endl;
 
-            expected<uint64_t, StreamError> last_sequence_number{0};
+            aws::gg::expected<uint64_t, aws::gg::StreamError> last_sequence_number{0};
             for (int i = 0; i < NUM_RECORDS; i++) {
-                last_sequence_number = s->append(BorrowedSlice{data.data(), data.size()}, AppendOptions{});
+                last_sequence_number = s->append(aws::gg::BorrowedSlice{data.data(), data.size()}, aws::gg::AppendOptions{});
             }
 
-            auto last_record_or = s->read(last_sequence_number.val(), ReadOptions{});
+            auto last_record_or = s->read(last_sequence_number.val(), aws::gg::ReadOptions{});
             if (last_record_or.ok()) {
                 std::cout << last_record_or.val().data.string() << std::endl;
             } else {
                 std::cerr << last_record_or.err().msg << std::endl;
             }
 
-            for (auto r : s->openOrCreateIterator("a", IteratorOptions{})) {
+            for (auto r : s->openOrCreateIterator("a", aws::gg::IteratorOptions{})) {
                 if (r.ok()) {
                     // Do something with the record....
                     // std::cout << r.val().sequence_number << std::endl;
@@ -115,10 +112,10 @@ int main() {
                 }
             }
 
-            std::cout << "last checkpoint: " << s->openOrCreateIterator("a", IteratorOptions{}).sequence_number
+            std::cout << "last checkpoint: " << s->openOrCreateIterator("a", aws::gg::IteratorOptions{}).sequence_number
                       << std::endl;
             (void)s->deleteIterator("a");
-            std::cout << "after deleting iterator: " << s->openOrCreateIterator("a", IteratorOptions{}).sequence_number
+            std::cout << "after deleting iterator: " << s->openOrCreateIterator("a", aws::gg::IteratorOptions{}).sequence_number
                       << std::endl;
         }
     }

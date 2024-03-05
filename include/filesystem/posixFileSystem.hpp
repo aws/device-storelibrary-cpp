@@ -19,32 +19,31 @@ namespace gg __attribute__((visibility("default"))) {
     }
 
     static FileError errnoToFileError(const int err, const std::string &str = {}) {
-        using namespace std::string_literals;
         switch (err) {
         case EACCES:
-            return FileError{FileErrorCode::AccessDenied, str + " Access denied"s};
+            return FileError{FileErrorCode::AccessDenied, str + " Access denied"};
         case EDQUOT:
-            return FileError{FileErrorCode::DiskFull, str + " User inode/disk block quota exhausted"s};
+            return FileError{FileErrorCode::DiskFull, str + " User inode/disk block quota exhausted"};
         case EINVAL:
-            return FileError{FileErrorCode::InvalidArguments, str + " Unknown invalid arguments"s};
+            return FileError{FileErrorCode::InvalidArguments, str + " Unknown invalid arguments"};
         case EISDIR:
             return FileError{FileErrorCode::InvalidArguments,
-                             str + " Path cannot be opened for writing because it is a directory"s};
+                             str + " Path cannot be opened for writing because it is a directory"};
         case ELOOP:
-            return FileError{FileErrorCode::InvalidArguments, str + " Too many symbolic links"s};
+            return FileError{FileErrorCode::InvalidArguments, str + " Too many symbolic links"};
         case EMFILE: // fallthrough
         case ENFILE:
-            return FileError{FileErrorCode::TooManyOpenFiles, str + " Too many open files. Consider raising limits."s};
+            return FileError{FileErrorCode::TooManyOpenFiles, str + " Too many open files. Consider raising limits."};
         case ENOENT:
-            return FileError{FileErrorCode::FileDoesNotExist, str + " Path does not exist"s};
+            return FileError{FileErrorCode::FileDoesNotExist, str + " Path does not exist"};
         case EFBIG:
-            return FileError{FileErrorCode::InvalidArguments, str + " File is too large"s};
+            return FileError{FileErrorCode::InvalidArguments, str + " File is too large"};
         case EIO:
-            return FileError{FileErrorCode::IOError, str + " Unknown IO error"s};
+            return FileError{FileErrorCode::IOError, str + " Unknown IO error"};
         case ENOSPC:
-            return FileError{FileErrorCode::DiskFull, str + " Disk full"s};
+            return FileError{FileErrorCode::DiskFull, str + " Disk full"};
         default:
-            return FileError{FileErrorCode::Unknown, str + " Unknown error code: "s + std::to_string(err)};
+            return FileError{FileErrorCode::Unknown, str + " Unknown error code: " + std::to_string(err)};
         }
     }
 
