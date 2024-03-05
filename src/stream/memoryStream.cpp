@@ -6,8 +6,6 @@
 
 namespace aws {
 namespace gg {
-static constexpr auto RecordNotFoundErrorStr = "Record not found";
-
 std::shared_ptr<MemoryStream> MemoryStream::openOrCreate(StreamOptions &&opts) noexcept {
     return std::shared_ptr<MemoryStream>(new MemoryStream(std::move(opts)));
 }
@@ -42,7 +40,7 @@ StreamError MemoryStream::remove_records_if_new_record_beyond_max_size(const uin
                                               }
                                               return false;
                                           }),
-                           _records.end());
+                           _records.cend());
         _first_sequence_number = _records.front().sequence_number;
     }
 
@@ -50,15 +48,16 @@ StreamError MemoryStream::remove_records_if_new_record_beyond_max_size(const uin
 }
 
 expected<uint64_t, StreamError> MemoryStream::append(OwnedSlice &&d, const AppendOptions &) noexcept {
-    const auto record_size = d.size();
+    auto data = std::move(d);
+    const auto record_size = data.size();
     auto err = remove_records_if_new_record_beyond_max_size(record_size);
     if (!err.ok()) {
         return err;
     }
 
     uint64_t seq = _next_sequence_number.fetch_add(1U);
-    _current_size_bytes += d.size();
-    _records.emplace_back(std::move(d), timestamp(), seq, 0);
+    _current_size_bytes += data.size();
+    _records.emplace_back(std::move(data), timestamp(), seq, 0);
     return seq;
 }
 

@@ -158,7 +158,7 @@ StreamError FileStream::removeSegmentsIfNewRecordBeyondMaxSize(const uint32_t re
 
     // if we need more room but can't make more room, error
     if ((_current_size_bytes > (_opts.maximum_size_bytes - record_size)) && (!remove_oldest_segments_if_full)) {
-        return StreamError{StreamErrorCode::StreamFull,{}};
+        return StreamError{StreamErrorCode::StreamFull, {}};
     }
 
     // Make room while we need more room
@@ -245,7 +245,7 @@ StreamError FileStream::deleteIterator(const std::string &identifier) noexcept {
         auto iter = _iterators[i];
         if (iter.getIdentifier() == identifier) {
             e = iter.remove();
-            auto it = _iterators.begin();
+            auto it = _iterators.cbegin();
             std::advance(it, i);
             std::ignore = _iterators.erase(it);
             break;

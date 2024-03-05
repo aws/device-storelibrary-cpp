@@ -46,7 +46,7 @@ namespace crc32 __attribute__((visibility("default"))) {
         return c ^ 0xFFFFFFFF;
     }
 
-    template <typename... Args> static uint32_t crc32_of(Args && ...args) {
+    template <typename... Args> static inline uint32_t crc32_of(Args... args) {
         uint32_t crc{0U};
         for (auto arg : {args...}) {
             crc = update(crc, arg.data(), arg.size());

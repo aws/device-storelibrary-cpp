@@ -49,9 +49,9 @@ static auto my_htonl(std::uint32_t h) {
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
     if (IS_LITTLE_ENDIAN > 0) {
         // NOLINTNEXTLINE(cppcoreguidelines-avoid-magic-numbers)
-        h = (((h & 0xff000000U) >> 24) | ((h & 0x00ff0000U) >> 8) | ((h & 0x0000ff00U) << 8) |
+        h = (((h & 0xFF000000U) >> 24) | ((h & 0x00FF0000U) >> 8) | ((h & 0x0000FF00U) << 8) |
              // NOLINTNEXTLINE(cppcoreguidelines-avoid-magic-numbers)
-             ((h & 0x000000ffU) << 24));
+             ((h & 0x000000FFU) << 24));
     }
     return h;
 }

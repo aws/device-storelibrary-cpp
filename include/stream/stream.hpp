@@ -246,5 +246,7 @@ namespace gg __attribute__((visibility("default"))) {
                    std::chrono::system_clock::now().time_since_epoch())
             .count();
     }
+
+    static constexpr auto RecordNotFoundErrorStr = "Record not found";
 } // namespace gg
 } // namespace aws

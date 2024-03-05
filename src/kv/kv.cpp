@@ -14,7 +14,8 @@ namespace gg {
 namespace kv {
 constexpr static uint8_t DELETED_FLAG = 0x01U;
 
-expected<std::shared_ptr<KV>, KVError> KV::openOrCreate(KVOptions &&opts) noexcept {
+expected<std::shared_ptr<KV>, KVError> KV::openOrCreate(KVOptions &&o) noexcept {
+    auto opts = std::move(o);
     if (opts.identifier.empty()) {
         return KVError{KVErrorCodes::InvalidArguments, "Identifier cannot be empty"};
     }
@@ -97,7 +98,7 @@ KVError KV::openFile() noexcept {
     return KVError{KVErrorCodes::NoError, {}};
 }
 
-template <typename T> static constexpr uint32_t smallSizeOf() {
+template <typename T> static inline constexpr uint32_t smallSizeOf() {
     return static_cast<uint32_t>(sizeof(T));
 }
 

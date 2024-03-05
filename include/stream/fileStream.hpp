@@ -14,7 +14,6 @@
 
 namespace aws {
 namespace gg {
-static constexpr auto RecordNotFoundErrorStr = "Record not found";
 
 struct LogEntryHeader;
 class FileSegment {
