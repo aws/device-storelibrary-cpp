@@ -2,7 +2,7 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace __attribute__((visibility("default"))) crc32 {
+namespace crc32 __attribute__((visibility("default"))) {
     static constexpr uint32_t table[256] = {
         0x00000000U, 0x77073096U, 0xEE0E612CU, 0x990951BAU, 0x076DC419U, 0x706AF48FU, 0xE963A535U, 0x9E6495A3U,
         0x0EDB8832U, 0x79DCB8A4U, 0xE0D5E91EU, 0x97D2D988U, 0x09B64C2BU, 0x7EB17CBDU, 0xE7B82D07U, 0x90BF1D91U,
