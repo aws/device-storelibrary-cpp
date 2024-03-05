@@ -79,7 +79,8 @@ namespace kv __attribute__((visibility("default"))) {
 
         expected<uint32_t, KVError> readWrite(const uint32_t, std::pair<std::string, uint32_t> &, FileLike &) noexcept;
 
-        KV(KVOptions &&opts) noexcept : _opts(std::move(opts)), _shadow_name(_opts.identifier + "s") {}
+        KV(KVOptions &&opts) noexcept : _opts(std::move(opts)), _shadow_name(_opts.identifier + "s") {
+        }
 
         KVError initialize() noexcept;
 
@@ -116,7 +117,9 @@ namespace kv __attribute__((visibility("default"))) {
             return compactNoLock();
         }
 
-        std::uint32_t currentSizeBytes() const noexcept { return _byte_position; }
+        std::uint32_t currentSizeBytes() const noexcept {
+            return _byte_position;
+        }
     };
 } // namespace kv
 } // namespace gg

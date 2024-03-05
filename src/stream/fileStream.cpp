@@ -71,10 +71,12 @@ StreamError FileStream::loadExistingSegments() noexcept {
         auto idx = f.rfind(".log");
         if (idx != std::string::npos) {
             char *end_ptr = nullptr; // NOLINT(cppcoreguidelines-pro-type-vararg)
+            // coverity[autosar_cpp14_m19_3_1_violation] setting errno so we can read it from strtoull call
             // coverity[misra_cpp_2008_rule_19_3_1_violation] setting errno so we can read it from strtoull call
             errno = 0;
             auto base = strtoull(f.c_str(), &end_ptr, BASE_10);
             // Ignore files whose names are not parsable as u64.
+            // coverity[autosar_cpp14_m19_3_1_violation] strtoull gives us errors via errno
             // coverity[misra_cpp_2008_rule_19_3_1_violation] strtoull gives us errors via errno
             if (((base == 0U) && (end_ptr == f.c_str())) || (errno != 0)) {
                 continue;
@@ -159,7 +161,7 @@ StreamError FileStream::removeSegmentsIfNewRecordBeyondMaxSize(const uint32_t re
         _current_size_bytes -= to_delete.totalSizeBytes();
         to_delete.remove();
         // Remove from in-memory
-        std::ignore = _segments.erase(_segments.begin());
+        std::ignore = _segments.erase(_segments.cbegin());
         _first_sequence_number = _segments.front().getBaseSeqNum();
     }
     return StreamError{StreamErrorCode::NoError, {}};

@@ -66,7 +66,9 @@ namespace gg __attribute__((visibility("default"))) {
         CheckpointableOwnedRecord &operator=(CheckpointableOwnedRecord &&o) = default;
         CheckpointableOwnedRecord operator=(CheckpointableOwnedRecord &) = delete;
 
-        void checkpoint() const noexcept { _checkpoint(); }
+        void checkpoint() const noexcept {
+            _checkpoint();
+        }
     };
 
     class Iterator {
@@ -102,16 +104,22 @@ namespace gg __attribute__((visibility("default"))) {
 
         expected<CheckpointableOwnedRecord, StreamError> operator*() noexcept;
 
-        Iterator &&begin() noexcept { return std::move(*this); }
+        Iterator &&begin() noexcept {
+            return std::move(*this);
+        }
 
         /**
          * The iterator never ends.
          */
-        static int end() noexcept { return 0; }
+        static int end() noexcept {
+            return 0;
+        }
 
         // coverity[misra_cpp_2008_rule_0_1_11_violation] interface requires a parameter, but our implementation does
         // not
-        bool operator!=(__attribute__((unused)) const int x) const noexcept { return true; }
+        bool operator!=(__attribute__((unused)) const int x) const noexcept {
+            return true;
+        }
     };
 
     struct ReadOptions {
@@ -131,9 +139,15 @@ namespace gg __attribute__((visibility("default"))) {
         std::atomic_uint64_t _current_size_bytes{0U};
 
       public:
-        std::uint64_t firstSequenceNumber() const noexcept { return _first_sequence_number; };
-        std::uint64_t highestSequenceNumber() const noexcept { return _next_sequence_number - 1U; };
-        std::uint64_t currentSizeBytes() const noexcept { return _current_size_bytes; };
+        std::uint64_t firstSequenceNumber() const noexcept {
+            return _first_sequence_number;
+        };
+        std::uint64_t highestSequenceNumber() const noexcept {
+            return _next_sequence_number - 1U;
+        };
+        std::uint64_t currentSizeBytes() const noexcept {
+            return _current_size_bytes;
+        };
         StreamInterface(StreamInterface &) = delete;
 
         /**

@@ -22,11 +22,17 @@ namespace gg __attribute__((visibility("default"))) {
             assert(s.length() <= UINT32_MAX);
         };
 
-        const void *data() const { return _data; };
+        const void *data() const {
+            return _data;
+        };
 
-        const char *char_data() const { return static_cast<const char *>(_data); };
+        const char *char_data() const {
+            return static_cast<const char *>(_data);
+        };
 
-        uint32_t size() const { return _size; };
+        uint32_t size() const {
+            return _size;
+        };
 
         std::string string() const {
             const auto d = char_data();
@@ -53,7 +59,9 @@ namespace gg __attribute__((visibility("default"))) {
             swap(mem);
         }
 
-        OwnedSlice(uint8_t *d, const uint32_t size) : _size(size) { reset(d); };
+        OwnedSlice(uint8_t *d, const uint32_t size) : _size(size) {
+            reset(d);
+        };
 
         OwnedSlice(OwnedSlice &&) = default;
         OwnedSlice(OwnedSlice &) = delete;
@@ -62,11 +70,17 @@ namespace gg __attribute__((visibility("default"))) {
 
         ~OwnedSlice() = default;
 
-        void *data() const { return get(); };
+        void *data() const {
+            return get();
+        };
 
-        const char *char_data() const { return reinterpret_cast<const char *>(get()); };
+        const char *char_data() const {
+            return reinterpret_cast<const char *>(get());
+        };
 
-        uint32_t size() const { return _size; };
+        uint32_t size() const {
+            return _size;
+        };
 
         std::string string() const {
             const auto d = char_data();

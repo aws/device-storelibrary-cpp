@@ -26,7 +26,7 @@ namespace gg {
 
 static constexpr int UINT64_MAX_DECIMAL_COUNT = 19;
 
-auto my_htonll(std::uint64_t h) {
+static auto my_htonll(std::uint64_t h) {
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
     if (IS_LITTLE_ENDIAN > 0) {
         // NOLINTNEXTLINE(cppcoreguidelines-avoid-magic-numbers)
@@ -41,9 +41,11 @@ auto my_htonll(std::uint64_t h) {
     return h;
 }
 
-auto my_ntohll(const std::uint64_t h) { return my_htonll(h); }
+static auto my_ntohll(const std::uint64_t h) {
+    return my_htonll(h);
+}
 
-auto my_htonl(std::uint32_t h) {
+static auto my_htonl(std::uint32_t h) {
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
     if (IS_LITTLE_ENDIAN > 0) {
         // NOLINTNEXTLINE(cppcoreguidelines-avoid-magic-numbers)
@@ -53,7 +55,9 @@ auto my_htonl(std::uint32_t h) {
     }
     return h;
 }
-auto my_ntohl(const std::uint32_t h) { return my_htonl(h); }
+static auto my_ntohl(const std::uint32_t h) {
+    return my_htonl(h);
+}
 
 constexpr uint8_t HEADER_SIZE = 32U;
 constexpr int32_t MAGIC_BYTES = 0xAAAAAA;

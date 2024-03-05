@@ -97,7 +97,9 @@ KVError KV::openFile() noexcept {
     return KVError{KVErrorCodes::NoError, {}};
 }
 
-template <typename T> static constexpr uint32_t smallSizeOf() { return static_cast<uint32_t>(sizeof(T)); }
+template <typename T> static constexpr uint32_t smallSizeOf() {
+    return static_cast<uint32_t>(sizeof(T));
+}
 
 KVError KV::initialize() noexcept {
     std::lock_guard<std::mutex> lock(_lock);
@@ -466,7 +468,7 @@ KVError KV::compactNoLock() noexcept {
 bool KV::removeKey(const std::string &key) noexcept {
     for (size_t i = 0U; i < _key_pointers.size(); i++) {
         if (_key_pointers[i].first == key) {
-            auto it = _key_pointers.begin();
+            auto it = _key_pointers.cbegin();
             std::advance(it, i);
             std::ignore = _key_pointers.erase(it);
             return true;

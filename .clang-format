@@ -7,3 +7,4 @@ ColumnLimit: 120
 Language: Cpp
 # Don't be "smart" about determining where the * and & go
 DerivePointerAlignment: false
+AllowShortFunctionsOnASingleLine: None

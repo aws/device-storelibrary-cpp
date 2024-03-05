@@ -111,7 +111,9 @@ namespace gg __attribute__((visibility("default"))) {
             return errnoToFileError(errno);
         }
 
-        virtual void sync() override { aws::gg::sync(fileno(_f)); }
+        virtual void sync() override {
+            aws::gg::sync(fileno(_f));
+        }
 
         virtual FileError truncate(const uint32_t max) override {
             // Flush buffers before truncating since truncation is operating on the FD directly rather than the file
@@ -202,9 +204,13 @@ namespace gg __attribute__((visibility("default"))) {
             return FileError{FileErrorCode::NoError, {}};
         };
 
-        virtual FileError flush() override { return FileError{FileErrorCode::NoError, {}}; }
+        virtual FileError flush() override {
+            return FileError{FileErrorCode::NoError, {}};
+        }
 
-        virtual void sync() override { aws::gg::sync(_f); }
+        virtual void sync() override {
+            aws::gg::sync(_f);
+        }
 
         virtual FileError truncate(const uint32_t max) override {
             if (ftruncate(_f, static_cast<off_t>(max)) != 0) {
