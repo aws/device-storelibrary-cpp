@@ -69,7 +69,7 @@ static std::string string(const KVErrorCodes e) {
 }
 
 void KV::truncateAndLog(const uint32_t truncate, const KVError &err) const noexcept {
-    if (_opts.logger && _opts.logger->level <= logging::LogLevel::Warning) {
+    if (_opts.logger && (_opts.logger->level <= logging::LogLevel::Warning)) {
         auto message = std::string{"Truncating "} + _opts.identifier + " to a length of " + std::to_string(truncate);
         if (!err.msg.empty()) {
             message += " because " + err.msg;
@@ -363,7 +363,7 @@ KVError KV::put(const std::string &key, const BorrowedSlice data) noexcept {
 }
 
 KVError KV::maybeCompact() noexcept {
-    if (_opts.compact_after > 0 && static_cast<int64_t>(_added_bytes) > _opts.compact_after) {
+    if ((_opts.compact_after > 0) && (static_cast<int64_t>(_added_bytes) > _opts.compact_after)) {
         // We're already holding the mutex, so call compactNoLock() directly.
         return compactNoLock();
     }
@@ -419,8 +419,8 @@ KVError KV::compactNoLock() noexcept {
             auto err_or = readWrite(new_byte_pos, point, *shadow);
             if (!err_or.ok()) {
                 // if key is corrupted, remove it from the map
-                if (err_or.err().code == KVErrorCodes::HeaderCorrupted ||
-                    err_or.err().code == KVErrorCodes::DataCorrupted) {
+                if ((err_or.err().code == KVErrorCodes::HeaderCorrupted) ||
+                    (err_or.err().code == KVErrorCodes::DataCorrupted)) {
                     _opts.logger->log(logging::LogLevel::Warning, "Encountered corruption during compaction. Key <" +
                                                                       point.first + "> will be dropped.");
                     continue;

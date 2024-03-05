@@ -124,7 +124,7 @@ FileSegment::FileSegment(const uint64_t base, std::shared_ptr<FileSystemInterfac
 }
 
 void FileSegment::truncateAndLog(const uint32_t truncate, const StreamError &err) const noexcept {
-    if (_logger && _logger->level <= logging::LogLevel::Warning) {
+    if (_logger && (_logger->level <= logging::LogLevel::Warning)) {
         auto message = std::string{"Truncating "} + _segment_id + " to a length of " + std::to_string(truncate);
         if (!err.msg.empty()) {
             message += " because " + err.msg;
@@ -274,13 +274,13 @@ expected<OwnedRecord, StreamError> FileSegment::read(const uint64_t sequence_num
         const auto expected_rel_seq_num = static_cast<int32_t>(sequence_number - _base_seq_num);
 
         // If the record we read is after the one we wanted, and we're not allowed to return later records, we must fail
-        if (header.relative_sequence_number > expected_rel_seq_num && !read_options.may_return_later_records) {
+        if ((header.relative_sequence_number > expected_rel_seq_num) && (!read_options.may_return_later_records)) {
             return StreamError{StreamErrorCode::RecordNotFound, RecordNotFoundErrorStr};
         }
 
         // We found the one we want, or the next available sequence number was acceptable to us
-        if (header.relative_sequence_number == expected_rel_seq_num ||
-            (header.relative_sequence_number > expected_rel_seq_num && read_options.may_return_later_records)) {
+        if ((header.relative_sequence_number == expected_rel_seq_num) ||
+            ((header.relative_sequence_number > expected_rel_seq_num) && read_options.may_return_later_records)) {
             auto data_or = _f->read(offset + HEADER_SIZE,
                                     offset + HEADER_SIZE + static_cast<std::uint32_t>(header.payload_length_bytes));
             if (!data_or.ok()) {
@@ -292,9 +292,10 @@ expected<OwnedRecord, StreamError> FileSegment::read(const uint64_t sequence_num
             const auto ts_swap = static_cast<int64_t>(_htonll(static_cast<std::uint64_t>(header.timestamp)));
 
             if (read_options.check_for_corruption &&
-                header.crc != static_cast<int64_t>(crc32::crc32_of(BorrowedSlice{&ts_swap, sizeof(ts_swap)},
-                                                                   BorrowedSlice{&data_len_swap, sizeof(data_len_swap)},
-                                                                   BorrowedSlice{data.data(), data.size()}))) {
+                (header.crc !=
+                 static_cast<int64_t>(crc32::crc32_of(BorrowedSlice{&ts_swap, sizeof(ts_swap)},
+                                                      BorrowedSlice{&data_len_swap, sizeof(data_len_swap)},
+                                                      BorrowedSlice{data.data(), data.size()})))) {
                 return StreamError{StreamErrorCode::RecordDataCorrupted, {}};
             }
 
@@ -315,7 +316,7 @@ void FileSegment::remove() noexcept {
     // Close file handle, then delete file
     _f.reset();
     const auto e = _file_implementation->remove(_segment_id);
-    if (!e.ok() && _logger->level <= logging::LogLevel::Warning) {
+    if ((!e.ok()) && (_logger->level <= logging::LogLevel::Warning)) {
         _logger->log(logging::LogLevel::Warning, "Issue deleting " + _segment_id + " due to: " + e.msg);
     }
 }

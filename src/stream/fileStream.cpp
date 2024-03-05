@@ -73,7 +73,7 @@ StreamError FileStream::loadExistingSegments() noexcept {
             errno = 0;
             auto base = strtoull(f.c_str(), &end_ptr, BASE_10);
             // Ignore files whose names are not parsable as u64.
-            if ((base == 0U && end_ptr == f.c_str()) || errno != 0) {
+            if (((base == 0U) && (end_ptr == f.c_str())) || (errno != 0)) {
                 continue;
             }
             FileSegment segment{base, _opts.file_implementation, _opts.logger};
@@ -122,7 +122,7 @@ expected<uint64_t, StreamError> FileStream::append(const BorrowedSlice d, const 
     }
 
     // Check if we need a new segment because we don't have any, or the last segment is getting too big.
-    if (_segments.empty() || _segments.back().totalSizeBytes() >= _opts.minimum_segment_size_bytes) {
+    if (_segments.empty() || (_segments.back().totalSizeBytes() >= _opts.minimum_segment_size_bytes)) {
         err = makeNextSegment();
         if (!err.ok()) {
             return err;
@@ -169,7 +169,7 @@ expected<uint64_t, StreamError> FileStream::append(OwnedSlice &&d, const AppendO
 
 expected<OwnedRecord, StreamError> FileStream::read(const uint64_t sequence_number,
                                                     const ReadOptions &provided_options) const noexcept {
-    if (sequence_number < _first_sequence_number || sequence_number >= _next_sequence_number) {
+    if ((sequence_number < _first_sequence_number) || (sequence_number >= _next_sequence_number)) {
         return StreamError{StreamErrorCode::RecordNotFound, RecordNotFoundErrorStr};
     }
 
@@ -184,25 +184,25 @@ expected<OwnedRecord, StreamError> FileStream::read(const uint64_t sequence_numb
     bool find_exact = true;
     for (const auto &seg : _segments) {
         const auto have_exact_segment =
-            sequence_number >= seg.getBaseSeqNum() && sequence_number <= seg.getHighestSeqNum();
+            (sequence_number >= seg.getBaseSeqNum()) && (sequence_number <= seg.getHighestSeqNum());
 
         // sequence_number may refer to a corrupted entry from the previous segment.
         // this can happen when stream re-opened and the segment is truncated due to corruption
         // (highest sequence number is changed).
         //
         // in such cases, we should attempt to return the next available record (if configured)
-        if (sequence_number < seg.getBaseSeqNum() && read_options.may_return_later_records) {
+        if ((sequence_number < seg.getBaseSeqNum()) && read_options.may_return_later_records) {
             find_exact = false;
         }
 
-        if (have_exact_segment || !find_exact) {
+        if (have_exact_segment || (!find_exact)) {
             auto val_or = seg.read(sequence_number, read_options);
             if (val_or.ok()) {
                 return val_or;
             }
-            if ((val_or.err().code == StreamErrorCode::RecordNotFound ||
-                 val_or.err().code == StreamErrorCode::RecordDataCorrupted ||
-                 val_or.err().code == StreamErrorCode::HeaderDataCorrupted) &&
+            if (((val_or.err().code == StreamErrorCode::RecordNotFound) ||
+                 (val_or.err().code == StreamErrorCode::RecordDataCorrupted) ||
+                 (val_or.err().code == StreamErrorCode::HeaderDataCorrupted)) &&
                 read_options.may_return_later_records) {
                 // Fallback to the next available record in the next segment (if any)
                 find_exact = false;
