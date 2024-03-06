@@ -1,5 +1,5 @@
-#include "stream/memoryStream.hpp"
-#include "stream/stream.hpp"
+#include "aws/store/stream/memoryStream.hpp"
+#include "aws/store/stream/stream.hpp"
 #include <algorithm>
 #include <atomic>
 #include <tuple>

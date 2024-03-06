@@ -1,7 +1,7 @@
-#include "kv/kv.hpp"
-#include "common/crc32.hpp"
-#include "common/expected.hpp"
-#include "common/util.hpp"
+#include "aws/store/kv/kv.hpp"
+#include "aws/store/common/crc32.hpp"
+#include "aws/store/common/expected.hpp"
+#include "aws/store/common/util.hpp"
 #include <cstring>
 #include <iterator>
 #include <memory>

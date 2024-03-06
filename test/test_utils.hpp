@@ -1,7 +1,7 @@
 #pragma once
 
-#include "common/expected.hpp"
-#include "filesystem/filesystem.hpp"
+#include "aws/store/common/expected.hpp"
+#include "aws/store/filesystem/filesystem.hpp"
 #include <any>
 #include <catch2/generators/catch_generators.hpp>
 #include <catch2/generators/catch_generators_adapters.hpp>

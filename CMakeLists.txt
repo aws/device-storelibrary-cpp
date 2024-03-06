@@ -16,14 +16,14 @@ include(cmake/ClangFormat.cmake)
 
 add_library(
     greenlake_kv
-    include/kv/kv.hpp
-    include/common/expected.hpp
-    include/common/crc32.hpp
-    include/filesystem/filesystem.hpp
-    include/common/slices.hpp
-    include/common/util.hpp
+    include/aws/store/kv/kv.hpp
+    include/aws/store/common/expected.hpp
+    include/aws/store/common/crc32.hpp
+    include/aws/store/filesystem/filesystem.hpp
+    include/aws/store/common/slices.hpp
+    include/aws/store/common/util.hpp
     src/kv/kv.cpp
-    include/common/logging.hpp
+    include/aws/store/common/logging.hpp
 )
 set_target_properties(greenlake_kv PROPERTIES LINKER_LANGUAGE CXX)
 target_include_directories(greenlake_kv PUBLIC include)
@@ -37,16 +37,16 @@ target_clangtidy_setup(greenlake_kv)
 
 add_library(
     greenlake_stream
-    include/stream/stream.hpp
-    include/stream/fileStream.hpp
-    include/stream/memoryStream.hpp
-    include/common/crc32.hpp
-    include/common/slices.hpp
+    include/aws/store/stream/stream.hpp
+    include/aws/store/stream/fileStream.hpp
+    include/aws/store/stream/memoryStream.hpp
+    include/aws/store/common/crc32.hpp
+    include/aws/store/common/slices.hpp
     src/stream/memoryStream.cpp
     src/stream/fileStream.cpp
-    include/common/expected.hpp
-    include/common/util.hpp
-    include/common/logging.hpp
+    include/aws/store/common/expected.hpp
+    include/aws/store/common/util.hpp
+    include/aws/store/common/logging.hpp
     src/stream/fileSegment.cpp
 )
 set_target_properties(greenlake_stream PROPERTIES LINKER_LANGUAGE CXX)
@@ -61,15 +61,12 @@ target_clangtidy_setup(greenlake_stream)
 
 include(GNUInstallDirs)
 install(TARGETS greenlake_kv greenlake_stream LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
-install(DIRECTORY include/common DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/aws/store)
-install(DIRECTORY include/filesystem DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/aws/store)
-install(DIRECTORY include/kv DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/aws/store)
-install(DIRECTORY include/stream DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/aws/store)
+install(DIRECTORY include/aws DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
 option(STORE_BUILD_EXAMPLE "Build example program" ON)
 if(STORE_BUILD_EXAMPLE)
     set(CMAKE_CXX_STANDARD 17)
-    add_executable(greenlake_example include/filesystem/posixFileSystem.hpp src/main.cpp)
+    add_executable(greenlake_example include/aws/store/filesystem/posixFileSystem.hpp src/main.cpp)
     target_link_libraries(greenlake_example PRIVATE greenlake_stream)
     target_compile_options(greenlake_example PRIVATE -fno-exceptions -Wall -Wextra -Werror -Wconversion -pedantic)
     if(NOT CMAKE_BUILD_TYPE MATCHES "Debug")

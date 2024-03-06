@@ -1,8 +1,10 @@
-#include "stream/fileStream.hpp"
-#include "common/util.hpp"
-#include "stream/stream.hpp"
+#include "aws/store/stream/fileStream.hpp"
+#include "aws/store/common/util.hpp"
+#include "aws/store/kv/kv.hpp"
+#include "aws/store/stream/stream.hpp"
 #include <algorithm>
 #include <atomic>
+#include <aws/store/common/expected.hpp>
 #include <cerrno>
 #include <cstdint>
 #include <cstdlib>

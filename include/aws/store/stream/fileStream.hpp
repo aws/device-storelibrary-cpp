@@ -1,9 +1,9 @@
 #pragma once
-#include "common/expected.hpp"
-#include "common/logging.hpp"
-#include "common/slices.hpp"
-#include "filesystem/filesystem.hpp"
-#include "kv/kv.hpp"
+#include "aws/store/common/expected.hpp"
+#include "aws/store/common/logging.hpp"
+#include "aws/store/common/slices.hpp"
+#include "aws/store/filesystem/filesystem.hpp"
+#include "aws/store/kv/kv.hpp"
 #include "stream.hpp"
 #include <cstdint>
 #include <memory>
