@@ -15,15 +15,15 @@ endif()
 include(cmake/ClangFormat.cmake)
 
 add_library(
-        greenlake_kv
-        include/kv/kv.hpp
-        include/common/expected.hpp
-        include/common/crc32.hpp
-        include/filesystem/filesystem.hpp
-        include/common/slices.hpp
-        include/common/util.hpp
-        src/kv/kv.cpp
-        include/common/logging.hpp
+    greenlake_kv
+    include/kv/kv.hpp
+    include/common/expected.hpp
+    include/common/crc32.hpp
+    include/filesystem/filesystem.hpp
+    include/common/slices.hpp
+    include/common/util.hpp
+    src/kv/kv.cpp
+    include/common/logging.hpp
 )
 set_target_properties(greenlake_kv PROPERTIES LINKER_LANGUAGE CXX)
 target_include_directories(greenlake_kv PUBLIC include)
@@ -36,18 +36,18 @@ target_clangformat_setup(greenlake_kv)
 target_clangtidy_setup(greenlake_kv)
 
 add_library(
-        greenlake_stream
-        include/stream/stream.hpp
-        include/stream/fileStream.hpp
-        include/stream/memoryStream.hpp
-        include/common/crc32.hpp
-        include/common/slices.hpp
-        src/stream/memoryStream.cpp
-        src/stream/fileStream.cpp
-        include/common/expected.hpp
-        include/common/util.hpp
-        include/common/logging.hpp
-        src/stream/fileSegment.cpp
+    greenlake_stream
+    include/stream/stream.hpp
+    include/stream/fileStream.hpp
+    include/stream/memoryStream.hpp
+    include/common/crc32.hpp
+    include/common/slices.hpp
+    src/stream/memoryStream.cpp
+    src/stream/fileStream.cpp
+    include/common/expected.hpp
+    include/common/util.hpp
+    include/common/logging.hpp
+    src/stream/fileSegment.cpp
 )
 set_target_properties(greenlake_stream PROPERTIES LINKER_LANGUAGE CXX)
 target_link_libraries(greenlake_stream PUBLIC greenlake_kv)
@@ -58,6 +58,13 @@ if(NOT CMAKE_BUILD_TYPE MATCHES "Debug")
 endif()
 target_clangformat_setup(greenlake_stream)
 target_clangtidy_setup(greenlake_stream)
+
+include(GNUInstallDirs)
+install(TARGETS greenlake_kv greenlake_stream LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
+install(DIRECTORY include/common DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(DIRECTORY include/filesystem DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(DIRECTORY include/kv DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(DIRECTORY include/stream DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
 option(STORE_BUILD_EXAMPLE "Build example program" ON)
 if(STORE_BUILD_EXAMPLE)
@@ -75,11 +82,11 @@ if(STORE_BUILD_EXAMPLE)
     if(CMAKE_BUILD_TYPE MATCHES "Debug")
         include(cmake/Sanitizers.cmake)
         myproject_enable_sanitizers(
-                greenlake_example
-                ON # asan
-                ON # ub
-                OFF # thread
-                OFF # memory
+            greenlake_example
+            ON # asan
+            ON # ub
+            OFF # thread
+            OFF # memory
         )
         message("ASAN and UBSan enabled")
     endif()
@@ -100,10 +107,10 @@ if(STORE_BUILD_TESTS)
     list(JOIN CMAKE_CXX_IMPLICIT_LINK_DIRECTORIES : DISCOVERED_LD_PATH)
     # Setup the 'release' target (which is run on Package Builder).
     add_custom_target(
-            release
-            COMMENT "Build and install the library, and run the unit tests."
-            COMMAND "${CMAKE_COMMAND}" -E env LD_LIBRARY_PATH=${DISCOVERED_LD_PATH} "test/tests" --durations yes
-            DEPENDS tests
-            USES_TERMINAL
+        release
+        COMMENT "Build and install the library, and run the unit tests."
+        COMMAND "${CMAKE_COMMAND}" -E env LD_LIBRARY_PATH=${DISCOVERED_LD_PATH} "test/tests" --durations yes
+        DEPENDS tests
+        USES_TERMINAL
     )
 endif()

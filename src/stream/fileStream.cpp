@@ -247,7 +247,7 @@ StreamError FileStream::deleteIterator(const std::string &identifier) noexcept {
         if (iter.getIdentifier() == identifier) {
             e = iter.remove();
             auto it = _iterators.cbegin();
-            std::advance(it, i);
+            std::advance(it, static_cast<int32_t>(i));
             std::ignore = _iterators.erase(it);
             break;
         }

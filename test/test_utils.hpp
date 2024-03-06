@@ -75,11 +75,17 @@ class TempDir {
     std::filesystem::path _path{std::filesystem::current_path() / random(1, 10, 'a', 'z').get()};
 
   public:
-    TempDir() { std::filesystem::remove_all(_path); }
+    TempDir() {
+        std::filesystem::remove_all(_path);
+    }
 
-    ~TempDir() { std::filesystem::remove_all(_path); }
+    ~TempDir() {
+        std::filesystem::remove_all(_path);
+    }
 
-    const std::filesystem::path &path() const { return _path; }
+    const std::filesystem::path &path() const {
+        return _path;
+    }
 };
 
 template <typename> struct RemoveMembership {};
@@ -109,7 +115,8 @@ class SpyFileLike : public aws::gg::FileLike {
         return std::move(e.err());
     }
 
-    SpyFileLike(std::unique_ptr<aws::gg::FileLike> f) : _real(std::move(f)) {}
+    SpyFileLike(std::unique_ptr<aws::gg::FileLike> f) : _real(std::move(f)) {
+    }
 
     aws::gg::expected<aws::gg::OwnedSlice, aws::gg::FileError> read(const uint32_t begin, const uint32_t end) override {
         if (!_mocks.empty() && _mocks.front().first == "read") {
@@ -195,7 +202,8 @@ class SpyFileSystem : public aws::gg::FileSystemInterface {
     using RemoveType = std::function<RemoveMembership<decltype(&aws::gg::FileSystemInterface::remove)>::type>;
     using ListType = std::function<RemoveMembership<decltype(&aws::gg::FileSystemInterface::list)>::type>;
 
-    SpyFileSystem(std::shared_ptr<aws::gg::FileSystemInterface> real) : real(std::move(real)) {}
+    SpyFileSystem(std::shared_ptr<aws::gg::FileSystemInterface> real) : real(std::move(real)) {
+    }
 
     aws::gg::expected<std::unique_ptr<aws::gg::FileLike>, aws::gg::FileError>
     open(const std::string &identifier) override {

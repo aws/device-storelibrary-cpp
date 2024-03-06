@@ -9,7 +9,9 @@ RandomStringGenerator::RandomStringGenerator(const int low, const int high, cons
     static_cast<void>(next());
 }
 
-const std::string &RandomStringGenerator::get() const { return current_string; }
+const std::string &RandomStringGenerator::get() const {
+    return current_string;
+}
 } // namespace utils
 } // namespace test
 } // namespace gg

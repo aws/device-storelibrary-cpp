@@ -116,9 +116,8 @@ namespace gg __attribute__((visibility("default"))) {
             return 0;
         }
 
-        // coverity[misra_cpp_2008_rule_0_1_11_violation] iterator interface requires a parameter
-        // coverity[autosar_cpp14_a0_1_4_violation] iterator interface requires a parameter
-        bool operator!=(__attribute__((unused)) const int x) const noexcept {
+        bool operator!=(const int x) const noexcept {
+            static_cast<void>(x); // unused parameter required as part of interface
             return true;
         }
     };

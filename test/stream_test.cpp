@@ -156,7 +156,8 @@ SCENARIO("I can append data to a stream", "[stream]") {
 
         THEN("Stream deletes oldest data when appending to a full stream") {
             auto temp_dir = aws::gg::test::utils::TempDir();
-            auto fs = std::make_shared<aws::gg::test::utils::SpyFileSystem>(std::make_shared<aws::gg::PosixFileSystem>(temp_dir.path()));
+            auto fs = std::make_shared<aws::gg::test::utils::SpyFileSystem>(
+                std::make_shared<aws::gg::PosixFileSystem>(temp_dir.path()));
             auto stream_or = open_stream(fs);
             REQUIRE(stream_or.ok());
             auto stream = std::move(stream_or.val());
@@ -180,7 +181,8 @@ SCENARIO("I can append data to a stream", "[stream]") {
 
         THEN("Stream fails when appending to a full stream") {
             auto temp_dir = aws::gg::test::utils::TempDir();
-            auto fs = std::make_shared<aws::gg::test::utils::SpyFileSystem>(std::make_shared<aws::gg::PosixFileSystem>(temp_dir.path()));
+            auto fs = std::make_shared<aws::gg::test::utils::SpyFileSystem>(
+                std::make_shared<aws::gg::PosixFileSystem>(temp_dir.path()));
             auto stream_or = open_stream(fs);
             REQUIRE(stream_or.ok());
             auto stream = std::move(stream_or.val());
@@ -222,10 +224,14 @@ SCENARIO("I can delete an iterator") {
         THEN("I checkpoint the iterator") {
             (*it).val().checkpoint();
 
-            THEN("I can delete the iterator") { REQUIRE(stream->deleteIterator("ita").ok()); }
+            THEN("I can delete the iterator") {
+                REQUIRE(stream->deleteIterator("ita").ok());
+            }
         }
 
-        THEN("I can delete the iterator") { REQUIRE(stream->deleteIterator("ita").ok()); }
+        THEN("I can delete the iterator") {
+            REQUIRE(stream->deleteIterator("ita").ok());
+        }
     }
 }
 

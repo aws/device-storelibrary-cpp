@@ -121,6 +121,10 @@ namespace kv __attribute__((visibility("default"))) {
             return _byte_position;
         }
     };
+
+    template <typename T> inline constexpr uint32_t smallSizeOf() {
+        return static_cast<uint32_t>(sizeof(T));
+    }
 } // namespace kv
 } // namespace gg
 } // namespace aws
