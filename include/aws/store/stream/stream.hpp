@@ -26,6 +26,9 @@ namespace gg __attribute__((visibility("default"))) {
         uint64_t sequence_number{};
 
         OwnedRecord() = default;
+
+        // coverity[autosar_cpp14_a15_4_3_violation] false positive, all implementations are noexcept
+        // coverity[misra_cpp_2008_rule_15_4_1_violation] false positive, implementation is noexcept
         OwnedRecord(OwnedSlice &&idata, const int64_t itimestamp, const uint64_t isequence_number,
                     const uint32_t ioffset) noexcept;
     };
@@ -57,6 +60,9 @@ namespace gg __attribute__((visibility("default"))) {
 
       public:
         CheckpointableOwnedRecord() = default;
+
+        // coverity[autosar_cpp14_a15_4_3_violation] false positive, all implementations are noexcept
+        // coverity[misra_cpp_2008_rule_15_4_1_violation] false positive, implementation is noexcept
         CheckpointableOwnedRecord(OwnedRecord &&o, std::function<StreamError(void)> &&checkpoint) noexcept;
         CheckpointableOwnedRecord(CheckpointableOwnedRecord &) = delete;
         CheckpointableOwnedRecord(CheckpointableOwnedRecord &&) = default;
@@ -77,8 +83,9 @@ namespace gg __attribute__((visibility("default"))) {
         StreamError checkpoint() const noexcept;
 
       public:
-        explicit Iterator(std::weak_ptr<StreamInterface> s, std::string id, const uint64_t seq) noexcept
-            : _stream(std::move(s)), _id(std::move(id)), sequence_number(seq){};
+        // coverity[autosar_cpp14_a15_4_3_violation] false positive, all implementations are noexcept
+        // coverity[misra_cpp_2008_rule_15_4_1_violation] false positive, implementation is noexcept
+        explicit Iterator(std::weak_ptr<StreamInterface> s, std::string id, const uint64_t seq) noexcept;
 
         Iterator(Iterator &) = delete;
 
@@ -92,30 +99,24 @@ namespace gg __attribute__((visibility("default"))) {
         int64_t timestamp = 0;
         uint64_t sequence_number = 0U;
 
-        // mutate in place and return this
-        Iterator &operator++() noexcept {
-            ++sequence_number;
-            timestamp = 0;
-            return *this;
-        }
+        /*
+         * mutate in place and return this
+         */
+        // coverity[autosar_cpp14_a15_4_3_violation] false positive, all implementations are noexcept
+        // coverity[misra_cpp_2008_rule_15_4_1_violation] false positive, implementation is noexcept
+        Iterator &operator++() noexcept;
 
+        // coverity[autosar_cpp14_a15_4_3_violation] false positive, all implementations are noexcept
+        // coverity[misra_cpp_2008_rule_15_4_1_violation] false positive, implementation is noexcept
         expected<CheckpointableOwnedRecord, StreamError> operator*() noexcept;
 
-        Iterator &&begin() noexcept {
-            return std::move(*this);
-        }
+        Iterator &&begin() noexcept;
 
-        /**
-         * The iterator never ends.
-         */
-        static int end() noexcept {
-            return 0;
-        }
+        static int end() noexcept;
 
-        bool operator!=(const int x) const noexcept {
-            static_cast<void>(x); // unused parameter required as part of interface
-            return true;
-        }
+        // coverity[autosar_cpp14_a15_4_3_violation] false positive, all implementations are noexcept
+        // coverity[misra_cpp_2008_rule_15_4_1_violation] false positive, implementation is noexcept
+        bool operator!=(const int x) const noexcept;
     };
 
     struct ReadOptions {

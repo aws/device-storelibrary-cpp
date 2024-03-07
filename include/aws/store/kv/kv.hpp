@@ -80,6 +80,8 @@ namespace kv __attribute__((visibility("default"))) {
         expected<uint32_t, KVError> readWrite(const uint32_t, std::pair<std::string, uint32_t> &, FileLike &) noexcept;
 
         // coverity[autosar_cpp14_a0_1_3_violation] false positive, the constructor is being used
+        // coverity[autosar_cpp14_a15_4_3_violation] false positive, all implementations are noexcept
+        // coverity[misra_cpp_2008_rule_15_4_1_violation] false positive, implementation is noexcept
         KV(KVOptions &&opts) noexcept;
 
         KVError initialize() noexcept;

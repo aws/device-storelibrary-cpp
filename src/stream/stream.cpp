@@ -5,10 +5,17 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <string>
 #include <utility>
 
 namespace aws {
 namespace gg {
+Iterator &Iterator::operator++() noexcept {
+    ++sequence_number;
+    timestamp = 0;
+    return *this;
+}
+
 expected<CheckpointableOwnedRecord, StreamError> Iterator::operator*() noexcept {
     if (const auto stream = _stream.lock()) {
         auto record_or = stream->read(sequence_number, ReadOptions{true, true, _offset});
@@ -23,6 +30,20 @@ expected<CheckpointableOwnedRecord, StreamError> Iterator::operator*() noexcept 
         return CheckpointableOwnedRecord{std::move(x), [this]() -> StreamError { return checkpoint(); }};
     }
     return StreamError{StreamErrorCode::StreamClosed, "Unable to read from destroyed stream"};
+}
+
+Iterator &&Iterator::begin() noexcept {
+    return std::move(*this);
+}
+
+// Iterator never ends
+int Iterator::end() noexcept {
+    return 0;
+}
+
+bool Iterator::operator!=(const int x) const noexcept {
+    static_cast<void>(x); // unused parameter required as part of interface
+    return true;
 }
 
 std::uint64_t StreamInterface::firstSequenceNumber() const noexcept {
@@ -43,6 +64,10 @@ StreamError Iterator::checkpoint() const noexcept {
         e = stream->setCheckpoint(_id, sequence_number);
     }
     return e;
+}
+
+Iterator::Iterator(std::weak_ptr<StreamInterface> s, std::string id, const uint64_t seq) noexcept
+    : _stream(std::move(s)), _id(std::move(id)), sequence_number(seq) {
 }
 
 int64_t timestamp() noexcept {
