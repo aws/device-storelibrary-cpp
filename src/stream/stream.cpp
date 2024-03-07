@@ -1,6 +1,10 @@
+#include <aws/store/common/expected.hpp>
 #include <aws/store/common/slices.hpp>
 #include <aws/store/stream/stream.hpp>
+#include <chrono>
+#include <cstdint>
 #include <functional>
+#include <memory>
 #include <utility>
 
 namespace aws {

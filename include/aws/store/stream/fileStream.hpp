@@ -18,6 +18,7 @@ namespace gg {
 struct LogEntryHeader;
 class FileSegment {
   public:
+    // coverity[autosar_cpp14_a15_4_3_violation] false positive, all implementations are noexcept
     // coverity[misra_cpp_2008_rule_15_4_1_violation] false positive, all implementations are noexcept
     FileSegment(const uint64_t base, std::shared_ptr<FileSystemInterface>, std::shared_ptr<logging::Logger>) noexcept;
 
@@ -70,6 +71,7 @@ class FileSegment {
 
 class PersistentIterator {
   public:
+    // coverity[autosar_cpp14_a15_4_3_violation] false positive, all implementations are noexcept
     // coverity[misra_cpp_2008_rule_15_4_1_violation] false positive, all implementations are noexcept
     PersistentIterator(std::string id, const uint64_t start, std::shared_ptr<kv::KV>) noexcept;
 
@@ -96,6 +98,7 @@ class __attribute__((visibility("default"))) FileStream : public StreamInterface
     std::vector<PersistentIterator> _iterators{};
     std::vector<FileSegment> _segments{};
 
+    // coverity[autosar_cpp14_a15_4_3_violation] false positive, all implementations are noexcept
     // coverity[misra_cpp_2008_rule_15_4_1_violation] false positive, implementation is also noexcept
     explicit FileStream(StreamOptions &&o) noexcept;
 

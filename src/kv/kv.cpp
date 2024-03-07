@@ -301,6 +301,7 @@ expected<OwnedSlice, KVError> KV::get(const std::string &key) const noexcept {
     return KVError{KVErrorCodes::KeyNotFound, {}};
 }
 
+// coverity[autosar_cpp14_a15_4_3_violation] false positive, declared as noexcept
 // coverity[misra_cpp_2008_rule_15_4_1_violation] false positive, declared as noexcept
 template <typename... Args> FileError KV::appendMultiple(const Args &...args) const noexcept {
     // Try to append any non-zero data, rolling back all appends if any fails by truncating the file.
