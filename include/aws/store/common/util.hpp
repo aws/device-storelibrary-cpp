@@ -8,7 +8,7 @@ namespace gg __attribute__((visibility("default"))) {
         E code;
         std::string msg;
 
-        bool ok() const {
+        inline bool ok() const {
             return code == E::NoError;
         }
     };

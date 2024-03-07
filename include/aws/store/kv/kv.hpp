@@ -112,14 +112,9 @@ namespace kv __attribute__((visibility("default"))) {
 
         expected<std::vector<std::string>, KVError> listKeys() const noexcept;
 
-        KVError compact() noexcept {
-            std::lock_guard<std::mutex> lock(_lock);
-            return compactNoLock();
-        }
+        KVError compact() noexcept;
 
-        std::uint32_t currentSizeBytes() const noexcept {
-            return _byte_position;
-        }
+        std::uint32_t currentSizeBytes() const noexcept;
     };
 
     template <typename T> inline constexpr uint32_t smallSizeOf() {

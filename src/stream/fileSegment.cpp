@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <aws/store/common/crc32.hpp>
 #include <aws/store/common/expected.hpp>
 #include <aws/store/common/logging.hpp>
@@ -6,7 +7,6 @@
 #include <aws/store/filesystem/filesystem.hpp>
 #include <aws/store/stream/fileStream.hpp>
 #include <aws/store/stream/stream.hpp>
-#include <algorithm>
 #include <climits>
 #include <cstdint>
 #include <cstring>

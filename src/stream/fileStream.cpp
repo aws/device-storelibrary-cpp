@@ -1,5 +1,12 @@
 #include <algorithm>
 #include <atomic>
+#include <aws/store/common/expected.hpp>
+#include <aws/store/common/slices.hpp>
+#include <aws/store/common/util.hpp>
+#include <aws/store/filesystem/filesystem.hpp>
+#include <aws/store/kv/kv.hpp>
+#include <aws/store/stream/fileStream.hpp>
+#include <aws/store/stream/stream.hpp>
 #include <cerrno>
 #include <cstdint>
 #include <cstdlib>
@@ -11,13 +18,6 @@
 #include <tuple>
 #include <utility>
 #include <vector>
-#include <aws/store/common/expected.hpp>
-#include <aws/store/common/slices.hpp>
-#include <aws/store/common/util.hpp>
-#include <aws/store/filesystem/filesystem.hpp>
-#include <aws/store/kv/kv.hpp>
-#include <aws/store/stream/fileStream.hpp>
-#include <aws/store/stream/stream.hpp>
 
 namespace aws {
 namespace gg {
@@ -156,6 +156,12 @@ expected<uint64_t, StreamError> FileStream::append(const BorrowedSlice d, const 
     _current_size_bytes += e.val();
 
     return seq;
+}
+
+FileStream::FileStream(StreamOptions &&o) noexcept : _opts(std::move(o)) {
+    _iterators.reserve(1U);
+    const auto toReserve = 1U + (_opts.maximum_size_bytes - 1U) / _opts.minimum_segment_size_bytes;
+    _segments.reserve(toReserve);
 }
 
 StreamError FileStream::removeSegmentsIfNewRecordBeyondMaxSize(const uint32_t record_size,

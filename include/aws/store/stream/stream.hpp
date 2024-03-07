@@ -1,12 +1,12 @@
 #pragma once
 
+#include <atomic>
 #include <aws/store/common/expected.hpp>
 #include <aws/store/common/logging.hpp>
 #include <aws/store/common/slices.hpp>
 #include <aws/store/common/util.hpp>
 #include <aws/store/filesystem/filesystem.hpp>
 #include <aws/store/kv/kv.hpp>
-#include <atomic>
 #include <cstdint>
 #include <functional>
 #include <string>
@@ -27,8 +27,7 @@ namespace gg __attribute__((visibility("default"))) {
 
         OwnedRecord() = default;
         OwnedRecord(OwnedSlice &&idata, const int64_t itimestamp, const uint64_t isequence_number,
-                    const uint32_t ioffset) noexcept
-            : offset(ioffset), data(std::move(idata)), timestamp(itimestamp), sequence_number(isequence_number){};
+                    const uint32_t ioffset) noexcept;
     };
 
     enum class StreamErrorCode : std::uint8_t {
@@ -58,8 +57,7 @@ namespace gg __attribute__((visibility("default"))) {
 
       public:
         CheckpointableOwnedRecord() = default;
-        CheckpointableOwnedRecord(OwnedRecord &&o, std::function<StreamError(void)> &&checkpoint) noexcept
-            : OwnedRecord(std::move(o)), _checkpoint(std::move(checkpoint)){};
+        CheckpointableOwnedRecord(OwnedRecord &&o, std::function<StreamError(void)> &&checkpoint) noexcept;
         CheckpointableOwnedRecord(CheckpointableOwnedRecord &) = delete;
         CheckpointableOwnedRecord(CheckpointableOwnedRecord &&) = default;
         ~CheckpointableOwnedRecord() = default;
@@ -67,9 +65,7 @@ namespace gg __attribute__((visibility("default"))) {
         CheckpointableOwnedRecord &operator=(CheckpointableOwnedRecord &&o) = default;
         CheckpointableOwnedRecord &operator=(CheckpointableOwnedRecord &) = delete;
 
-        void checkpoint() const noexcept {
-            _checkpoint();
-        }
+        void checkpoint() const noexcept;
     };
 
     class Iterator {
@@ -140,15 +136,9 @@ namespace gg __attribute__((visibility("default"))) {
         std::atomic_uint64_t _current_size_bytes{0U};
 
       public:
-        std::uint64_t firstSequenceNumber() const noexcept {
-            return _first_sequence_number;
-        };
-        std::uint64_t highestSequenceNumber() const noexcept {
-            return _next_sequence_number - 1U;
-        };
-        std::uint64_t currentSizeBytes() const noexcept {
-            return _current_size_bytes;
-        };
+        std::uint64_t firstSequenceNumber() const noexcept;
+        std::uint64_t highestSequenceNumber() const noexcept;
+        std::uint64_t currentSizeBytes() const noexcept;
         StreamInterface(StreamInterface &) = delete;
 
         /**
@@ -233,6 +223,18 @@ namespace gg __attribute__((visibility("default"))) {
         return StreamError{StreamErrorCode::StreamClosed, "Unable to read from destroyed stream"};
     }
 
+    inline std::uint64_t StreamInterface::firstSequenceNumber() const noexcept {
+        return _first_sequence_number;
+    }
+
+    inline std::uint64_t StreamInterface::highestSequenceNumber() const noexcept {
+        return _next_sequence_number - 1U;
+    }
+
+    inline std::uint64_t StreamInterface::currentSizeBytes() const noexcept {
+        return _current_size_bytes;
+    }
+
     inline StreamError Iterator::checkpoint() const noexcept {
         auto e = StreamError{StreamErrorCode::StreamClosed, "Unable to read from destroyed stream"};
         if (const auto stream = _stream.lock()) {
@@ -248,5 +250,19 @@ namespace gg __attribute__((visibility("default"))) {
     }
 
     static constexpr auto RecordNotFoundErrorStr = "Record not found";
+
+    inline OwnedRecord::OwnedRecord(OwnedSlice && idata, const int64_t itimestamp, const uint64_t isequence_number,
+                                    const uint32_t ioffset) noexcept
+        : offset(ioffset), data(std::move(idata)), timestamp(itimestamp), sequence_number(isequence_number) {
+    }
+
+    inline CheckpointableOwnedRecord::CheckpointableOwnedRecord(OwnedRecord && o,
+                                                                std::function<StreamError()> && checkpoint) noexcept
+        : OwnedRecord(std::move(o)), _checkpoint(std::move(checkpoint)) {
+    }
+
+    inline void CheckpointableOwnedRecord::checkpoint() const noexcept {
+        _checkpoint();
+    }
 } // namespace gg
 } // namespace aws

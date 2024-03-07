@@ -1,12 +1,12 @@
-#include <aws/store/kv/kv.hpp>
 #include <aws/store/common/crc32.hpp>
 #include <aws/store/common/expected.hpp>
-#include <aws/store/common/util.hpp>
 #include <aws/store/common/logging.hpp>
 #include <aws/store/common/slices.hpp>
+#include <aws/store/common/util.hpp>
 #include <aws/store/filesystem/filesystem.hpp>
-#include <cstring>
+#include <aws/store/kv/kv.hpp>
 #include <cstdint>
+#include <cstring>
 #include <iterator>
 #include <memory>
 #include <mutex>
@@ -281,6 +281,15 @@ expected<std::vector<std::string>, KVError> KV::listKeys() const noexcept {
     return keys;
 }
 
+KVError KV::compact() noexcept {
+    std::lock_guard<std::mutex> lock(_lock);
+    return compactNoLock();
+}
+
+std::uint32_t KV::currentSizeBytes() const noexcept {
+    return _byte_position;
+}
+
 expected<OwnedSlice, KVError> KV::get(const std::string &key) const noexcept {
     std::lock_guard<std::mutex> lock(_lock);
 
@@ -292,6 +301,7 @@ expected<OwnedSlice, KVError> KV::get(const std::string &key) const noexcept {
     return KVError{KVErrorCodes::KeyNotFound, {}};
 }
 
+// coverity[misra_cpp_2008_rule_15_4_1_violation] false positive, declared as noexcept
 template <typename... Args> FileError KV::appendMultiple(const Args &...args) const noexcept {
     // Try to append any non-zero data, rolling back all appends if any fails by truncating the file.
     for (auto arg : {args...}) {

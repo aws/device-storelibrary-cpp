@@ -18,6 +18,7 @@ namespace gg {
 struct LogEntryHeader;
 class FileSegment {
   public:
+    // coverity[misra_cpp_2008_rule_15_4_1_violation] false positive, all implementations are noexcept
     FileSegment(const uint64_t base, std::shared_ptr<FileSystemInterface>, std::shared_ptr<logging::Logger>) noexcept;
 
     FileSegment(FileSegment &&s) = default;
@@ -69,6 +70,7 @@ class FileSegment {
 
 class PersistentIterator {
   public:
+    // coverity[misra_cpp_2008_rule_15_4_1_violation] false positive, all implementations are noexcept
     PersistentIterator(std::string id, const uint64_t start, std::shared_ptr<kv::KV>) noexcept;
 
     uint64_t getSequenceNumber() const noexcept {
@@ -94,11 +96,7 @@ class __attribute__((visibility("default"))) FileStream : public StreamInterface
     std::vector<PersistentIterator> _iterators{};
     std::vector<FileSegment> _segments{};
 
-    explicit FileStream(StreamOptions &&o) noexcept : _opts(std::move(o)) {
-        _iterators.reserve(1U);
-        const auto toReserve = 1U + (_opts.maximum_size_bytes - 1U) / _opts.minimum_segment_size_bytes;
-        _segments.reserve(toReserve);
-    }
+    explicit FileStream(StreamOptions &&o) noexcept;
 
     StreamError removeSegmentsIfNewRecordBeyondMaxSize(const uint32_t record_size,
                                                        const bool remove_oldest_segments_if_full) noexcept;
