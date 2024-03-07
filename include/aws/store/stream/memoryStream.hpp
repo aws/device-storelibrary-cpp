@@ -1,7 +1,7 @@
 #pragma once
-#include "aws/store/common/expected.hpp"
-#include "aws/store/common/slices.hpp"
-#include "aws/store/stream/stream.hpp"
+#include <aws/store/common/expected.hpp>
+#include <aws/store/common/slices.hpp>
+#include <aws/store/stream/stream.hpp>
 #include <cstdint>
 #include <memory>
 #include <string>

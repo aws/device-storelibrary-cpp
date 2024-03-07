@@ -1,8 +1,8 @@
 #pragma once
 
-#include "aws/store/common/expected.hpp"
-#include "aws/store/common/slices.hpp"
-#include "aws/store/common/util.hpp"
+#include <aws/store/common/expected.hpp>
+#include <aws/store/common/slices.hpp>
+#include <aws/store/common/util.hpp>
 #include <cstdint>
 #include <string>
 #include <vector>

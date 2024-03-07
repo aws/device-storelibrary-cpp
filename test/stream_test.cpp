@@ -1,5 +1,5 @@
-#include "aws/store/filesystem/posixFileSystem.hpp"
-#include "aws/store/stream/fileStream.hpp"
+#include <aws/store/filesystem/posixFileSystem.hpp>
+#include <aws/store/stream/fileStream.hpp>
 #include "test_utils.hpp"
 #include <catch2/catch_test_macros.hpp>
 #include <fstream>

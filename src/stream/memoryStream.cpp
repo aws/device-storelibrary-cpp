@@ -1,5 +1,7 @@
-#include "aws/store/stream/memoryStream.hpp"
-#include "aws/store/stream/stream.hpp"
+#include <aws/store/stream/memoryStream.hpp>
+#include <aws/store/stream/stream.hpp>
+#include <aws/store/common/expected.hpp>
+#include <aws/store/common/slices.hpp>
 #include <algorithm>
 #include <atomic>
 #include <tuple>

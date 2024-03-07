@@ -1,10 +1,5 @@
-#include "aws/store/stream/fileStream.hpp"
-#include "aws/store/common/util.hpp"
-#include "aws/store/kv/kv.hpp"
-#include "aws/store/stream/stream.hpp"
 #include <algorithm>
 #include <atomic>
-#include <aws/store/common/expected.hpp>
 #include <cerrno>
 #include <cstdint>
 #include <cstdlib>
@@ -13,6 +8,13 @@
 #include <string>
 #include <tuple>
 #include <utility>
+#include <aws/store/common/expected.hpp>
+#include <aws/store/common/slices.hpp>
+#include <aws/store/common/util.hpp>
+#include <aws/store/kv/kv.hpp>
+#include <aws/store/filesystem/filesystem.hpp>
+#include <aws/store/stream/fileStream.hpp>
+#include <aws/store/stream/stream.hpp>
 
 namespace aws {
 namespace gg {
