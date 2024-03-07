@@ -207,62 +207,8 @@ namespace gg __attribute__((visibility("default"))) {
         kv::KVOptions kv_options = {false, file_implementation, logger, "kv", 128 * 1024};
     };
 
-    inline expected<CheckpointableOwnedRecord, StreamError> Iterator::operator*() noexcept {
-        if (const auto stream = _stream.lock()) {
-            auto record_or = stream->read(sequence_number, ReadOptions{true, true, _offset});
-            if (!record_or.ok()) {
-                return record_or.err();
-            }
-            auto x = std::move(record_or.val());
-            timestamp = x.timestamp;
-            _offset = x.offset + x.data.size();
-            sequence_number = x.sequence_number;
-            // coverity[autosar_cpp14_a7_1_7_violation] defining lambda inline
-            return CheckpointableOwnedRecord{std::move(x), [this]() -> StreamError { return checkpoint(); }};
-        }
-        return StreamError{StreamErrorCode::StreamClosed, "Unable to read from destroyed stream"};
-    }
-
-    inline std::uint64_t StreamInterface::firstSequenceNumber() const noexcept {
-        return _first_sequence_number;
-    }
-
-    inline std::uint64_t StreamInterface::highestSequenceNumber() const noexcept {
-        return _next_sequence_number - 1U;
-    }
-
-    inline std::uint64_t StreamInterface::currentSizeBytes() const noexcept {
-        return _current_size_bytes;
-    }
-
-    inline StreamError Iterator::checkpoint() const noexcept {
-        auto e = StreamError{StreamErrorCode::StreamClosed, "Unable to read from destroyed stream"};
-        if (const auto stream = _stream.lock()) {
-            e = stream->setCheckpoint(_id, sequence_number);
-        }
-        return e;
-    }
-
-    inline int64_t timestamp() {
-        return std::chrono::duration_cast<std::chrono::milliseconds>(
-                   std::chrono::system_clock::now().time_since_epoch())
-            .count();
-    }
+    int64_t timestamp() noexcept;
 
     static constexpr auto RecordNotFoundErrorStr = "Record not found";
-
-    inline OwnedRecord::OwnedRecord(OwnedSlice && idata, const int64_t itimestamp, const uint64_t isequence_number,
-                                    const uint32_t ioffset) noexcept
-        : offset(ioffset), data(std::move(idata)), timestamp(itimestamp), sequence_number(isequence_number) {
-    }
-
-    inline CheckpointableOwnedRecord::CheckpointableOwnedRecord(OwnedRecord && o,
-                                                                std::function<StreamError()> && checkpoint) noexcept
-        : OwnedRecord(std::move(o)), _checkpoint(std::move(checkpoint)) {
-    }
-
-    inline void CheckpointableOwnedRecord::checkpoint() const noexcept {
-        _checkpoint();
-    }
 } // namespace gg
 } // namespace aws

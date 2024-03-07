@@ -79,8 +79,7 @@ namespace kv __attribute__((visibility("default"))) {
 
         expected<uint32_t, KVError> readWrite(const uint32_t, std::pair<std::string, uint32_t> &, FileLike &) noexcept;
 
-        KV(KVOptions &&opts) noexcept : _opts(std::move(opts)), _shadow_name(_opts.identifier + "s") {
-        }
+        KV(KVOptions &&opts) noexcept;
 
         KVError initialize() noexcept;
 

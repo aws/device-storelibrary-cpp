@@ -96,6 +96,7 @@ class __attribute__((visibility("default"))) FileStream : public StreamInterface
     std::vector<PersistentIterator> _iterators{};
     std::vector<FileSegment> _segments{};
 
+    // coverity[misra_cpp_2008_rule_15_4_1_violation] false positive, implementation is also noexcept
     explicit FileStream(StreamOptions &&o) noexcept;
 
     StreamError removeSegmentsIfNewRecordBeyondMaxSize(const uint32_t record_size,

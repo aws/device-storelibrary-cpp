@@ -48,6 +48,7 @@ add_library(
     include/aws/store/common/util.hpp
     include/aws/store/common/logging.hpp
     src/stream/fileSegment.cpp
+    src/stream/stream.cpp
 )
 set_target_properties(greenlake_stream PROPERTIES LINKER_LANGUAGE CXX)
 target_link_libraries(greenlake_stream PUBLIC greenlake_kv)

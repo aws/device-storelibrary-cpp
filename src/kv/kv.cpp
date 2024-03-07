@@ -417,6 +417,9 @@ expected<uint32_t, KVError> KV::readWrite(const uint32_t begin, std::pair<std::s
     return smallSizeOf<detail::KVHeader>() + header.key_length + header.value_length;
 }
 
+KV::KV(KVOptions &&opts) noexcept : _opts(std::move(opts)), _shadow_name(_opts.identifier + "s") {
+}
+
 KVError KV::compactNoLock() noexcept {
     // Remove any previous partially written shadow
     _opts.filesystem_implementation->remove(_shadow_name);
