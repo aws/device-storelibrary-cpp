@@ -6,11 +6,14 @@
 #include <aws/store/common/slices.hpp>
 #include <aws/store/filesystem/filesystem.hpp>
 #include <cstring>
+#include <cstdint>
 #include <iterator>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <tuple>
 #include <utility>
+#include <vector>
 
 namespace aws {
 namespace gg {

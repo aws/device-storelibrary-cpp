@@ -5,14 +5,17 @@
 #include <cstdlib>
 #include <cstring>
 #include <iterator>
+#include <memory>
+#include <mutex>
 #include <string>
 #include <tuple>
 #include <utility>
+#include <vector>
 #include <aws/store/common/expected.hpp>
 #include <aws/store/common/slices.hpp>
 #include <aws/store/common/util.hpp>
-#include <aws/store/kv/kv.hpp>
 #include <aws/store/filesystem/filesystem.hpp>
+#include <aws/store/kv/kv.hpp>
 #include <aws/store/stream/fileStream.hpp>
 #include <aws/store/stream/stream.hpp>
 
