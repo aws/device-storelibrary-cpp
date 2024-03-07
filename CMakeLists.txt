@@ -5,6 +5,7 @@ set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
 include(cmake/ClangTidy.cmake)
+include(cmake/CPPCheck.cmake)
 include(cmake/CMakeFormat.cmake)
 
 option(STORE_USE_LTO "Build using LTO in release mode" ON)
@@ -35,6 +36,7 @@ if(NOT CMAKE_BUILD_TYPE MATCHES "Debug")
 endif()
 target_clangformat_setup(greenlake_kv)
 target_clangtidy_setup(greenlake_kv)
+target_cppcheck_setup(greenlake_kv)
 
 add_library(
     greenlake_stream
@@ -60,6 +62,7 @@ if(NOT CMAKE_BUILD_TYPE MATCHES "Debug")
 endif()
 target_clangformat_setup(greenlake_stream)
 target_clangtidy_setup(greenlake_stream)
+target_cppcheck_setup(greenlake_stream)
 
 include(GNUInstallDirs)
 install(TARGETS greenlake_kv greenlake_stream LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
@@ -77,6 +80,7 @@ if(STORE_BUILD_EXAMPLE)
     endif()
     target_clangformat_setup(greenlake_example)
     target_clangtidy_setup(greenlake_example)
+    target_cppcheck_setup(greenlake_example)
 
     if(CMAKE_BUILD_TYPE MATCHES "Debug")
         include(cmake/Sanitizers.cmake)
