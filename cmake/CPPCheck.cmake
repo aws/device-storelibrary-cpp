@@ -15,16 +15,17 @@ endif()
 
 function(target_cppcheck_setup target_name)
     if(EXISTS ${CPPCHECK_EXECUTABLE})
-        list(APPEND
-                CPP_CHECK_OPTS
-                ${CPPCHECK_EXECUTABLE}
-                "--enable=warning,performance,portability,missingInclude"
-                "--inconclusive"
-                "--force"
-                "--inline-suppr"
-                "--suppress=missingIncludeSystem"
-                "--suppressions-list=${CMAKE_SOURCE_DIR}/CppCheckSuppressions.txt"
-                "--error-exitcode=1"
+        list(
+            APPEND
+            CPP_CHECK_OPTS
+            ${CPPCHECK_EXECUTABLE}
+            "--enable=warning,performance,portability,missingInclude"
+            "--inconclusive"
+            "--force"
+            "--inline-suppr"
+            "--suppress=missingIncludeSystem"
+            "--suppressions-list=${CMAKE_SOURCE_DIR}/CppCheckSuppressions.txt"
+            "--error-exitcode=1"
         )
         set_target_properties(${target_name} PROPERTIES CXX_CPPCHECK "${CPP_CHECK_OPTS}")
     endif()

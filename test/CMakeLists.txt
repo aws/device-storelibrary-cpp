@@ -16,7 +16,7 @@ list(APPEND CMAKE_MODULE_PATH ${Catch2_SOURCE_DIR}/extras)
 add_executable(tests kv_test.cpp test_utils.cpp test_utils.hpp stream_test.cpp)
 target_link_libraries(tests PRIVATE Catch2::Catch2WithMain greenlake_stream)
 target_clangformat_setup(tests)
-target_compile_options(tests PRIVATE -Wall -Wextra -Werror -pedantic)
+target_compile_options(tests PRIVATE ${STORE_COMPILE_FLAGS})
 
 if(CMAKE_BUILD_TYPE MATCHES "Debug")
     include(../cmake/Sanitizers.cmake)

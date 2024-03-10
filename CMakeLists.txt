@@ -14,6 +14,29 @@ if(CMAKE_BUILD_TYPE MATCHES "Release" AND STORE_USE_LTO)
     message("IPO enabled, debugging will not work")
 endif()
 
+if(MSVC)
+    list(APPEND STORE_COMPILE_FLAGS "/EHs-c-" "/D_HAS_EXCEPTIONS=0" "/Wall" "/WX")
+    if(NOT CMAKE_BUILD_TYPE MATCHES "Debug")
+        # Keep RTTI in debug for UBSan
+        list(APPEND STORE_COMPILE_FLAGS "/GR-")
+    endif()
+else()
+    list(
+        APPEND
+        STORE_COMPILE_FLAGS
+        "-fno-exceptions"
+        "-Wall"
+        "-Wextra"
+        "-Werror"
+        "-Wconversion"
+        "-pedantic"
+    )
+    if(NOT CMAKE_BUILD_TYPE MATCHES "Debug")
+        # Keep RTTI in debug for UBSan
+        list(APPEND STORE_COMPILE_FLAGS "-fno-rtti")
+    endif()
+endif()
+
 include(cmake/ClangFormat.cmake)
 
 add_library(
@@ -27,13 +50,8 @@ add_library(
     src/kv/kv.cpp
     include/aws/store/common/logging.hpp
 )
-set_target_properties(greenlake_kv PROPERTIES LINKER_LANGUAGE CXX)
 target_include_directories(greenlake_kv PUBLIC include)
-target_compile_options(greenlake_kv PRIVATE -fno-exceptions -Wall -Wextra -Werror -Wconversion -pedantic)
-if(NOT CMAKE_BUILD_TYPE MATCHES "Debug")
-    # Keep RTTI in debug for UBSan
-    target_compile_options(greenlake_kv PRIVATE -fno-rtti)
-endif()
+target_compile_options(greenlake_kv PRIVATE ${STORE_COMPILE_FLAGS})
 target_clangformat_setup(greenlake_kv)
 target_clangtidy_setup(greenlake_kv)
 target_cppcheck_setup(greenlake_kv)
@@ -53,13 +71,8 @@ add_library(
     src/stream/fileSegment.cpp
     src/stream/stream.cpp
 )
-set_target_properties(greenlake_stream PROPERTIES LINKER_LANGUAGE CXX)
 target_link_libraries(greenlake_stream PUBLIC greenlake_kv)
-target_compile_options(greenlake_stream PRIVATE -fno-exceptions -Wall -Wextra -Werror -Wconversion -pedantic)
-if(NOT CMAKE_BUILD_TYPE MATCHES "Debug")
-    # Keep RTTI in debug for UBSan
-    target_compile_options(greenlake_stream PRIVATE -fno-rtti)
-endif()
+target_compile_options(greenlake_stream PRIVATE ${STORE_COMPILE_FLAGS})
 target_clangformat_setup(greenlake_stream)
 target_clangtidy_setup(greenlake_stream)
 target_cppcheck_setup(greenlake_stream)
@@ -73,11 +86,7 @@ if(STORE_BUILD_EXAMPLE)
     set(CMAKE_CXX_STANDARD 17)
     add_executable(greenlake_example include/aws/store/filesystem/posixFileSystem.hpp src/main.cpp)
     target_link_libraries(greenlake_example PRIVATE greenlake_stream)
-    target_compile_options(greenlake_example PRIVATE -fno-exceptions -Wall -Wextra -Werror -Wconversion -pedantic)
-    if(NOT CMAKE_BUILD_TYPE MATCHES "Debug")
-        # Keep RTTI in debug for UBSan
-        target_compile_options(greenlake_example PRIVATE -fno-rtti)
-    endif()
+    target_compile_options(greenlake_example PRIVATE ${STORE_COMPILE_FLAGS})
     target_clangformat_setup(greenlake_example)
     target_clangtidy_setup(greenlake_example)
     target_cppcheck_setup(greenlake_example)
@@ -96,9 +105,12 @@ if(STORE_BUILD_EXAMPLE)
 
     # Setup a default target that runs when no target is specified.
     add_custom_target(default DEPENDS greenlake_example)
-    if(TARGET cmakeformat)
-        add_dependencies(default cmakeformat)
-    endif()
+else()
+    # Setup a default target that runs when no target is specified.
+    add_custom_target(default DEPENDS greenlake_stream)
+endif()
+if(TARGET cmakeformat)
+    add_dependencies(default cmakeformat)
 endif()
 
 option(STORE_BUILD_TESTS "Build tests" ON)

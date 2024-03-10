@@ -17,20 +17,20 @@ namespace aws {
 namespace gg {
 namespace test {
 namespace utils {
-static void random_string(std::string &s, const int len) {
+static void random_string(std::string &s, const size_t len) {
     static std::random_device rd;
     static std::mt19937 mt(rd());
     static std::uniform_int_distribution<int> dist(0, 25);
     s.reserve(len);
-    for (int i = 0; i < len; ++i) {
-        s.push_back('a' + dist(mt));
+    for (size_t i = 0; i < len; ++i) {
+        s.push_back('a' + static_cast<char>(dist(mt)));
     }
 }
 
 // TODO consider making Catch generator for filled-up KV store
-__attribute__((unused)) static auto generate_key_values(const int count) {
+__attribute__((unused)) static auto generate_key_values(const size_t count) {
     std::vector<std::pair<std::string, std::string>> key_values;
-    for (auto i = 0; i < count; i++) {
+    for (auto i = 0U; i < count; i++) {
         std::string key;
         random_string(key, 512);
 

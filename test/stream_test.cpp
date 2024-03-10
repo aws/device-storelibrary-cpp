@@ -58,7 +58,7 @@ static auto open_stream(const std::shared_ptr<aws::gg::FileSystemInterface> &fs)
 static constexpr auto log_header_size = 32;
 
 static auto read_stream_values_by_segment(std::shared_ptr<aws::gg::test::utils::SpyFileSystem> fs,
-                                          std::filesystem::path temp_dir_path, int value_size) {
+                                          std::filesystem::path temp_dir_path, uint32_t value_size) {
     auto files_or = fs->list();
     REQUIRE(files_or.ok());
     auto files = std::move(files_or.val());
@@ -71,7 +71,7 @@ static auto read_stream_values_by_segment(std::shared_ptr<aws::gg::test::utils::
         auto file_or = fs->open(temp_dir_path / f);
         REQUIRE(file_or.ok());
         std::vector<std::string> values;
-        auto pos = 0;
+        auto pos = 0U;
         while (true) {
             pos += log_header_size;
             auto val_or = file_or.val()->read(pos, pos + value_size);
@@ -333,7 +333,7 @@ SCENARIO("Stream detects and recovers from corruption", "[stream]") {
     }
 
     // sanity check: verify we can read all values in the stream
-    for (auto i = 0; i < num_stream_values; i++) {
+    for (auto i = 0U; i < num_stream_values; i++) {
         REQUIRE(stream->read(i, aws::gg::ReadOptions{}).ok());
     }
 
@@ -360,7 +360,7 @@ SCENARIO("Stream detects and recovers from corruption", "[stream]") {
             REQUIRE(val_or.val().data.string() == first_segment->second[0]);
 
             // rest of the current segment is unreadable
-            for (auto i = 1; i < static_cast<int>(first_segment->second.size()); i++) {
+            for (auto i = 1U; i < first_segment->second.size(); i++) {
                 auto data_or = stream->read(i, aws::gg::ReadOptions{});
                 REQUIRE(!data_or.ok());
                 REQUIRE(data_or.err().code == aws::gg::StreamErrorCode::RecordNotFound);
@@ -394,7 +394,7 @@ SCENARIO("Stream detects and recovers from corruption", "[stream]") {
                         REQUIRE(val_or.val().data.string() == first_segment->second[0]);
 
                         // rest of the current segment is unreadable
-                        for (auto i = 1; i < static_cast<int>(first_segment->second.size()); i++) {
+                        for (auto i = 1U; i < first_segment->second.size(); i++) {
                             auto data_or = stream->read(i, aws::gg::ReadOptions{});
                             REQUIRE(!data_or.ok());
                             REQUIRE(data_or.err().code == aws::gg::StreamErrorCode::RecordNotFound);

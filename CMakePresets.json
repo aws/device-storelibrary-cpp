@@ -105,6 +105,17 @@
         "CMAKE_BUILD_TYPE": "Release",
         "BUILD_SHARED_LIBS": "OFF"
       }
+    },
+    {
+      "name": "libs-minsizerel",
+      "displayName": "MinSizeRel",
+      "inherits": "conf-common",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "MinSizeRel",
+        "BUILD_SHARED_LIBS": "ON",
+        "STORE_BUILD_TESTS": "OFF",
+        "STORE_BUILD_EXAMPLE": "OFF"
+      }
     }
   ],
   "testPresets": [

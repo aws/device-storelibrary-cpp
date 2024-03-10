@@ -181,7 +181,7 @@ SCENARIO("I can detect a corrupt KV map value", "[kv]") {
         auto kv = std::move(kv_or.val());
 
         // populate the map with random keys and values
-        auto num_entries = 10;
+        auto num_entries = 10U;
         auto test_data = aws::gg::test::utils::generate_key_values(num_entries);
         for (const auto &key_value : test_data) {
             auto e = kv->put(key_value.first, aws::gg::BorrowedSlice{key_value.second});
@@ -197,8 +197,8 @@ SCENARIO("I can detect a corrupt KV map value", "[kv]") {
 
             // entries are stored as [header, key, value]
             // seek next to last key and overwrite it
-            auto offset = 0;
-            for (auto i = 0; i < num_entries - 2; i++) {
+            auto offset = 0UL;
+            for (auto i = 0U; i < num_entries - 2; i++) {
                 offset += sizeof(aws::gg::kv::detail::KVHeader);
                 offset += test_data[i].first.size();
                 offset += test_data[i].second.size();
@@ -224,7 +224,7 @@ SCENARIO("I can detect a corrupt KV map value", "[kv]") {
                     kv = std::move(kv_or.val());
 
                     THEN("KeyNotFound for corrupted Key and rest of the store is untouched") {
-                        for (auto i = 0; i < num_entries; i++) {
+                        for (auto i = 0U; i < num_entries; i++) {
                             if (i == num_entries - 2) {
                                 v_or = kv->get(test_data[i].first);
                                 REQUIRE(!v_or.ok());
@@ -246,13 +246,14 @@ SCENARIO("I can detect a corrupt KV map value", "[kv]") {
 
             // entries are stored as [header, key, value]
             // seek next to last value and overwrite it
-            auto offset = 0;
-            for (auto i = 0; i < num_entries - 2; i++) {
+            auto offset = 0UL;
+            for (auto i = 0U; i < num_entries - 2; i++) {
                 offset += sizeof(aws::gg::kv::detail::KVHeader);
                 offset += test_data[i].first.size();
                 offset += test_data[i].second.size();
             }
-            file.seekp(offset + sizeof(aws::gg::kv::detail::KVHeader) + test_data[num_entries - 1].first.size());
+            file.seekp(static_cast<std::streamoff>(offset + aws::gg::kv::smallSizeOf<aws::gg::kv::detail::KVHeader>() +
+                                                   test_data[num_entries - 1].first.size()));
 
             std::string corrupted_value = "value";
             file.write(corrupted_value.c_str(), static_cast<std::streamsize>(corrupted_value.size()));
@@ -277,7 +278,7 @@ SCENARIO("I can detect a corrupt KV map value", "[kv]") {
                         }
 
                         AND_THEN("Rest of store is untouched") {
-                            for (auto i = 0; i < num_entries - 2; i++) {
+                            for (auto i = 0U; i < num_entries - 2; i++) {
                                 v_or = kv->get(test_data[i].first);
                                 REQUIRE(v_or.ok());
                                 REQUIRE(v_or.val().string() == test_data[i].second);
@@ -298,7 +299,7 @@ SCENARIO("KV store with multiple values per key is corrupted", "[kv]") {
 
         auto kv = std::move(kv_or.val());
 
-        auto num_unique_keys = 2;
+        auto num_unique_keys = 2U;
 
         auto test_data = aws::gg::test::utils::generate_key_values(num_unique_keys);
         for (const auto &key_value : test_data) {
@@ -323,8 +324,8 @@ SCENARIO("KV store with multiple values per key is corrupted", "[kv]") {
             REQUIRE(file);
 
             // entries are stored as [header, key, value]
-            auto offset = 0;
-            for (auto i = 0; i < num_unique_keys; i++) {
+            auto offset = 0UL;
+            for (auto i = 0U; i < num_unique_keys; i++) {
                 offset += sizeof(aws::gg::kv::detail::KVHeader);
                 offset += test_data[i].first.size();
                 offset += test_data[i].second.size();
@@ -378,7 +379,7 @@ SCENARIO("I can detect a corrupt KV map header", "[kv]") {
         auto kv = std::move(kv_or.val());
 
         // populate the map with random keys and values
-        auto num_entries = 10;
+        auto num_entries = 10U;
         auto test_data = aws::gg::test::utils::generate_key_values(num_entries);
         for (const auto &key_value : test_data) {
             auto e = kv->put(key_value.first, aws::gg::BorrowedSlice{key_value.second});
@@ -394,8 +395,8 @@ SCENARIO("I can detect a corrupt KV map header", "[kv]") {
 
             // entries are stored as [header, key, value]
             // seek to last header and overwrite it
-            auto offset = 0;
-            for (auto i = 0; i < num_entries - 2; i++) {
+            auto offset = 0UL;
+            for (auto i = 0U; i < num_entries - 2; i++) {
                 offset += sizeof(aws::gg::kv::detail::KVHeader);
                 offset += test_data[i].first.size();
                 offset += test_data[i].second.size();
@@ -425,7 +426,7 @@ SCENARIO("I can detect a corrupt KV map header", "[kv]") {
                         }
 
                         AND_THEN("Rest of store is untouched") {
-                            for (auto i = 0; i < num_entries - 2; i++) {
+                            for (auto i = 0U; i < num_entries - 2; i++) {
                                 v_or = kv->get(test_data[i].first);
                                 REQUIRE(v_or.ok());
                                 REQUIRE(v_or.val().string() == test_data[i].second);
