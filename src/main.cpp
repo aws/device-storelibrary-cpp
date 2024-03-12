@@ -18,12 +18,12 @@ void do_memory() {
     printf("resident size max: %lu KB\n", (rusage.ru_maxrss) / 1024);
 }
 
-class MyLogger final : public aws::gg::logging::Logger {
-    void log(const aws::gg::logging::LogLevel l, const std::string &msg) const override {
+class MyLogger final : public aws::store::logging::Logger {
+    void log(const aws::store::logging::LogLevel l, const std::string &msg) const override {
         if (l < level) {
             return;
         }
-        if (l >= aws::gg::logging::LogLevel::Warning) {
+        if (l >= aws::store::logging::LogLevel::Warning) {
             std::cerr << l << " " << msg << std::endl;
         } else {
             std::cout << l << " " << msg << std::endl;
@@ -45,11 +45,12 @@ int main() {
 
     auto start = std::chrono::high_resolution_clock::now();
     {
-        auto fs = std::make_shared<aws::gg::PosixFileSystem>(std::filesystem::current_path() / "stream1");
+        auto fs =
+            std::make_shared<aws::store::filesystem::PosixFileSystem>(std::filesystem::current_path() / "stream1");
         auto logger = std::make_shared<MyLogger>();
 
         if (use_kv) {
-            auto kv_or = aws::gg::kv::KV::openOrCreate(aws::gg::kv::KVOptions{
+            auto kv_or = aws::store::kv::KV::openOrCreate(aws::store::kv::KVOptions{
                 false,
                 fs,
                 logger,
@@ -62,17 +63,18 @@ int main() {
             }
             auto kv = kv_or.val();
             for (int i = 0; i < NUM_RECORDS; i++) {
-                auto x = kv->put("key" + std::to_string(i), aws::gg::BorrowedSlice{data.data(), data.size()});
+                auto x =
+                    kv->put("key" + std::to_string(i), aws::store::common::BorrowedSlice{data.data(), data.size()});
             }
         } else {
             // auto s = MemoryStream::openOrCreate(StreamOptions{.maximum_size_bytes = 500 * 1024 * 1024});
-            auto s_or = aws::gg::FileStream::openOrCreate(aws::gg::StreamOptions{
+            auto s_or = aws::store::stream::FileStream::openOrCreate(aws::store::stream::StreamOptions{
                 1024 * 1024,
                 10 * 1024 * 1024,
                 false,
                 fs,
                 logger,
-                aws::gg::kv::KVOptions{
+                aws::store::kv::KVOptions{
                     false,
                     fs,
                     logger,
@@ -87,22 +89,23 @@ int main() {
             auto s = s_or.val();
 
             std::cout << "loaded checkpoint: "
-                      << s->openOrCreateIterator("a", aws::gg::IteratorOptions{}).sequence_number << std::endl;
+                      << s->openOrCreateIterator("a", aws::store::stream::IteratorOptions{}).sequence_number
+                      << std::endl;
 
-            aws::gg::expected<uint64_t, aws::gg::StreamError> last_sequence_number{0};
+            aws::store::common::Expected<uint64_t, aws::store::stream::StreamError> last_sequence_number{0};
             for (int i = 0; i < NUM_RECORDS; i++) {
-                last_sequence_number =
-                    s->append(aws::gg::BorrowedSlice{data.data(), data.size()}, aws::gg::AppendOptions{});
+                last_sequence_number = s->append(aws::store::common::BorrowedSlice{data.data(), data.size()},
+                                                 aws::store::stream::AppendOptions{});
             }
 
-            auto last_record_or = s->read(last_sequence_number.val(), aws::gg::ReadOptions{});
+            auto last_record_or = s->read(last_sequence_number.val(), aws::store::stream::ReadOptions{});
             if (last_record_or.ok()) {
                 std::cout << last_record_or.val().data.string() << std::endl;
             } else {
                 std::cerr << last_record_or.err().msg << std::endl;
             }
 
-            for (auto r : s->openOrCreateIterator("a", aws::gg::IteratorOptions{})) {
+            for (auto r : s->openOrCreateIterator("a", aws::store::stream::IteratorOptions{})) {
                 if (r.ok()) {
                     // Do something with the record....
                     // std::cout << r.val().sequence_number << std::endl;
@@ -113,11 +116,13 @@ int main() {
                 }
             }
 
-            std::cout << "last checkpoint: " << s->openOrCreateIterator("a", aws::gg::IteratorOptions{}).sequence_number
+            std::cout << "last checkpoint: "
+                      << s->openOrCreateIterator("a", aws::store::stream::IteratorOptions{}).sequence_number
                       << std::endl;
             (void)s->deleteIterator("a");
             std::cout << "after deleting iterator: "
-                      << s->openOrCreateIterator("a", aws::gg::IteratorOptions{}).sequence_number << std::endl;
+                      << s->openOrCreateIterator("a", aws::store::stream::IteratorOptions{}).sequence_number
+                      << std::endl;
         }
     }
 

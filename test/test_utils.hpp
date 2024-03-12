@@ -14,7 +14,7 @@
 #include <variant>
 
 namespace aws {
-namespace gg {
+namespace store {
 namespace test {
 namespace utils {
 static void random_string(std::string &s, const size_t len) {
@@ -95,30 +95,31 @@ template <typename X, typename Y> struct RemoveMembership<X Y::*> {
 
 struct CallRealMethod {};
 
-class SpyFileLike : public aws::gg::FileLike {
+class SpyFileLike : public store::filesystem::FileLike {
   private:
-    std::unique_ptr<aws::gg::FileLike> _real;
+    std::unique_ptr<FileLike> _real;
     std::list<std::pair<std::string, std::variant<CallRealMethod, std::any>>> _mocks{};
 
   public:
-    using ReadType = std::function<RemoveMembership<decltype(&aws::gg::FileLike::read)>::type>;
-    using AppendType = std::function<RemoveMembership<decltype(&aws::gg::FileLike::append)>::type>;
-    using FlushType = std::function<RemoveMembership<decltype(&aws::gg::FileLike::flush)>::type>;
-    using SyncType = std::function<RemoveMembership<decltype(&aws::gg::FileLike::sync)>::type>;
-    using TruncateType = std::function<RemoveMembership<decltype(&aws::gg::FileLike::truncate)>::type>;
+    using ReadType = std::function<RemoveMembership<decltype(&FileLike::read)>::type>;
+    using AppendType = std::function<RemoveMembership<decltype(&FileLike::append)>::type>;
+    using FlushType = std::function<RemoveMembership<decltype(&FileLike::flush)>::type>;
+    using SyncType = std::function<RemoveMembership<decltype(&FileLike::sync)>::type>;
+    using TruncateType = std::function<RemoveMembership<decltype(&FileLike::truncate)>::type>;
 
-    static aws::gg::expected<std::unique_ptr<aws::gg::FileLike>, aws::gg::FileError>
-    create(aws::gg::expected<std::unique_ptr<aws::gg::FileLike>, aws::gg::FileError> e) {
+    static common::Expected<std::unique_ptr<FileLike>, filesystem::FileError>
+    create(common::Expected<std::unique_ptr<FileLike>, filesystem::FileError> e) {
         if (e.ok()) {
             return {std::make_unique<SpyFileLike>(std::move(e.val()))};
         }
         return std::move(e.err());
     }
 
-    SpyFileLike(std::unique_ptr<aws::gg::FileLike> f) : _real(std::move(f)) {
+    SpyFileLike(std::unique_ptr<FileLike> f) : _real(std::move(f)) {
     }
 
-    aws::gg::expected<aws::gg::OwnedSlice, aws::gg::FileError> read(const uint32_t begin, const uint32_t end) override {
+    common::Expected<common::OwnedSlice, filesystem::FileError> read(const uint32_t begin,
+                                                                     const uint32_t end) override {
         if (!_mocks.empty() && _mocks.front().first == "read") {
             const auto mock = _mocks.front();
             _mocks.pop_front();
@@ -130,7 +131,7 @@ class SpyFileLike : public aws::gg::FileLike {
         return _real->read(begin, end);
     }
 
-    aws::gg::FileError append(const aws::gg::BorrowedSlice data) override {
+    filesystem::FileError append(const common::BorrowedSlice data) override {
         if (!_mocks.empty() && _mocks.front().first == "append") {
             const auto mock = _mocks.front();
             _mocks.pop_front();
@@ -142,7 +143,7 @@ class SpyFileLike : public aws::gg::FileLike {
         return _real->append(data);
     }
 
-    aws::gg::FileError flush() override {
+    filesystem::FileError flush() override {
         if (!_mocks.empty() && _mocks.front().first == "flush") {
             const auto mock = _mocks.front();
             _mocks.pop_front();
@@ -166,7 +167,7 @@ class SpyFileLike : public aws::gg::FileLike {
         _real->sync();
     }
 
-    aws::gg::FileError truncate(const uint32_t s) override {
+    filesystem::FileError truncate(const uint32_t s) override {
         if (!_mocks.empty() && _mocks.front().first == "truncate") {
             const auto mock = _mocks.front();
             _mocks.pop_front();
@@ -189,23 +190,23 @@ class SpyFileLike : public aws::gg::FileLike {
     }
 };
 
-class SpyFileSystem : public aws::gg::FileSystemInterface {
+class SpyFileSystem : public filesystem::FileSystemInterface {
   private:
     std::list<std::pair<std::string, std::variant<CallRealMethod, std::any>>> _mocks{};
 
   public:
-    std::shared_ptr<aws::gg::FileSystemInterface> real;
+    std::shared_ptr<FileSystemInterface> real;
 
-    using OpenType = std::function<RemoveMembership<decltype(&aws::gg::FileSystemInterface::open)>::type>;
-    using ExistsType = std::function<RemoveMembership<decltype(&aws::gg::FileSystemInterface::exists)>::type>;
-    using RenameType = std::function<RemoveMembership<decltype(&aws::gg::FileSystemInterface::rename)>::type>;
-    using RemoveType = std::function<RemoveMembership<decltype(&aws::gg::FileSystemInterface::remove)>::type>;
-    using ListType = std::function<RemoveMembership<decltype(&aws::gg::FileSystemInterface::list)>::type>;
+    using OpenType = std::function<RemoveMembership<decltype(&FileSystemInterface::open)>::type>;
+    using ExistsType = std::function<RemoveMembership<decltype(&FileSystemInterface::exists)>::type>;
+    using RenameType = std::function<RemoveMembership<decltype(&FileSystemInterface::rename)>::type>;
+    using RemoveType = std::function<RemoveMembership<decltype(&FileSystemInterface::remove)>::type>;
+    using ListType = std::function<RemoveMembership<decltype(&FileSystemInterface::list)>::type>;
 
-    SpyFileSystem(std::shared_ptr<aws::gg::FileSystemInterface> real) : real(std::move(real)) {
+    SpyFileSystem(std::shared_ptr<FileSystemInterface> real) : real(std::move(real)) {
     }
 
-    aws::gg::expected<std::unique_ptr<aws::gg::FileLike>, aws::gg::FileError>
+    common::Expected<std::unique_ptr<filesystem::FileLike>, filesystem::FileError>
     open(const std::string &identifier) override {
         if (!_mocks.empty() && _mocks.front().first == "open") {
             const auto mock = _mocks.front();
@@ -230,7 +231,7 @@ class SpyFileSystem : public aws::gg::FileSystemInterface {
         return real->exists(identifier);
     };
 
-    aws::gg::FileError rename(const std::string &old_id, const std::string &new_id) override {
+    filesystem::FileError rename(const std::string &old_id, const std::string &new_id) override {
         if (!_mocks.empty() && _mocks.front().first == "rename") {
             const auto mock = _mocks.front();
             _mocks.pop_front();
@@ -242,7 +243,7 @@ class SpyFileSystem : public aws::gg::FileSystemInterface {
         return real->rename(old_id, new_id);
     };
 
-    aws::gg::FileError remove(const std::string &id) override {
+    filesystem::FileError remove(const std::string &id) override {
         if (!_mocks.empty() && _mocks.front().first == "remove") {
             const auto mock = _mocks.front();
             _mocks.pop_front();
@@ -254,7 +255,7 @@ class SpyFileSystem : public aws::gg::FileSystemInterface {
         return real->remove(id);
     };
 
-    aws::gg::expected<std::vector<std::string>, aws::gg::FileError> list() override {
+    common::Expected<std::vector<std::string>, filesystem::FileError> list() override {
         if (!_mocks.empty() && _mocks.front().first == "list") {
             const auto mock = _mocks.front();
             _mocks.pop_front();
@@ -278,5 +279,5 @@ class SpyFileSystem : public aws::gg::FileSystemInterface {
 };
 } // namespace utils
 } // namespace test
-} // namespace gg
+} // namespace store
 } // namespace aws

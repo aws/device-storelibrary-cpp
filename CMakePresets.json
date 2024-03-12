@@ -114,7 +114,7 @@
         "CMAKE_BUILD_TYPE": "MinSizeRel",
         "BUILD_SHARED_LIBS": "ON",
         "STORE_BUILD_TESTS": "OFF",
-        "STORE_BUILD_EXAMPLE": "OFF"
+        "STORE_BUILD_EXAMPLE": "ON"
       }
     }
   ],

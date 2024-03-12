@@ -4,59 +4,59 @@
 #include <string>
 
 namespace aws {
-namespace gg {
-namespace logging __attribute__((visibility("default"))) {
-    enum class LogLevel : std::uint8_t {
-        Disabled,
-        Trace,
-        Debug,
-        Info,
-        Warning,
-        Error,
-    };
+namespace store {
+namespace logging {
+enum class LogLevel : std::uint8_t {
+    Disabled,
+    Trace,
+    Debug,
+    Info,
+    Warning,
+    Error,
+};
 
-    static std::string str(const LogLevel level) {
-        std::string v{};
-        switch (level) {
-        case LogLevel::Disabled:
-            v = "Disabled";
-            break;
-        case LogLevel::Trace:
-            v = "Trace";
-            break;
-        case LogLevel::Debug:
-            v = "Debug";
-            break;
-        case LogLevel::Info:
-            v = "Info";
-            break;
-        case LogLevel::Warning:
-            v = "Warning";
-            break;
-        case LogLevel::Error:
-            v = "Error";
-            break;
-        }
-
-        return v;
+static std::string str(const LogLevel level) {
+    std::string v{};
+    switch (level) {
+    case LogLevel::Disabled:
+        v = "Disabled";
+        break;
+    case LogLevel::Trace:
+        v = "Trace";
+        break;
+    case LogLevel::Debug:
+        v = "Debug";
+        break;
+    case LogLevel::Info:
+        v = "Info";
+        break;
+    case LogLevel::Warning:
+        v = "Warning";
+        break;
+    case LogLevel::Error:
+        v = "Error";
+        break;
     }
 
-    // coverity[autosar_cpp14_a13_2_2_violation] The design of << is such that we should return a reference
-    inline std::ostream &operator<<(std::ostream &out, const LogLevel level) {
-        out << str(level);
-        // coverity[misra_cpp_2008_rule_7_5_3_violation] The design of << is such that we should return a reference
-        return out;
-    }
+    return v;
+}
 
-    class Logger {
-      public:
-        LogLevel level{LogLevel::Info};
+// coverity[autosar_cpp14_a13_2_2_violation] The design of << is such that we should return a reference
+inline std::ostream &operator<<(std::ostream &out, const LogLevel level) {
+    out << str(level);
+    // coverity[misra_cpp_2008_rule_7_5_3_violation] The design of << is such that we should return a reference
+    return out;
+}
 
-        Logger() = default;
-        virtual ~Logger() = default;
+class Logger {
+  public:
+    LogLevel level{LogLevel::Info};
 
-        virtual void log(LogLevel, const std::string &) const = 0;
-    };
+    Logger() = default;
+    virtual ~Logger() = default;
+
+    virtual void log(LogLevel, const std::string &) const = 0;
+};
 } // namespace logging
-} // namespace gg
+} // namespace store
 } // namespace aws

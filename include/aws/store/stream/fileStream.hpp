@@ -13,14 +13,16 @@
 #include <vector>
 
 namespace aws {
-namespace gg {
+namespace store {
+namespace stream {
 
 struct LogEntryHeader;
 class FileSegment {
   public:
     // coverity[autosar_cpp14_a15_4_3_violation] false positive, all implementations are noexcept
     // coverity[misra_cpp_2008_rule_15_4_1_violation] false positive, all implementations are noexcept
-    FileSegment(const uint64_t base, std::shared_ptr<FileSystemInterface>, std::shared_ptr<logging::Logger>) noexcept;
+    FileSegment(const uint64_t base, std::shared_ptr<filesystem::FileSystemInterface>,
+                std::shared_ptr<logging::Logger>) noexcept;
 
     FileSegment(FileSegment &&s) = default;
     FileSegment &operator=(FileSegment &&s) = default;
@@ -36,10 +38,10 @@ class FileSegment {
         return _base_seq_num < other._base_seq_num;
     }
 
-    expected<uint64_t, FileError> append(const BorrowedSlice d, const int64_t timestamp_ms,
-                                         const uint64_t sequence_number, const bool sync) noexcept;
+    common::Expected<uint64_t, filesystem::FileError> append(const common::BorrowedSlice d, const int64_t timestamp_ms,
+                                                             const uint64_t sequence_number, const bool sync) noexcept;
 
-    expected<OwnedRecord, StreamError> read(const uint64_t sequence_number, const ReadOptions &) const noexcept;
+    common::Expected<OwnedRecord, StreamError> read(const uint64_t sequence_number, const ReadOptions &) const noexcept;
 
     void remove() noexcept;
 
@@ -56,20 +58,20 @@ class FileSegment {
     }
 
   private:
-    std::unique_ptr<FileLike> _f;
-    std::shared_ptr<FileSystemInterface> _file_implementation{};
+    std::unique_ptr<filesystem::FileLike> _f;
+    std::shared_ptr<filesystem::FileSystemInterface> _file_implementation{};
     std::shared_ptr<logging::Logger> _logger;
     std::uint64_t _base_seq_num{1U};
     std::uint64_t _highest_seq_num{0U};
     std::uint32_t _total_bytes{0U};
     std::string _segment_id;
 
-    static LogEntryHeader convertSliceToHeader(const OwnedSlice &) noexcept;
+    static LogEntryHeader convertSliceToHeader(const common::OwnedSlice &) noexcept;
 
     void truncateAndLog(const uint32_t truncate, const StreamError &err) const noexcept;
 };
 
-class PersistentIterator {
+class __attribute__((visibility("default"))) PersistentIterator {
   public:
     // coverity[autosar_cpp14_a15_4_3_violation] false positive, all implementations are noexcept
     // coverity[misra_cpp_2008_rule_15_4_1_violation] false positive, all implementations are noexcept
@@ -108,12 +110,14 @@ class __attribute__((visibility("default"))) FileStream : public StreamInterface
     StreamError loadExistingSegments() noexcept;
 
   public:
-    static expected<std::shared_ptr<FileStream>, StreamError> openOrCreate(StreamOptions &&) noexcept;
+    static common::Expected<std::shared_ptr<FileStream>, StreamError> openOrCreate(StreamOptions &&) noexcept;
 
-    expected<uint64_t, StreamError> append(const BorrowedSlice, const AppendOptions &) noexcept override;
-    expected<uint64_t, StreamError> append(OwnedSlice &&, const AppendOptions &) noexcept override;
+    common::Expected<uint64_t, StreamError> append(const common::BorrowedSlice,
+                                                   const AppendOptions &) noexcept override;
 
-    expected<OwnedRecord, StreamError> read(const uint64_t, const ReadOptions &) const noexcept override;
+    common::Expected<uint64_t, StreamError> append(common::OwnedSlice &&, const AppendOptions &) noexcept override;
+
+    common::Expected<OwnedRecord, StreamError> read(const uint64_t, const ReadOptions &) const noexcept override;
 
     Iterator openOrCreateIterator(const std::string &identifier, IteratorOptions) noexcept override;
     StreamError deleteIterator(const std::string &identifier) noexcept override;
@@ -123,5 +127,6 @@ class __attribute__((visibility("default"))) FileStream : public StreamInterface
     ~FileStream() override = default;
 };
 
-} // namespace gg
+} // namespace stream
+} // namespace store
 } // namespace aws

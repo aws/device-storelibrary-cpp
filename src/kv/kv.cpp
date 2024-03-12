@@ -16,11 +16,11 @@
 #include <vector>
 
 namespace aws {
-namespace gg {
+namespace store {
 namespace kv {
 constexpr static uint8_t DELETED_FLAG = 0x01U;
 
-expected<std::shared_ptr<KV>, KVError> KV::openOrCreate(KVOptions &&o) noexcept {
+common::Expected<std::shared_ptr<KV>, KVError> KV::openOrCreate(KVOptions &&o) noexcept {
     auto opts = std::move(o);
     if (opts.identifier.empty()) {
         return KVError{KVErrorCodes::InvalidArguments, "Identifier cannot be empty"};
@@ -183,34 +183,34 @@ inline void KV::addOrRemoveKeyInInitialization(const std::string &key, const uin
     }
 }
 
-static KVError fileErrorToKVError(const FileError &e) {
+static KVError fileErrorToKVError(const filesystem::FileError &e) {
     auto v = KVError{KVErrorCodes::NoError, e.msg};
     switch (e.code) {
-    case FileErrorCode::NoError:
+    case filesystem::FileErrorCode::NoError:
         v = KVError{KVErrorCodes::NoError, e.msg};
         break;
-    case FileErrorCode::InvalidArguments:
+    case filesystem::FileErrorCode::InvalidArguments:
         v = KVError{KVErrorCodes::InvalidArguments, e.msg};
         break;
-    case FileErrorCode::EndOfFile:
+    case filesystem::FileErrorCode::EndOfFile:
         v = KVError{KVErrorCodes::EndOfFile, e.msg};
         break;
-    case FileErrorCode::AccessDenied:
+    case filesystem::FileErrorCode::AccessDenied:
         v = KVError{KVErrorCodes::WriteError, e.msg};
         break;
-    case FileErrorCode::TooManyOpenFiles:
+    case filesystem::FileErrorCode::TooManyOpenFiles:
         v = KVError{KVErrorCodes::WriteError, e.msg};
         break;
-    case FileErrorCode::DiskFull:
+    case filesystem::FileErrorCode::DiskFull:
         v = KVError{KVErrorCodes::DiskFull, e.msg};
         break;
-    case FileErrorCode::FileDoesNotExist:
+    case filesystem::FileErrorCode::FileDoesNotExist:
         v = KVError{KVErrorCodes::ReadError, e.msg};
         break;
-    case FileErrorCode::IOError:
+    case filesystem::FileErrorCode::IOError:
         v = KVError{KVErrorCodes::ReadError, e.msg};
         break;
-    case FileErrorCode::Unknown:
+    case filesystem::FileErrorCode::Unknown:
         v = KVError{KVErrorCodes::ReadError, e.msg};
         break;
     }
@@ -218,7 +218,7 @@ static KVError fileErrorToKVError(const FileError &e) {
     return v;
 }
 
-expected<detail::KVHeader, KVError> KV::readHeaderFrom(const uint32_t begin) const noexcept {
+common::Expected<detail::KVHeader, KVError> KV::readHeaderFrom(const uint32_t begin) const noexcept {
     auto header_or = _f->read(begin, begin + smallSizeOf<detail::KVHeader>());
     if (!header_or.ok()) {
         return fileErrorToKVError(header_or.err());
@@ -235,8 +235,8 @@ expected<detail::KVHeader, KVError> KV::readHeaderFrom(const uint32_t begin) con
     return ret;
 }
 
-expected<std::string, KVError> KV::readKeyFrom(const uint32_t begin,
-                                               const detail::key_length_type key_length) const noexcept {
+common::Expected<std::string, KVError> KV::readKeyFrom(const uint32_t begin,
+                                                       const detail::key_length_type key_length) const noexcept {
     auto key_or =
         _f->read(begin + smallSizeOf<detail::KVHeader>(), begin + smallSizeOf<detail::KVHeader>() + key_length);
     if (!key_or.ok()) {
@@ -245,7 +245,7 @@ expected<std::string, KVError> KV::readKeyFrom(const uint32_t begin,
     return key_or.val().string();
 }
 
-expected<OwnedSlice, KVError> KV::readValueFrom(const uint32_t begin) const noexcept {
+common::Expected<common::OwnedSlice, KVError> KV::readValueFrom(const uint32_t begin) const noexcept {
     auto header_or = readHeaderFrom(begin);
     if (!header_or.ok()) {
         return header_or.err();
@@ -253,24 +253,25 @@ expected<OwnedSlice, KVError> KV::readValueFrom(const uint32_t begin) const noex
     return readValueFrom(begin, header_or.val());
 }
 
-expected<OwnedSlice, KVError> KV::readValueFrom(const uint32_t begin, const detail::KVHeader &header) const noexcept {
+common::Expected<common::OwnedSlice, KVError> KV::readValueFrom(const uint32_t begin,
+                                                                const detail::KVHeader &header) const noexcept {
     auto value_or = _f->read(begin + smallSizeOf<detail::KVHeader>() + header.key_length,
                              begin + smallSizeOf<detail::KVHeader>() + header.key_length + header.value_length);
     if (!value_or.ok()) {
         return fileErrorToKVError(value_or.err());
     }
-    const auto crc = crc32::crc32_of(BorrowedSlice{&header.flags, sizeof(header.flags)},
-                                     BorrowedSlice{&header.key_length, sizeof(header.key_length)},
-                                     BorrowedSlice{&header.value_length, sizeof(header.value_length)},
-                                     BorrowedSlice{value_or.val().data(), value_or.val().size()});
+    const auto crc = common::crc32::crc32_of(common::BorrowedSlice{&header.flags, sizeof(header.flags)},
+                                             common::BorrowedSlice{&header.key_length, sizeof(header.key_length)},
+                                             common::BorrowedSlice{&header.value_length, sizeof(header.value_length)},
+                                             common::BorrowedSlice{value_or.val().data(), value_or.val().size()});
 
     if (crc != header.crc32) {
         return KVError{KVErrorCodes::DataCorrupted, "CRC mismatch"};
     }
-    return std::move(value_or.val());
+    return common::Expected<common::OwnedSlice, KVError>{std::move(value_or.val())};
 }
 
-expected<std::vector<std::string>, KVError> KV::listKeys() const noexcept {
+common::Expected<std::vector<std::string>, KVError> KV::listKeys() const noexcept {
     std::lock_guard<std::mutex> lock(_lock);
 
     std::vector<std::string> keys{};
@@ -290,7 +291,7 @@ std::uint32_t KV::currentSizeBytes() const noexcept {
     return _byte_position;
 }
 
-expected<OwnedSlice, KVError> KV::get(const std::string &key) const noexcept {
+common::Expected<common::OwnedSlice, KVError> KV::get(const std::string &key) const noexcept {
     std::lock_guard<std::mutex> lock(_lock);
 
     for (const auto &point : _key_pointers) {
@@ -303,7 +304,7 @@ expected<OwnedSlice, KVError> KV::get(const std::string &key) const noexcept {
 
 // coverity[autosar_cpp14_a15_4_3_violation] false positive, declared as noexcept
 // coverity[misra_cpp_2008_rule_15_4_1_violation] false positive, declared as noexcept
-template <typename... Args> FileError KV::appendMultiple(const Args &...args) const noexcept {
+template <typename... Args> filesystem::FileError KV::appendMultiple(const Args &...args) const noexcept {
     // Try to append any non-zero data, rolling back all appends if any fails by truncating the file.
     for (auto arg : {args...}) {
         if (arg.size() > 0) {
@@ -319,25 +320,27 @@ template <typename... Args> FileError KV::appendMultiple(const Args &...args) co
         std::ignore = _f->truncate(_byte_position);
         return e;
     }
-    return FileError{FileErrorCode::NoError, {}};
+    return filesystem::FileError{filesystem::FileErrorCode::NoError, {}};
 }
 
-inline KVError KV::writeEntry(const std::string &key, const BorrowedSlice data, const uint8_t flags) const noexcept {
+inline KVError KV::writeEntry(const std::string &key, const common::BorrowedSlice data,
+                              const uint8_t flags) const noexcept {
     const auto key_len = static_cast<detail::key_length_type>(key.length());
     const auto value_len = data.size();
 
-    const auto crc =
-        crc32::crc32_of(BorrowedSlice{&flags, sizeof(flags)}, BorrowedSlice{&key_len, sizeof(key_len)},
-                        BorrowedSlice{&value_len, sizeof(value_len)}, BorrowedSlice{data.data(), data.size()});
+    const auto crc = store::common::crc32::crc32_of(
+        common::BorrowedSlice{&flags, sizeof(flags)}, common::BorrowedSlice{&key_len, sizeof(key_len)},
+        common::BorrowedSlice{&value_len, sizeof(value_len)}, common::BorrowedSlice{data.data(), data.size()});
 
     const auto header = detail::KVHeader{
         detail::MAGIC_AND_VERSION, flags, key_len, crc, value_len,
     };
 
-    return fileErrorToKVError(appendMultiple(BorrowedSlice(&header, sizeof(header)), BorrowedSlice{key}, data));
+    return fileErrorToKVError(
+        appendMultiple(common::BorrowedSlice(&header, sizeof(header)), common::BorrowedSlice{key}, data));
 }
 
-KVError KV::put(const std::string &key, const BorrowedSlice data) noexcept {
+KVError KV::put(const std::string &key, const common::BorrowedSlice data) noexcept {
     if (key.empty()) {
         return KVError{KVErrorCodes::InvalidArguments, "Key cannot be empty"};
     }
@@ -388,8 +391,8 @@ KVError KV::maybeCompact() noexcept {
     return KVError{KVErrorCodes::NoError, {}};
 }
 
-expected<uint32_t, KVError> KV::readWrite(const uint32_t begin, std::pair<std::string, uint32_t> &p,
-                                          FileLike &f) noexcept {
+common::Expected<uint32_t, KVError> KV::readWrite(const uint32_t begin, std::pair<std::string, uint32_t> &p,
+                                                  filesystem::FileLike &f) noexcept {
     auto header_or = readHeaderFrom(p.second);
     if (!header_or.ok()) {
         return header_or.err();
@@ -401,15 +404,15 @@ expected<uint32_t, KVError> KV::readWrite(const uint32_t begin, std::pair<std::s
     }
     const auto value = std::move(value_or.val());
 
-    auto e = f.append(BorrowedSlice{&header, sizeof(header)});
+    auto e = f.append(common::BorrowedSlice{&header, sizeof(header)});
     if (!e.ok()) {
         return fileErrorToKVError(e);
     }
-    e = f.append(BorrowedSlice{p.first});
+    e = f.append(common::BorrowedSlice{p.first});
     if (!e.ok()) {
         return fileErrorToKVError(e);
     }
-    e = f.append(BorrowedSlice{value.data(), value.size()});
+    e = f.append(common::BorrowedSlice{value.data(), value.size()});
     if (!e.ok()) {
         return fileErrorToKVError(e);
     }
@@ -502,7 +505,7 @@ KVError KV::remove(const std::string &key) noexcept {
         return KVError{KVErrorCodes::KeyNotFound, {}};
     }
 
-    auto e = writeEntry(key, BorrowedSlice{}, DELETED_FLAG);
+    auto e = writeEntry(key, common::BorrowedSlice{}, DELETED_FLAG);
     if (!e.ok()) {
         return e;
     }
@@ -514,5 +517,5 @@ KVError KV::remove(const std::string &key) noexcept {
     return maybeCompact();
 }
 } // namespace kv
-} // namespace gg
+} // namespace store
 } // namespace aws

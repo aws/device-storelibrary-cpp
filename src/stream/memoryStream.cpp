@@ -13,13 +13,15 @@
 #include <vector>
 
 namespace aws {
-namespace gg {
+namespace store {
+namespace stream {
 std::shared_ptr<MemoryStream> MemoryStream::openOrCreate(StreamOptions &&opts) noexcept {
     // coverity[autosar_cpp14_a20_8_6_violation] constructor is private, cannot use make_shared
     return std::shared_ptr<MemoryStream>(new MemoryStream(std::move(opts)));
 }
 
-expected<uint64_t, StreamError> MemoryStream::append(const BorrowedSlice d, const AppendOptions &) noexcept {
+common::Expected<uint64_t, StreamError> MemoryStream::append(const common::BorrowedSlice d,
+                                                             const AppendOptions &) noexcept {
     const auto record_size = d.size();
     auto err = remove_records_if_new_record_beyond_max_size(record_size);
     if (!err.ok()) {
@@ -28,7 +30,7 @@ expected<uint64_t, StreamError> MemoryStream::append(const BorrowedSlice d, cons
 
     auto seq = _next_sequence_number.fetch_add(1U);
     _current_size_bytes += d.size();
-    _records.emplace_back(OwnedSlice(d), timestamp(), seq, 0);
+    _records.emplace_back(common::OwnedSlice(d), timestamp(), seq, 0);
     return seq;
 }
 
@@ -57,7 +59,7 @@ StreamError MemoryStream::remove_records_if_new_record_beyond_max_size(const uin
     return StreamError{StreamErrorCode::NoError, {}};
 }
 
-expected<uint64_t, StreamError> MemoryStream::append(OwnedSlice &&d, const AppendOptions &) noexcept {
+common::Expected<uint64_t, StreamError> MemoryStream::append(common::OwnedSlice &&d, const AppendOptions &) noexcept {
     auto data = std::move(d);
     const auto record_size = data.size();
     auto err = remove_records_if_new_record_beyond_max_size(record_size);
@@ -71,8 +73,8 @@ expected<uint64_t, StreamError> MemoryStream::append(OwnedSlice &&d, const Appen
     return seq;
 }
 
-expected<OwnedRecord, StreamError> MemoryStream::read(const uint64_t sequence_number,
-                                                      const ReadOptions &) const noexcept {
+common::Expected<OwnedRecord, StreamError> MemoryStream::read(const uint64_t sequence_number,
+                                                              const ReadOptions &) const noexcept {
     if (sequence_number < _first_sequence_number) {
         return StreamError{StreamErrorCode::RecordNotFound, RecordNotFoundErrorStr};
     }
@@ -83,7 +85,7 @@ expected<OwnedRecord, StreamError> MemoryStream::read(const uint64_t sequence_nu
         if (r.sequence_number == sequence_number) {
             return OwnedRecord{
                 // TODO: This is copying the data because the file-based version needs to return an owned record
-                OwnedSlice{BorrowedSlice(r.data.data(), r.data.size())},
+                common::OwnedSlice{common::BorrowedSlice(r.data.data(), r.data.size())},
                 r.timestamp,
                 r.sequence_number,
                 0U,
@@ -109,5 +111,6 @@ StreamError MemoryStream::setCheckpoint(const std::string &identifier, const uin
     return StreamError{StreamErrorCode::NoError, {}};
 }
 
-} // namespace gg
+} // namespace stream
+} // namespace store
 } // namespace aws

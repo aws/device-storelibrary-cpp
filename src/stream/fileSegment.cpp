@@ -23,7 +23,8 @@
 #define IS_LITTLE_ENDIAN (*(const uint16_t *)"\0\1" >> 8)
 
 namespace aws {
-namespace gg {
+namespace store {
+namespace stream {
 
 static constexpr int UINT64_MAX_DECIMAL_COUNT = 19;
 
@@ -78,10 +79,10 @@ struct LogEntryHeader {
 
 static_assert(sizeof(LogEntryHeader) == HEADER_SIZE, "Header size must be 32 bytes!");
 
-static std::string string(const StreamErrorCode e) noexcept {
+static std::string string(const store::stream::StreamErrorCode e) noexcept {
     std::string v{};
     switch (e) {
-    case StreamErrorCode::NoError:
+    case store::stream::StreamErrorCode::NoError:
         v = "NoError";
         break;
     case StreamErrorCode::RecordNotFound:
@@ -124,7 +125,7 @@ static std::string string(const StreamErrorCode e) noexcept {
     return v;
 }
 
-FileSegment::FileSegment(const uint64_t base, std::shared_ptr<FileSystemInterface> interface,
+FileSegment::FileSegment(const uint64_t base, std::shared_ptr<filesystem::FileSystemInterface> interface,
                          std::shared_ptr<logging::Logger> logger) noexcept
     : _file_implementation(std::move(interface)), _logger(std::move(logger)), _base_seq_num(base),
       _highest_seq_num(base) {
@@ -159,7 +160,7 @@ StreamError FileSegment::open(const bool full_corruption_check_on_open) noexcept
     while (true) {
         const auto header_data_or = _f->read(offset, offset + HEADER_SIZE);
         if (!header_data_or.ok()) {
-            if (header_data_or.err().code == FileErrorCode::EndOfFile) {
+            if (header_data_or.err().code == filesystem::FileErrorCode::EndOfFile) {
                 // If we reached the end of the file, there could have been extra data at the end, but less
                 // than what we were hoping to read. Truncate the file now so that everything before this point
                 // is known valid and everything after is gone.
@@ -193,7 +194,7 @@ StreamError FileSegment::open(const bool full_corruption_check_on_open) noexcept
     }
 }
 
-LogEntryHeader FileSegment::convertSliceToHeader(const OwnedSlice &data) noexcept {
+LogEntryHeader FileSegment::convertSliceToHeader(const common::OwnedSlice &data) noexcept {
     LogEntryHeader header{};
     // coverity[autosar_cpp14_a12_0_2_violation] Use memcpy instead of reinterpret cast to avoid UB.
     std::ignore = memcpy(&header, data.data(), sizeof(LogEntryHeader));
@@ -209,14 +210,16 @@ LogEntryHeader FileSegment::convertSliceToHeader(const OwnedSlice &data) noexcep
     return header;
 }
 
-expected<uint64_t, FileError> FileSegment::append(const BorrowedSlice d, const int64_t timestamp_ms,
-                                                  const uint64_t sequence_number, const bool sync) noexcept {
+common::Expected<uint64_t, filesystem::FileError> FileSegment::append(const common::BorrowedSlice d,
+                                                                      const int64_t timestamp_ms,
+                                                                      const uint64_t sequence_number,
+                                                                      const bool sync) noexcept {
     const auto ts = static_cast<int64_t>(my_htonll(static_cast<std::uint64_t>(timestamp_ms)));
     const auto data_len_swap = static_cast<int32_t>(my_htonl(d.size()));
     const auto byte_position = static_cast<int32_t>(my_htonl(_total_bytes));
 
-    const auto crc = static_cast<int64_t>(my_htonll(
-        crc32::crc32_of(BorrowedSlice{&ts, sizeof(ts)}, BorrowedSlice{&data_len_swap, sizeof(data_len_swap)}, d)));
+    const auto crc = static_cast<int64_t>(my_htonll(store::common::crc32::crc32_of(
+        common::BorrowedSlice{&ts, sizeof(ts)}, common::BorrowedSlice{&data_len_swap, sizeof(data_len_swap)}, d)));
     const auto header = LogEntryHeader{
         static_cast<int32_t>(my_htonl(static_cast<std::uint32_t>(MAGIC_AND_VERSION))),
         static_cast<int32_t>(my_htonl(static_cast<std::uint32_t>(sequence_number - _base_seq_num))),
@@ -228,7 +231,7 @@ expected<uint64_t, FileError> FileSegment::append(const BorrowedSlice d, const i
 
     // If an error happens when appending, truncate the file to the current size so that we don't have any
     // partial data in the file, and then return the error.
-    auto e = _f->append(BorrowedSlice{&header, sizeof(header)});
+    auto e = _f->append(common::BorrowedSlice{&header, sizeof(header)});
     if (!e.ok()) {
         std::ignore = _f->truncate(_total_bytes);
         return e;
@@ -254,8 +257,8 @@ expected<uint64_t, FileError> FileSegment::append(const BorrowedSlice d, const i
     return d.size() + sizeof(LogEntryHeader);
 }
 
-expected<OwnedRecord, StreamError> FileSegment::read(const uint64_t sequence_number,
-                                                     const ReadOptions &read_options) const noexcept {
+common::Expected<OwnedRecord, StreamError> FileSegment::read(const uint64_t sequence_number,
+                                                             const ReadOptions &read_options) const noexcept {
     // We will try to find the record by reading the segment starting at the offset.
     // If a suggested starting position within the segment was suggested to us, we start from further into the file.
     // If any error occurs with the suggested starting point, we will restart from the beginning of the file.
@@ -272,7 +275,7 @@ expected<OwnedRecord, StreamError> FileSegment::read(const uint64_t sequence_num
                 suggested_start = false;
                 continue;
             }
-            if (header_data_or.err().code == FileErrorCode::EndOfFile) {
+            if (header_data_or.err().code == filesystem::FileErrorCode::EndOfFile) {
                 return StreamError{StreamErrorCode::RecordNotFound, RecordNotFoundErrorStr};
             }
             return StreamError{StreamErrorCode::ReadError, header_data_or.err().msg};
@@ -305,10 +308,10 @@ expected<OwnedRecord, StreamError> FileSegment::read(const uint64_t sequence_num
             const auto ts_swap = static_cast<int64_t>(my_htonll(static_cast<std::uint64_t>(header.timestamp)));
 
             if (read_options.check_for_corruption &&
-                (header.crc !=
-                 static_cast<int64_t>(crc32::crc32_of(BorrowedSlice{&ts_swap, sizeof(ts_swap)},
-                                                      BorrowedSlice{&data_len_swap, sizeof(data_len_swap)},
-                                                      BorrowedSlice{data.data(), data.size()})))) {
+                (header.crc != static_cast<int64_t>(store::common::crc32::crc32_of(
+                                   common::BorrowedSlice{&ts_swap, sizeof(ts_swap)},
+                                   common::BorrowedSlice{&data_len_swap, sizeof(data_len_swap)},
+                                   common::BorrowedSlice{data.data(), data.size()})))) {
                 return StreamError{StreamErrorCode::RecordDataCorrupted, {}};
             }
 
@@ -333,5 +336,6 @@ void FileSegment::remove() noexcept {
         _logger->log(logging::LogLevel::Warning, "Issue deleting " + _segment_id + " due to: " + e.msg);
     }
 }
-} // namespace gg
+} // namespace stream
+} // namespace store
 } // namespace aws

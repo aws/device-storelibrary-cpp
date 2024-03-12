@@ -9,14 +9,15 @@
 #include <utility>
 
 namespace aws {
-namespace gg {
+namespace store {
+namespace stream {
 Iterator &Iterator::operator++() noexcept {
     ++sequence_number;
     timestamp = 0;
     return *this;
 }
 
-expected<CheckpointableOwnedRecord, StreamError> Iterator::operator*() noexcept {
+common::Expected<CheckpointableOwnedRecord, StreamError> Iterator::operator*() noexcept {
     if (const auto stream = _stream.lock()) {
         auto record_or = stream->read(sequence_number, ReadOptions{true, true, _offset});
         if (!record_or.ok()) {
@@ -75,7 +76,7 @@ int64_t timestamp() noexcept {
         .count();
 }
 
-OwnedRecord::OwnedRecord(OwnedSlice &&idata, const int64_t itimestamp, const uint64_t isequence_number,
+OwnedRecord::OwnedRecord(common::OwnedSlice &&idata, const int64_t itimestamp, const uint64_t isequence_number,
                          const uint32_t ioffset) noexcept
     : offset(ioffset), data(std::move(idata)), timestamp(itimestamp), sequence_number(isequence_number) {
 }
@@ -88,5 +89,6 @@ CheckpointableOwnedRecord::CheckpointableOwnedRecord(OwnedRecord &&o,
 void CheckpointableOwnedRecord::checkpoint() const noexcept {
     _checkpoint();
 }
-} // namespace gg
+} // namespace stream
+} // namespace store
 } // namespace aws

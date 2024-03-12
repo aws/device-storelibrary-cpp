@@ -18,10 +18,11 @@
 #endif
 
 namespace aws {
-namespace gg __attribute__((visibility("default"))) {
+namespace store {
+namespace stream __attribute__((visibility("default"))) {
     struct OwnedRecord {
         uint32_t offset{};
-        OwnedSlice data{};
+        common::OwnedSlice data{};
         int64_t timestamp{};
         uint64_t sequence_number{};
 
@@ -29,7 +30,7 @@ namespace gg __attribute__((visibility("default"))) {
 
         // coverity[autosar_cpp14_a15_4_3_violation] false positive, all implementations are noexcept
         // coverity[misra_cpp_2008_rule_15_4_1_violation] false positive, implementation is noexcept
-        OwnedRecord(OwnedSlice &&idata, const int64_t itimestamp, const uint64_t isequence_number,
+        OwnedRecord(common::OwnedSlice &&idata, const int64_t itimestamp, const uint64_t isequence_number,
                     const uint32_t ioffset) noexcept;
     };
 
@@ -52,7 +53,7 @@ namespace gg __attribute__((visibility("default"))) {
     struct IteratorOptions {};
 
     class StreamInterface;
-    using StreamError = GenericError<StreamErrorCode>;
+    using StreamError = common::GenericError<StreamErrorCode>;
 
     class CheckpointableOwnedRecord : public OwnedRecord {
       private:
@@ -108,7 +109,7 @@ namespace gg __attribute__((visibility("default"))) {
 
         // coverity[autosar_cpp14_a15_4_3_violation] false positive, all implementations are noexcept
         // coverity[misra_cpp_2008_rule_15_4_1_violation] false positive, implementation is noexcept
-        expected<CheckpointableOwnedRecord, StreamError> operator*() noexcept;
+        common::Expected<CheckpointableOwnedRecord, StreamError> operator*() noexcept;
 
         Iterator &&begin() noexcept;
 
@@ -147,14 +148,16 @@ namespace gg __attribute__((visibility("default"))) {
          *
          * @return the sequence number of the record appended.
          */
-        virtual expected<uint64_t, StreamError> append(const BorrowedSlice, const AppendOptions &) noexcept = 0;
+        virtual common::Expected<uint64_t, StreamError> append(const common::BorrowedSlice,
+                                                               const AppendOptions &) noexcept = 0;
 
         /**
          * Append data into the stream.
          *
          * @return the sequence number of the record appended.
          */
-        virtual expected<uint64_t, StreamError> append(OwnedSlice &&, const AppendOptions &) noexcept = 0;
+        virtual common::Expected<uint64_t, StreamError> append(common::OwnedSlice &&,
+                                                               const AppendOptions &) noexcept = 0;
 
         /**
          * Read a record from the stream by its sequence number or an error.
@@ -162,8 +165,8 @@ namespace gg __attribute__((visibility("default"))) {
          * @param sequence_number the sequence number of the record to read.
          * @return the Record.
          */
-        virtual expected<OwnedRecord, StreamError> read(const uint64_t sequence_number,
-                                                        const ReadOptions &) const noexcept = 0;
+        virtual common::Expected<OwnedRecord, StreamError> read(const uint64_t sequence_number,
+                                                                const ReadOptions &) const noexcept = 0;
 
         /**
          * Create an iterator identified by the chosen identifier. If an iterator already exists with the same
@@ -203,7 +206,7 @@ namespace gg __attribute__((visibility("default"))) {
             16U * 1024U * 1024U;                            // 16MB minimum segment size before making a new segment
         uint32_t maximum_size_bytes = 128U * 1024U * 1024U; // 128MB max stream size
         bool full_corruption_check_on_open = false;
-        const std::shared_ptr<FileSystemInterface> file_implementation{};
+        const std::shared_ptr<filesystem::FileSystemInterface> file_implementation{};
         const std::shared_ptr<logging::Logger> logger{};
         kv::KVOptions kv_options = {false, file_implementation, logger, "kv", 128 * 1024};
     };
@@ -211,5 +214,6 @@ namespace gg __attribute__((visibility("default"))) {
     int64_t timestamp() noexcept;
 
     static constexpr auto RecordNotFoundErrorStr = "Record not found";
-} // namespace gg
+} // namespace stream
+} // namespace store
 } // namespace aws

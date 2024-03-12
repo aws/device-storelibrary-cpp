@@ -1,7 +1,7 @@
 #include "test_utils.hpp"
 
 namespace aws {
-namespace gg {
+namespace store {
 namespace test {
 namespace utils {
 RandomStringGenerator::RandomStringGenerator(const int low, const int high, const char first, const char last)
@@ -14,5 +14,5 @@ const std::string &RandomStringGenerator::get() const {
 }
 } // namespace utils
 } // namespace test
-} // namespace gg
+} // namespace store
 } // namespace aws

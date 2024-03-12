@@ -20,8 +20,9 @@
 #include <vector>
 
 namespace aws {
-namespace gg {
-expected<std::shared_ptr<FileStream>, StreamError> FileStream::openOrCreate(StreamOptions &&opts) noexcept {
+namespace store {
+namespace stream {
+common::Expected<std::shared_ptr<FileStream>, StreamError> FileStream::openOrCreate(StreamOptions &&opts) noexcept {
     // coverity[autosar_cpp14_a20_8_6_violation] constructor is private, cannot use make_shared
     auto stream = std::shared_ptr<FileStream>(new FileStream(std::move(opts)));
     auto err = stream->loadExistingSegments();
@@ -54,9 +55,9 @@ static StreamError kvErrorToStreamError(const kv::KVError &kv_err) noexcept {
     return e;
 }
 
-static StreamError fileErrorToStreamError(const FileError &e) noexcept {
+static StreamError fileErrorToStreamError(const filesystem::FileError &e) noexcept {
     auto err = StreamError{StreamErrorCode::ReadError, e.msg};
-    if (e.code == FileErrorCode::DiskFull) {
+    if (e.code == filesystem::FileErrorCode::DiskFull) {
         err = StreamError{StreamErrorCode::DiskFull, e.msg};
     }
     return err;
@@ -126,7 +127,8 @@ StreamError FileStream::makeNextSegment() noexcept {
     return StreamError{StreamErrorCode::NoError, {}};
 }
 
-expected<uint64_t, StreamError> FileStream::append(const BorrowedSlice d, const AppendOptions &append_opts) noexcept {
+common::Expected<uint64_t, StreamError> FileStream::append(const common::BorrowedSlice d,
+                                                           const AppendOptions &append_opts) noexcept {
     std::lock_guard<std::mutex> lock(_segments_lock);
 
     auto err = removeSegmentsIfNewRecordBeyondMaxSize(d.size(), append_opts.remove_oldest_segments_if_full);
@@ -146,7 +148,7 @@ expected<uint64_t, StreamError> FileStream::append(const BorrowedSlice d, const 
     auto &seg = _segments.back();
     auto seq = _next_sequence_number.fetch_add(1U);
 
-    auto e = seg.append(d, aws::gg::timestamp(), seq, append_opts.sync_on_append);
+    auto e = seg.append(d, timestamp(), seq, append_opts.sync_on_append);
     if (!e.ok()) {
         return fileErrorToStreamError(e.err());
     }
@@ -187,13 +189,14 @@ StreamError FileStream::removeSegmentsIfNewRecordBeyondMaxSize(const uint32_t re
     return StreamError{StreamErrorCode::NoError, {}};
 }
 
-expected<uint64_t, StreamError> FileStream::append(OwnedSlice &&d, const AppendOptions &append_opts) noexcept {
+common::Expected<uint64_t, StreamError> FileStream::append(common::OwnedSlice &&d,
+                                                           const AppendOptions &append_opts) noexcept {
     const auto x = std::move(d);
-    return append(BorrowedSlice(x.data(), x.size()), append_opts);
+    return append(common::BorrowedSlice(x.data(), x.size()), append_opts);
 }
 
-expected<OwnedRecord, StreamError> FileStream::read(const uint64_t sequence_number,
-                                                    const ReadOptions &provided_options) const noexcept {
+common::Expected<OwnedRecord, StreamError> FileStream::read(const uint64_t sequence_number,
+                                                            const ReadOptions &provided_options) const noexcept {
     if ((sequence_number < _first_sequence_number) || (sequence_number >= _next_sequence_number)) {
         return StreamError{StreamErrorCode::RecordNotFound, RecordNotFoundErrorStr};
     }
@@ -291,11 +294,10 @@ PersistentIterator::PersistentIterator(std::string id, const uint64_t start, std
 }
 
 StreamError PersistentIterator::setCheckpoint(const uint64_t sequence_number) noexcept {
-    _sequence_number =
-        sequence_number + 1U; // Set the sequence number to the next in line, so that we
-                              // point to where we'd want to resume reading (ie. the first unread record).
+    _sequence_number = sequence_number + 1U; // Set the sequence number to the next in line, so that we
+    // point to where we'd want to resume reading (ie. the first unread record).
 
-    const auto e = _store->put(_id, BorrowedSlice{&_sequence_number, sizeof(uint64_t)});
+    const auto e = _store->put(_id, common::BorrowedSlice{&_sequence_number, sizeof(uint64_t)});
     return kvErrorToStreamError(e);
 }
 
@@ -305,5 +307,6 @@ StreamError PersistentIterator::remove() const noexcept {
                                                    : kvErrorToStreamError(e);
 }
 
-} // namespace gg
+} // namespace stream
+} // namespace store
 } // namespace aws
