@@ -52,10 +52,8 @@ add_library(
 )
 
 include(GNUInstallDirs)
-target_include_directories(kv
-        PUBLIC
-        "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>"
-        "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
+target_include_directories(
+    kv PUBLIC "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>" "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
 )
 target_compile_options(kv PRIVATE ${STORE_COMPILE_FLAGS})
 target_clangformat_setup(kv)
@@ -83,23 +81,30 @@ target_clangformat_setup(stream)
 target_clangtidy_setup(stream)
 target_cppcheck_setup(stream)
 
-install(TARGETS stream EXPORT lib-targets LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
-install(TARGETS kv EXPORT lib-targets LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
-install(DIRECTORY include/aws DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
-install(EXPORT lib-targets
-        NAMESPACE aws::store::
-        FILE aws-store-targets.cmake
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/aws)
-
-include(CMakePackageConfigHelpers)
-configure_package_config_file(cmake/aws-storeConfig.cmake.in
-        ${CMAKE_CURRENT_BINARY_DIR}/aws-storeConfig.cmake
-        INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/aws
+install(
+    TARGETS stream
+    EXPORT lib-targets
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
 install(
-        FILES ${CMAKE_CURRENT_BINARY_DIR}/aws-storeConfig.cmake
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/aws
+    TARGETS kv
+    EXPORT lib-targets
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
+install(DIRECTORY include/aws DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(
+    EXPORT lib-targets
+    NAMESPACE aws::store::
+    FILE aws-store-targets.cmake
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/aws
+)
+
+include(CMakePackageConfigHelpers)
+configure_package_config_file(
+    cmake/aws-storeConfig.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/aws-storeConfig.cmake
+    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/aws
+)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/aws-storeConfig.cmake DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/aws)
 
 option(STORE_BUILD_EXAMPLE "Build example program" ON)
 if(STORE_BUILD_EXAMPLE)

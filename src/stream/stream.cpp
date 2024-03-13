@@ -38,11 +38,11 @@ Iterator &&Iterator::begin() noexcept {
 }
 
 // Iterator never ends
-int Iterator::end() noexcept {
-    return 0;
+Iterator Iterator::end() noexcept {
+    return Iterator{{}, {}, 0};
 }
 
-bool Iterator::operator!=(const int x) const noexcept {
+bool Iterator::operator!=(const Iterator &x) const noexcept {
     static_cast<void>(x); // unused parameter required as part of interface
     return true;
 }
