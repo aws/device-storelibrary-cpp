@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10.2)
-project(greenlake)
+project(aws::store)
 
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
@@ -40,7 +40,7 @@ endif()
 include(cmake/ClangFormat.cmake)
 
 add_library(
-    greenlake_kv
+    kv
     include/aws/store/kv/kv.hpp
     include/aws/store/common/expected.hpp
     include/aws/store/common/crc32.hpp
@@ -50,14 +50,15 @@ add_library(
     src/kv/kv.cpp
     include/aws/store/common/logging.hpp
 )
-target_include_directories(greenlake_kv PUBLIC include)
-target_compile_options(greenlake_kv PRIVATE ${STORE_COMPILE_FLAGS})
-target_clangformat_setup(greenlake_kv)
-target_clangtidy_setup(greenlake_kv)
-target_cppcheck_setup(greenlake_kv)
+add_library(${PROJECT_NAME}::kv ALIAS kv)
+target_include_directories(kv PUBLIC include)
+target_compile_options(kv PRIVATE ${STORE_COMPILE_FLAGS})
+target_clangformat_setup(kv)
+target_clangtidy_setup(kv)
+target_cppcheck_setup(kv)
 
 add_library(
-    greenlake_stream
+    stream
     include/aws/store/stream/stream.hpp
     include/aws/store/stream/fileStream.hpp
     include/aws/store/stream/memoryStream.hpp
@@ -71,30 +72,31 @@ add_library(
     src/stream/fileSegment.cpp
     src/stream/stream.cpp
 )
-target_link_libraries(greenlake_stream PUBLIC greenlake_kv)
-target_compile_options(greenlake_stream PRIVATE ${STORE_COMPILE_FLAGS})
-target_clangformat_setup(greenlake_stream)
-target_clangtidy_setup(greenlake_stream)
-target_cppcheck_setup(greenlake_stream)
+add_library(${PROJECT_NAME}::stream ALIAS stream)
+target_link_libraries(stream PUBLIC kv)
+target_compile_options(stream PRIVATE ${STORE_COMPILE_FLAGS})
+target_clangformat_setup(stream)
+target_clangtidy_setup(stream)
+target_cppcheck_setup(stream)
 
 include(GNUInstallDirs)
-install(TARGETS greenlake_kv greenlake_stream LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
+install(TARGETS kv stream LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
 install(DIRECTORY include/aws DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
 option(STORE_BUILD_EXAMPLE "Build example program" ON)
 if(STORE_BUILD_EXAMPLE)
     set(CMAKE_CXX_STANDARD 17)
-    add_executable(greenlake_example include/aws/store/filesystem/posixFileSystem.hpp src/main.cpp)
-    target_link_libraries(greenlake_example PRIVATE greenlake_stream)
-    target_compile_options(greenlake_example PRIVATE ${STORE_COMPILE_FLAGS})
-    target_clangformat_setup(greenlake_example)
-    target_clangtidy_setup(greenlake_example)
-    target_cppcheck_setup(greenlake_example)
+    add_executable(example include/aws/store/filesystem/posixFileSystem.hpp src/main.cpp)
+    target_link_libraries(example PRIVATE stream)
+    target_compile_options(example PRIVATE ${STORE_COMPILE_FLAGS})
+    target_clangformat_setup(example)
+    target_clangtidy_setup(example)
+    target_cppcheck_setup(example)
 
     if(CMAKE_BUILD_TYPE MATCHES "Debug")
         include(cmake/Sanitizers.cmake)
         myproject_enable_sanitizers(
-            greenlake_example
+            example
             ON # asan
             ON # ub
             OFF # thread
@@ -104,13 +106,13 @@ if(STORE_BUILD_EXAMPLE)
     endif()
 
     # Setup a default target that runs when no target is specified.
-    add_custom_target(default DEPENDS greenlake_example)
+    add_custom_target(default DEPENDS example)
 else()
     # Setup a default target that runs when no target is specified.
-    add_custom_target(default DEPENDS greenlake_stream)
+    add_custom_target(default DEPENDS stream)
 endif()
-if(TARGET cmakeformat)
-    add_dependencies(default cmakeformat)
+if(TARGET cmake-format)
+    add_dependencies(default cmake-format)
 endif()
 
 option(STORE_BUILD_TESTS "Build tests" ON)
