@@ -38,6 +38,7 @@ Iterator &&Iterator::begin() noexcept {
 }
 
 // Iterator never ends
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 Iterator Iterator::end() noexcept {
     return Iterator{{}, {}, 0};
 }

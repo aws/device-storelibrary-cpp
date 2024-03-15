@@ -113,7 +113,7 @@ namespace stream __attribute__((visibility("default"))) {
 
         Iterator &&begin() noexcept;
 
-        static Iterator end() noexcept;
+        Iterator end() noexcept;
 
         // coverity[autosar_cpp14_a15_4_3_violation] false positive, all implementations are noexcept
         // coverity[misra_cpp_2008_rule_15_4_1_violation] false positive, implementation is noexcept
