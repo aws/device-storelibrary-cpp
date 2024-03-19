@@ -2,6 +2,8 @@
 #include <cstddef>
 #include <cstdint>
 
+#include <aws/store/common/slices.hpp>
+
 namespace aws {
 namespace store {
 namespace common {
@@ -46,9 +48,9 @@ static uint32_t update(const uint32_t initial_value, const void *buf, const size
     return c ^ 0xFFFFFFFF;
 }
 
-template <typename... Args> inline uint32_t crc32_of(Args... args) {
+inline uint32_t crc32_of(const std::initializer_list<BorrowedSlice> args) {
     uint32_t crc{0U};
-    for (auto arg : {args...}) {
+    for (auto arg : args) {
         crc = update(crc, arg.data(), arg.size());
     }
     return crc;

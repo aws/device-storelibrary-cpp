@@ -219,7 +219,7 @@ common::Expected<uint64_t, filesystem::FileError> FileSegment::append(const comm
     const auto byte_position = static_cast<int32_t>(my_htonl(_total_bytes));
 
     const auto crc = static_cast<int64_t>(my_htonll(store::common::crc32::crc32_of(
-        common::BorrowedSlice{&ts, sizeof(ts)}, common::BorrowedSlice{&data_len_swap, sizeof(data_len_swap)}, d)));
+        {common::BorrowedSlice{&ts, sizeof(ts)}, common::BorrowedSlice{&data_len_swap, sizeof(data_len_swap)}, d})));
     const auto header = LogEntryHeader{
         static_cast<int32_t>(my_htonl(static_cast<std::uint32_t>(MAGIC_AND_VERSION))),
         static_cast<int32_t>(my_htonl(static_cast<std::uint32_t>(sequence_number - _base_seq_num))),
@@ -309,9 +309,9 @@ common::Expected<OwnedRecord, StreamError> FileSegment::read(const uint64_t sequ
 
             if (read_options.check_for_corruption &&
                 (header.crc != static_cast<int64_t>(store::common::crc32::crc32_of(
-                                   common::BorrowedSlice{&ts_swap, sizeof(ts_swap)},
-                                   common::BorrowedSlice{&data_len_swap, sizeof(data_len_swap)},
-                                   common::BorrowedSlice{data.data(), data.size()})))) {
+                                   {common::BorrowedSlice{&ts_swap, sizeof(ts_swap)},
+                                    common::BorrowedSlice{&data_len_swap, sizeof(data_len_swap)},
+                                    common::BorrowedSlice{data.data(), data.size()}})))) {
                 return StreamError{StreamErrorCode::RecordDataCorrupted, {}};
             }
 

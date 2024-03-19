@@ -260,10 +260,10 @@ common::Expected<common::OwnedSlice, KVError> KV::readValueFrom(const uint32_t b
     if (!value_or.ok()) {
         return fileErrorToKVError(value_or.err());
     }
-    const auto crc = common::crc32::crc32_of(common::BorrowedSlice{&header.flags, sizeof(header.flags)},
-                                             common::BorrowedSlice{&header.key_length, sizeof(header.key_length)},
-                                             common::BorrowedSlice{&header.value_length, sizeof(header.value_length)},
-                                             common::BorrowedSlice{value_or.val().data(), value_or.val().size()});
+    const auto crc = common::crc32::crc32_of({common::BorrowedSlice{&header.flags, sizeof(header.flags)},
+                                              common::BorrowedSlice{&header.key_length, sizeof(header.key_length)},
+                                              common::BorrowedSlice{&header.value_length, sizeof(header.value_length)},
+                                              common::BorrowedSlice{value_or.val().data(), value_or.val().size()}});
 
     if (crc != header.crc32) {
         return KVError{KVErrorCodes::DataCorrupted, "CRC mismatch"};
@@ -302,11 +302,9 @@ common::Expected<common::OwnedSlice, KVError> KV::get(const std::string &key) co
     return KVError{KVErrorCodes::KeyNotFound, {}};
 }
 
-// coverity[autosar_cpp14_a15_4_3_violation] false positive, declared as noexcept
-// coverity[misra_cpp_2008_rule_15_4_1_violation] false positive, declared as noexcept
-template <typename... Args> filesystem::FileError KV::appendMultiple(const Args &...args) const noexcept {
+filesystem::FileError KV::appendMultiple(const std::initializer_list<common::BorrowedSlice> args) const noexcept {
     // Try to append any non-zero data, rolling back all appends if any fails by truncating the file.
-    for (auto arg : {args...}) {
+    for (auto arg : args) {
         if (arg.size() > 0) {
             auto e = _f->append(arg);
             if (!e.ok()) {
@@ -329,15 +327,15 @@ inline KVError KV::writeEntry(const std::string &key, const common::BorrowedSlic
     const auto value_len = data.size();
 
     const auto crc = store::common::crc32::crc32_of(
-        common::BorrowedSlice{&flags, sizeof(flags)}, common::BorrowedSlice{&key_len, sizeof(key_len)},
-        common::BorrowedSlice{&value_len, sizeof(value_len)}, common::BorrowedSlice{data.data(), data.size()});
+        {common::BorrowedSlice{&flags, sizeof(flags)}, common::BorrowedSlice{&key_len, sizeof(key_len)},
+         common::BorrowedSlice{&value_len, sizeof(value_len)}, common::BorrowedSlice{data.data(), data.size()}});
 
     const auto header = detail::KVHeader{
         detail::MAGIC_AND_VERSION, flags, key_len, crc, value_len,
     };
 
     return fileErrorToKVError(
-        appendMultiple(common::BorrowedSlice(&header, sizeof(header)), common::BorrowedSlice{key}, data));
+        appendMultiple({common::BorrowedSlice(&header, sizeof(header)), common::BorrowedSlice{key}, data}));
 }
 
 KVError KV::put(const std::string &key, const common::BorrowedSlice data) noexcept {

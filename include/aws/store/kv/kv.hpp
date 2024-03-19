@@ -103,7 +103,7 @@ class __attribute__((visibility("default"))) KV {
     inline KVError writeEntry(const std::string &key, const common::BorrowedSlice data,
                               const uint8_t flags) const noexcept;
 
-    template <typename... Args> filesystem::FileError appendMultiple(const Args &...args) const noexcept;
+    filesystem::FileError appendMultiple(const std::initializer_list<common::BorrowedSlice> args) const noexcept;
 
     KVError maybeCompact() noexcept;
 
