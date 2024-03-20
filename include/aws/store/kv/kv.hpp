@@ -6,6 +6,7 @@
 #include <aws/store/common/util.hpp>
 #include <aws/store/filesystem/filesystem.hpp>
 #include <cstdint>
+#include <initializer_list>
 #include <memory>
 #include <mutex>
 #include <string>
