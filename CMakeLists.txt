@@ -4,6 +4,12 @@ project(aws-store)
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
+option(STORE_UNITY_BUILD "Build store using a unity build" ON)
+if(STORE_UNITY_BUILD)
+    set(CMAKE_UNITY_BUILD ON)
+    set(CMAKE_UNITY_BUILD_MODE BATCH)
+endif()
+
 include(cmake/ClangTidy.cmake)
 include(cmake/CPPCheck.cmake)
 include(cmake/CMakeFormat.cmake)
@@ -31,6 +37,9 @@ else()
         "-Wconversion"
         "-pedantic"
     )
+    if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+        list(APPEND STORE_COMPILE_FLAGS "-fuse-ld=lld")
+    endif ()
     if(NOT CMAKE_BUILD_TYPE MATCHES "Debug")
         # Keep RTTI in debug for UBSan
         list(APPEND STORE_COMPILE_FLAGS "-fno-rtti")

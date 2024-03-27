@@ -10,7 +10,7 @@
 #include <string_view>
 #include <vector>
 
-class Logger final : public aws::store::logging::Logger {
+class StreamLogger final : public aws::store::logging::Logger {
     void log(const aws::store::logging::LogLevel level, const std::string &msg) const override {
         switch (level) {
         case aws::store::logging::LogLevel::Disabled:
@@ -36,7 +36,7 @@ class Logger final : public aws::store::logging::Logger {
     }
 };
 
-static const auto logger = std::make_shared<Logger>();
+static const auto stream_logger = std::make_shared<StreamLogger>();
 
 static auto open_stream(const std::shared_ptr<aws::store::filesystem::FileSystemInterface> &fs) {
     return aws::store::stream::FileStream::openOrCreate(aws::store::stream::StreamOptions{
@@ -44,11 +44,11 @@ static auto open_stream(const std::shared_ptr<aws::store::filesystem::FileSystem
         10 * 1024 * 1024,
         true,
         fs,
-        logger,
+        stream_logger,
         aws::store::kv::KVOptions{
             true,
             fs,
-            logger,
+            stream_logger,
             "m",
             1 * 1024,
         },

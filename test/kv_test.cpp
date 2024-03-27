@@ -9,7 +9,7 @@
 #include <string_view>
 #include <vector>
 
-class Logger final : public aws::store::logging::Logger {
+class KVLogger final : public aws::store::logging::Logger {
     void log(const aws::store::logging::LogLevel level, const std::string &msg) const override {
         switch (level) {
         case aws::store::logging::LogLevel::Disabled:
@@ -34,14 +34,14 @@ class Logger final : public aws::store::logging::Logger {
     }
 };
 
-static const auto logger = std::make_shared<Logger>();
+static const auto kv_logger = std::make_shared<KVLogger>();
 
 static auto open_kv(const std::string &path) {
     return aws::store::kv::KV::openOrCreate(aws::store::kv::KVOptions{
         true,
         std::make_shared<aws::store::test::utils::SpyFileSystem>(
             std::make_shared<aws::store::filesystem::PosixFileSystem>(path)),
-        logger,
+        kv_logger,
         "test-kv-map",
         0,
     });
@@ -52,7 +52,7 @@ static auto open_kv_manual_compaction(const std::string &path) {
         true,
         std::make_shared<aws::store::test::utils::SpyFileSystem>(
             std::make_shared<aws::store::filesystem::PosixFileSystem>(path)),
-        logger,
+        kv_logger,
         "test-kv-map",
         -1,
     });
