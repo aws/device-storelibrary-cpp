@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.10.2)
 project(aws-store)
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
 option(STORE_UNITY_BUILD "Build store using a unity build" ON)
@@ -37,9 +37,9 @@ else()
         "-Wconversion"
         "-pedantic"
     )
-    if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
         list(APPEND STORE_COMPILE_FLAGS "-fuse-ld=lld")
-    endif ()
+    endif()
     if(NOT CMAKE_BUILD_TYPE MATCHES "Debug")
         # Keep RTTI in debug for UBSan
         list(APPEND STORE_COMPILE_FLAGS "-fno-rtti")

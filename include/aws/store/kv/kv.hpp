@@ -26,11 +26,11 @@ constexpr uint16_t KEY_LENGTH_MAX = 0xFFFFU;
 
 #pragma pack(push, 4)
 struct KVHeader {
-    uint8_t magic_and_version{MAGIC_AND_VERSION};
-    uint8_t flags{0U};
-    key_length_type key_length{0U};
-    uint32_t crc32{0U};
-    value_length_type value_length{0U};
+    uint8_t magic_and_version;
+    uint8_t flags;
+    key_length_type key_length;
+    uint32_t crc32;
+    value_length_type value_length;
 };
 #pragma pack(pop)
 
@@ -51,7 +51,7 @@ enum class KVErrorCodes : std::uint8_t {
 using KVError = common::GenericError<KVErrorCodes>;
 
 struct KVOptions {
-    bool full_corruption_check_on_open{false};
+    bool full_corruption_check_on_open;
     const std::shared_ptr<filesystem::FileSystemInterface> filesystem_implementation;
     const std::shared_ptr<logging::Logger> logger;
     std::string identifier;

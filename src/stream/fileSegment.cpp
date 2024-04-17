@@ -28,7 +28,7 @@ namespace stream {
 
 static constexpr int UINT64_MAX_DECIMAL_COUNT = 19;
 
-static auto my_htonll(std::uint64_t h) {
+static std::uint64_t my_htonll(std::uint64_t h) {
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
     if (IS_LITTLE_ENDIAN > 0) {
         // NOLINTNEXTLINE(cppcoreguidelines-avoid-magic-numbers)
@@ -43,11 +43,11 @@ static auto my_htonll(std::uint64_t h) {
     return h;
 }
 
-static auto my_ntohll(const std::uint64_t h) {
+static std::uint64_t my_ntohll(const std::uint64_t h) {
     return my_htonll(h);
 }
 
-static auto my_htonl(std::uint32_t h) {
+static std::uint32_t my_htonl(std::uint32_t h) {
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
     if (IS_LITTLE_ENDIAN > 0) {
         // NOLINTNEXTLINE(cppcoreguidelines-avoid-magic-numbers)
@@ -57,7 +57,7 @@ static auto my_htonl(std::uint32_t h) {
     }
     return h;
 }
-static auto my_ntohl(const std::uint32_t h) {
+static std::uint32_t my_ntohl(const std::uint32_t h) {
     return my_htonl(h);
 }
 
@@ -68,12 +68,12 @@ constexpr int32_t MAGIC_AND_VERSION = MAGIC_BYTES << 8 | static_cast<int8_t>(VER
 
 #pragma pack(push, 4)
 struct LogEntryHeader {
-    int32_t magic_and_version = static_cast<int32_t>(my_htonl(static_cast<std::uint32_t>(MAGIC_AND_VERSION)));
-    int32_t relative_sequence_number = 0;
-    int32_t byte_position = 0;
-    int64_t crc = 0;
-    int64_t timestamp = 0;
-    int32_t payload_length_bytes = 0;
+    int32_t magic_and_version;
+    int32_t relative_sequence_number;
+    int32_t byte_position;
+    int64_t crc;
+    int64_t timestamp;
+    int32_t payload_length_bytes;
 };
 #pragma pack(pop)
 

@@ -11,6 +11,15 @@
 namespace aws {
 namespace store {
 namespace stream {
+ReadOptions::ReadOptions(bool check_for_corruption, bool may_return_later_records, std::uint32_t suggested_start)
+    : check_for_corruption(check_for_corruption), may_return_later_records(may_return_later_records),
+      suggested_start(suggested_start) {
+}
+
+AppendOptions::AppendOptions(bool sync_on_append, bool remove_oldest_segments_if_full)
+    : sync_on_append(sync_on_append), remove_oldest_segments_if_full(remove_oldest_segments_if_full) {
+}
+
 Iterator &Iterator::operator++() noexcept {
     ++sequence_number;
     timestamp = 0;

@@ -45,7 +45,7 @@ StreamError MemoryStream::remove_records_if_new_record_beyond_max_size(const uin
         // coverity[autosar_cpp14_a23_0_1_violation] we want the implicit iterator conversion
         std::ignore =
             _records.erase(std::remove_if(_records.begin(), _records.end(),
-                                          [&](const auto &r) -> bool {
+                                          [&](const OwnedRecord &r) -> bool {
                                               if (_current_size_bytes + record_size > _opts.maximum_size_bytes) {
                                                   _current_size_bytes -= r.data.size();
                                                   return true;
