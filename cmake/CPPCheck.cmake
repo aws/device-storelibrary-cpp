@@ -24,7 +24,7 @@ function(target_cppcheck_setup target_name)
             "--force"
             "--inline-suppr"
             "--suppress=missingIncludeSystem"
-            "--suppressions-list=${CMAKE_SOURCE_DIR}/CppCheckSuppressions.txt"
+            "--suppressions-list=${PROJECT_SOURCE_DIR}/CppCheckSuppressions.txt"
             "--error-exitcode=1"
         )
         set_target_properties(${target_name} PROPERTIES CXX_CPPCHECK "${CPP_CHECK_OPTS}")

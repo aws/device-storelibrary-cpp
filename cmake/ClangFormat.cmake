@@ -26,7 +26,7 @@ function(prefix_clangformat_setup prefix)
         add_custom_target(
             ${prefix}_clangformat
             COMMAND ${CLANGFORMAT_EXECUTABLE} -style=file -i ${clangformat_sources}
-            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+            WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
             COMMENT "Formatting ${prefix} with ${CLANGFORMAT_EXECUTABLE} ..."
         )
 
