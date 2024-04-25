@@ -11,13 +11,12 @@
 namespace aws {
 namespace store {
 namespace stream {
-ReadOptions::ReadOptions(bool check_for_corruption, bool may_return_later_records, std::uint32_t suggested_start)
-    : check_for_corruption(check_for_corruption), may_return_later_records(may_return_later_records),
-      suggested_start(suggested_start) {
+ReadOptions::ReadOptions(bool corruption, bool return_later, std::uint32_t start)
+    : check_for_corruption(corruption), may_return_later_records(return_later), suggested_start(start) {
 }
 
-AppendOptions::AppendOptions(bool sync_on_append, bool remove_oldest_segments_if_full)
-    : sync_on_append(sync_on_append), remove_oldest_segments_if_full(remove_oldest_segments_if_full) {
+AppendOptions::AppendOptions(bool sync, bool remove_if_full)
+    : sync_on_append(sync), remove_oldest_segments_if_full(remove_if_full) {
 }
 
 Iterator &Iterator::operator++() noexcept {
@@ -44,8 +43,8 @@ common::Expected<CheckpointableOwnedRecord, StreamError> Iterator::operator*() n
         return CheckpointableOwnedRecord{std::move(x), [ss, id, seq]() -> StreamError {
                                              auto e = StreamError{StreamErrorCode::StreamClosed,
                                                                   "Unable to set checkpoint in a destroyed stream"};
-                                             if (const auto stream = ss.lock()) {
-                                                 e = stream->setCheckpoint(id, seq);
+                                             if (const auto istream = ss.lock()) {
+                                                 e = istream->setCheckpoint(id, seq);
                                              }
                                              return e;
                                          }};
