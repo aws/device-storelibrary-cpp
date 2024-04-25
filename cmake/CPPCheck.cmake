@@ -26,6 +26,7 @@ function(target_cppcheck_setup target_name)
             "--suppress=missingIncludeSystem"
             "--suppressions-list=${PROJECT_SOURCE_DIR}/CppCheckSuppressions.txt"
             "--error-exitcode=1"
+            "--check-level=exhaustive"
         )
         set_target_properties(${target_name} PROPERTIES CXX_CPPCHECK "${CPP_CHECK_OPTS}")
     endif()

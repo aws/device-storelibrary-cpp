@@ -13,7 +13,7 @@ class BorrowedSlice {
     const uint32_t _size;
 
   public:
-    BorrowedSlice() : _data(nullptr), _size(0U){};
+    BorrowedSlice() : _data(nullptr), _size(0U) {};
     BorrowedSlice(const void *data, const size_t size) : _data(data), _size(static_cast<uint32_t>(size)) {
         // coverity[misra_cpp_2008_rule_5_2_12_violation] false positive
         assert(size <= UINT32_MAX);
