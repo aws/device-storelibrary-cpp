@@ -11,12 +11,14 @@
 namespace aws {
 namespace store {
 namespace stream {
-ReadOptions::ReadOptions(bool corruption, bool return_later, std::uint32_t start)
-    : check_for_corruption(corruption), may_return_later_records(return_later), suggested_start(start) {
+ReadOptions::ReadOptions(bool check_for_corruption_opt, bool may_return_later_records_opt,
+                         std::uint32_t suggested_start_opt)
+    : check_for_corruption(check_for_corruption_opt), may_return_later_records(may_return_later_records_opt),
+      suggested_start(suggested_start_opt) {
 }
 
-AppendOptions::AppendOptions(bool sync, bool remove_if_full)
-    : sync_on_append(sync), remove_oldest_segments_if_full(remove_if_full) {
+AppendOptions::AppendOptions(bool sync_on_append_opt, bool remove_oldest_segments_if_full_opt)
+    : sync_on_append(sync_on_append_opt), remove_oldest_segments_if_full(remove_oldest_segments_if_full_opt) {
 }
 
 Iterator &Iterator::operator++() noexcept {

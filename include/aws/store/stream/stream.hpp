@@ -129,8 +129,8 @@ namespace stream __attribute__((visibility("default"))) {
         ReadOptions &operator=(const ReadOptions &) = default;
         ReadOptions &operator=(ReadOptions &&) = default;
 
-        ReadOptions(bool check_for_corruption = true, bool may_return_later_records = false,
-                    std::uint32_t suggested_start = 0U);
+        ReadOptions(bool check_for_corruption_opt = true, bool may_return_later_records_opt = false,
+                    std::uint32_t suggested_start_opt = 0U);
     };
 
     struct AppendOptions {
@@ -143,7 +143,7 @@ namespace stream __attribute__((visibility("default"))) {
         AppendOptions &operator=(const AppendOptions &) = default;
         AppendOptions &operator=(AppendOptions &&) = default;
 
-        AppendOptions(bool sync_on_append = false, bool remove_oldest_segments_if_full = true);
+        AppendOptions(bool sync_on_append_opt = false, bool remove_oldest_segments_if_full_opt = true);
     };
 
     class StreamInterface : public std::enable_shared_from_this<StreamInterface> {
