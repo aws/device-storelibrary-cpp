@@ -36,8 +36,19 @@ common::Expected<CheckpointableOwnedRecord, StreamError> Iterator::operator*() n
         timestamp = x.timestamp;
         _offset = x.offset + x.data.size();
         sequence_number = x.sequence_number;
+
+        std::weak_ptr<StreamInterface> ss = _stream;
+        auto id = _id;
+        auto seq = sequence_number;
         // coverity[autosar_cpp14_a7_1_7_violation] defining lambda inline
-        return CheckpointableOwnedRecord{std::move(x), [this]() -> StreamError { return checkpoint(); }};
+        return CheckpointableOwnedRecord{std::move(x), [ss, id, seq]() -> StreamError {
+                                             auto e = StreamError{StreamErrorCode::StreamClosed,
+                                                                  "Unable to set checkpoint in a destroyed stream"};
+                                             if (const auto stream = ss.lock()) {
+                                                 e = stream->setCheckpoint(id, seq);
+                                             }
+                                             return e;
+                                         }};
     }
     return StreamError{StreamErrorCode::StreamClosed, "Unable to read from destroyed stream"};
 }
@@ -69,14 +80,6 @@ std::uint64_t StreamInterface::currentSizeBytes() const noexcept {
     return _current_size_bytes;
 }
 
-StreamError Iterator::checkpoint() const noexcept {
-    auto e = StreamError{StreamErrorCode::StreamClosed, "Unable to read from destroyed stream"};
-    if (const auto stream = _stream.lock()) {
-        e = stream->setCheckpoint(_id, sequence_number);
-    }
-    return e;
-}
-
 Iterator::Iterator(std::weak_ptr<StreamInterface> s, std::string id, const uint64_t seq) noexcept
     : _stream(std::move(s)), _id(std::move(id)), sequence_number(seq) {
 }
@@ -96,8 +99,8 @@ CheckpointableOwnedRecord::CheckpointableOwnedRecord(OwnedRecord &&o,
     : OwnedRecord(std::move(o)), _checkpoint(std::move(checkpoint)) {
 }
 
-void CheckpointableOwnedRecord::checkpoint() const noexcept {
-    _checkpoint();
+StreamError CheckpointableOwnedRecord::checkpoint() const noexcept {
+    return _checkpoint();
 }
 } // namespace stream
 } // namespace store

@@ -87,6 +87,13 @@ static auto read_stream_values_by_segment(std::shared_ptr<aws::store::test::util
     return segments;
 }
 
+SCENARIO("Posix filesystem errors", "[fs]") {
+    auto fs = std::make_shared<aws::store::filesystem::PosixFileSystem>("/abc");
+    auto file_or = fs->open("def");
+    REQUIRE_FALSE(file_or.ok());
+    REQUIRE(file_or.err().code == aws::store::filesystem::FileErrorCode::AccessDenied);
+}
+
 SCENARIO("I cannot create a stream", "[stream]") {
     auto temp_dir = aws::store::test::utils::TempDir();
     auto fs = std::make_shared<aws::store::test::utils::SpyFileSystem>(
@@ -223,11 +230,20 @@ SCENARIO("I can delete an iterator") {
         auto it = stream->openOrCreateIterator("ita", aws::store::stream::IteratorOptions{});
 
         THEN("I checkpoint the iterator") {
-            (*it).val().checkpoint();
+            REQUIRE((*it).val().checkpoint().ok());
 
             THEN("I can delete the iterator") {
                 REQUIRE(stream->deleteIterator("ita").ok());
             }
+        }
+
+        THEN("I can checkpoint a record returned from an out of scope iterator") {
+            aws::store::stream::CheckpointableOwnedRecord record;
+            {
+                auto it2 = stream->openOrCreateIterator("ita2", aws::store::stream::IteratorOptions{});
+                record = std::move((*it2).val());
+            }
+            REQUIRE(record.checkpoint().ok());
         }
 
         THEN("I can delete the iterator") {
@@ -260,13 +276,13 @@ SCENARIO("I can create a stream", "[stream]") {
         auto v_or = *it;
         REQUIRE(v_or.ok());
         REQUIRE(std::string_view{v_or.val().data.char_data(), v_or.val().data.size()} == value);
-        v_or.val().checkpoint();
+        REQUIRE(v_or.val().checkpoint().ok());
 
         ++it;
         REQUIRE(it.sequence_number == 1);
         v_or = *it;
         REQUIRE(v_or.ok());
-        v_or.val().checkpoint();
+        REQUIRE(v_or.val().checkpoint().ok());
 
         // New iterator starts at 0
         auto other_it = stream->openOrCreateIterator("other", aws::store::stream::IteratorOptions{});

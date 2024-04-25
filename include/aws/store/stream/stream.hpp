@@ -57,7 +57,7 @@ namespace stream __attribute__((visibility("default"))) {
 
     class CheckpointableOwnedRecord : public OwnedRecord {
       private:
-        std::function<void(void)> _checkpoint;
+        std::function<StreamError(void)> _checkpoint;
 
       public:
         CheckpointableOwnedRecord() = default;
@@ -72,7 +72,7 @@ namespace stream __attribute__((visibility("default"))) {
         CheckpointableOwnedRecord &operator=(CheckpointableOwnedRecord &&o) = default;
         CheckpointableOwnedRecord &operator=(CheckpointableOwnedRecord &) = delete;
 
-        void checkpoint() const noexcept;
+        StreamError checkpoint() const noexcept;
     };
 
     class Iterator {
@@ -80,8 +80,6 @@ namespace stream __attribute__((visibility("default"))) {
         std::weak_ptr<StreamInterface> _stream;
         std::string _id;
         uint32_t _offset = 0U;
-
-        StreamError checkpoint() const noexcept;
 
       public:
         // coverity[autosar_cpp14_a15_4_3_violation] false positive, all implementations are noexcept
