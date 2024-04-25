@@ -1,9 +1,6 @@
 cmake_minimum_required(VERSION 3.10.2)
 project(aws-store)
 
-set(CMAKE_CXX_STANDARD 11)
-set(CMAKE_CXX_VISIBILITY_PRESET hidden)
-
 option(STORE_UNITY_BUILD "Build store using a unity build" ON)
 if(STORE_UNITY_BUILD)
     set(CMAKE_UNITY_BUILD ON)
@@ -14,6 +11,7 @@ include(cmake/ClangTidy.cmake)
 include(cmake/CPPCheck.cmake)
 include(cmake/CMakeFormat.cmake)
 
+option(STORE_USE_LLD "Link with lld on clang" ON)
 option(STORE_USE_LTO "Build using LTO in release mode" ON)
 if(CMAKE_BUILD_TYPE MATCHES "Release" AND STORE_USE_LTO)
     set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
@@ -37,7 +35,7 @@ else()
         "-Wconversion"
         "-pedantic"
     )
-    if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND STORE_USE_LLD)
         list(APPEND STORE_COMPILE_FLAGS "-fuse-ld=lld")
     endif()
     if(NOT CMAKE_BUILD_TYPE MATCHES "Debug")
@@ -61,6 +59,7 @@ add_library(
 )
 
 include(GNUInstallDirs)
+set_target_properties(kv PROPERTIES CXX_STANDARD 11 CXX_VISIBILITY_PRESET hidden)
 target_include_directories(
     kv PUBLIC "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>" "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
 )
@@ -84,6 +83,7 @@ add_library(
     src/stream/fileSegment.cpp
     src/stream/stream.cpp
 )
+set_target_properties(stream PROPERTIES CXX_STANDARD 11 CXX_VISIBILITY_PRESET hidden)
 target_link_libraries(stream PUBLIC kv)
 target_compile_options(stream PRIVATE ${STORE_COMPILE_FLAGS})
 target_clangformat_setup(stream)
@@ -117,8 +117,8 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/aws-storeConfig.cmake DESTINATION ${CM
 
 option(STORE_BUILD_EXAMPLE "Build example program" ON)
 if(STORE_BUILD_EXAMPLE)
-    set(CMAKE_CXX_STANDARD 17)
     add_executable(example include/aws/store/filesystem/posixFileSystem.hpp src/main.cpp)
+    set_target_properties(example PROPERTIES CXX_STANDARD 17)
     target_link_libraries(example PRIVATE stream)
     target_compile_options(example PRIVATE ${STORE_COMPILE_FLAGS})
     target_clangformat_setup(example)

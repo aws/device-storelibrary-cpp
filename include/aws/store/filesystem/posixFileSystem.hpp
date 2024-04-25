@@ -227,8 +227,7 @@ class PosixFileSystem : public FileSystemInterface {
     std::filesystem::path _base_path;
 
   public:
-    explicit PosixFileSystem(std::filesystem::path base_path) : _base_path(std::move(base_path)) {
-    };
+    explicit PosixFileSystem(std::filesystem::path base_path) : _base_path(std::move(base_path)) {};
 
     virtual common::Expected<std::unique_ptr<FileLike>, FileError> open(const std::string &identifier) override {
         if (!_initialized) {
