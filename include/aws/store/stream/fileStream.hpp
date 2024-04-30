@@ -16,6 +16,8 @@ namespace aws {
 namespace store {
 namespace stream {
 
+constexpr uint8_t LOG_ENTRY_HEADER_SIZE = 32U;
+
 struct LogEntryHeader;
 class FileSegment {
   public:

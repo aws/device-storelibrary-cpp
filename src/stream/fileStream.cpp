@@ -168,17 +168,18 @@ FileStream::FileStream(StreamOptions &&o) noexcept : _opts(std::move(o)) {
 
 StreamError FileStream::removeSegmentsIfNewRecordBeyondMaxSize(const uint32_t record_size,
                                                                const bool remove_oldest_segments_if_full) noexcept {
-    if (record_size > _opts.maximum_size_bytes) {
+    const auto max_size = _opts.maximum_size_bytes - LOG_ENTRY_HEADER_SIZE;
+    if (record_size > max_size) {
         return StreamError{StreamErrorCode::RecordTooLarge, {}};
     }
 
     // if we need more room but can't make more room, error
-    if ((_current_size_bytes > (_opts.maximum_size_bytes - record_size)) && (!remove_oldest_segments_if_full)) {
+    if ((_current_size_bytes > (max_size - record_size)) && (!remove_oldest_segments_if_full)) {
         return StreamError{StreamErrorCode::StreamFull, {}};
     }
 
     // Make room while we need more room
-    while (_current_size_bytes > (_opts.maximum_size_bytes - record_size)) {
+    while (_current_size_bytes > (max_size - record_size)) {
         auto &to_delete = _segments.front();
         _current_size_bytes -= to_delete.totalSizeBytes();
         to_delete.remove();

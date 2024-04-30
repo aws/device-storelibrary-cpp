@@ -61,7 +61,6 @@ static std::uint32_t my_ntohl(const std::uint32_t h) {
     return my_htonl(h);
 }
 
-constexpr uint8_t HEADER_SIZE = 32U;
 constexpr int32_t MAGIC_BYTES = 0xAAAAAA;
 constexpr uint8_t VERSION = 0x01U;
 constexpr int32_t MAGIC_AND_VERSION = MAGIC_BYTES << 8 | static_cast<int8_t>(VERSION);
@@ -77,7 +76,7 @@ struct LogEntryHeader {
 };
 #pragma pack(pop)
 
-static_assert(sizeof(LogEntryHeader) == HEADER_SIZE, "Header size must be 32 bytes!");
+static_assert(sizeof(LogEntryHeader) == LOG_ENTRY_HEADER_SIZE, "Header size must be 32 bytes!");
 
 static std::string string(const store::stream::StreamErrorCode e) noexcept {
     std::string v{};
@@ -158,7 +157,7 @@ StreamError FileSegment::open(const bool full_corruption_check_on_open) noexcept
     uint32_t offset = 0U;
 
     while (true) {
-        const auto header_data_or = _f->read(offset, offset + HEADER_SIZE);
+        const auto header_data_or = _f->read(offset, offset + LOG_ENTRY_HEADER_SIZE);
         if (!header_data_or.ok()) {
             if (header_data_or.err().code == filesystem::FileErrorCode::EndOfFile) {
                 // If we reached the end of the file, there could have been extra data at the end, but less
@@ -186,9 +185,9 @@ StreamError FileSegment::open(const bool full_corruption_check_on_open) noexcept
             }
         }
 
-        offset += HEADER_SIZE;
+        offset += LOG_ENTRY_HEADER_SIZE;
         offset += static_cast<uint32_t>(header.payload_length_bytes);
-        _total_bytes += static_cast<std::uint32_t>(header.payload_length_bytes) + HEADER_SIZE;
+        _total_bytes += static_cast<std::uint32_t>(header.payload_length_bytes) + LOG_ENTRY_HEADER_SIZE;
         _highest_seq_num =
             std::max(_highest_seq_num, _base_seq_num + static_cast<std::uint64_t>(header.relative_sequence_number));
     }
@@ -268,7 +267,7 @@ common::Expected<OwnedRecord, StreamError> FileSegment::read(const uint64_t sequ
     auto suggested_start = offset != 0U;
 
     while (true) {
-        auto header_data_or = _f->read(offset, offset + HEADER_SIZE);
+        auto header_data_or = _f->read(offset, offset + LOG_ENTRY_HEADER_SIZE);
         if (!header_data_or.ok()) {
             if (suggested_start) {
                 offset = 0U;
@@ -297,8 +296,9 @@ common::Expected<OwnedRecord, StreamError> FileSegment::read(const uint64_t sequ
         // We found the one we want, or the next available sequence number was acceptable to us
         if ((header.relative_sequence_number == expected_rel_seq_num) ||
             ((header.relative_sequence_number > expected_rel_seq_num) && read_options.may_return_later_records)) {
-            auto data_or = _f->read(offset + HEADER_SIZE,
-                                    offset + HEADER_SIZE + static_cast<std::uint32_t>(header.payload_length_bytes));
+            auto data_or =
+                _f->read(offset + LOG_ENTRY_HEADER_SIZE,
+                         offset + LOG_ENTRY_HEADER_SIZE + static_cast<std::uint32_t>(header.payload_length_bytes));
             if (!data_or.ok()) {
                 return StreamError{StreamErrorCode::ReadError, header_data_or.err().msg};
             }
@@ -319,11 +319,11 @@ common::Expected<OwnedRecord, StreamError> FileSegment::read(const uint64_t sequ
                 std::move(data),
                 header.timestamp,
                 sequence_number,
-                offset + HEADER_SIZE,
+                offset + LOG_ENTRY_HEADER_SIZE,
             };
         }
 
-        offset += HEADER_SIZE;
+        offset += LOG_ENTRY_HEADER_SIZE;
         offset += static_cast<std::uint32_t>(header.payload_length_bytes);
     }
 }

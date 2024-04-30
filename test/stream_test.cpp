@@ -55,8 +55,6 @@ static auto open_stream(const std::shared_ptr<aws::store::filesystem::FileSystem
     });
 }
 
-static constexpr auto log_header_size = 32;
-
 static auto read_stream_values_by_segment(std::shared_ptr<aws::store::test::utils::SpyFileSystem> fs,
                                           std::filesystem::path temp_dir_path, uint32_t value_size) {
     auto files_or = fs->list();
@@ -73,7 +71,7 @@ static auto read_stream_values_by_segment(std::shared_ptr<aws::store::test::util
         std::vector<std::string> values;
         auto pos = 0U;
         while (true) {
-            pos += log_header_size;
+            pos += aws::store::stream::LOG_ENTRY_HEADER_SIZE;
             auto val_or = file_or.val()->read(pos, pos + value_size);
             if (!val_or.ok()) {
                 REQUIRE(val_or.err().code == aws::store::filesystem::FileErrorCode::EndOfFile);
@@ -181,7 +179,38 @@ SCENARIO("I can append data to a stream", "[stream]") {
             REQUIRE(stream->firstSequenceNumber() > 0);
             // Stream can fit 9 records since each record is 1MB and there is 32B overhead per record
             REQUIRE(stream->highestSequenceNumber() - stream->firstSequenceNumber() + 1 == 9);
-            REQUIRE(stream->currentSizeBytes() < 10 * 1024 * 1024);
+            REQUIRE(stream->currentSizeBytes() == 9 * (1024 * 1024 + aws::store::stream::LOG_ENTRY_HEADER_SIZE));
+        }
+
+        THEN("The max stream size is never exceeded") {
+            auto temp_dir = aws::store::test::utils::TempDir();
+            auto fs = std::make_shared<aws::store::test::utils::SpyFileSystem>(
+                std::make_shared<aws::store::filesystem::PosixFileSystem>(temp_dir.path()));
+            auto stream_or = aws::store::stream::FileStream::openOrCreate(aws::store::stream::StreamOptions{
+                1024,
+                5000,
+                true,
+                fs,
+                stream_logger,
+                aws::store::kv::KVOptions{
+                    true,
+                    fs,
+                    stream_logger,
+                    "m",
+                    1 * 1024,
+                },
+            });
+            REQUIRE(stream_or.ok());
+            auto stream = std::move(stream_or.val());
+
+            aws::store::common::OwnedSlice data{61};
+
+            for (int i = 0; i < 1000; i++) {
+                auto seq_or = stream->append(aws::store::common::BorrowedSlice{data.data(), data.size()}, append_opts);
+                REQUIRE(seq_or.ok());
+                // We never exceed the max size of the stream
+                REQUIRE(stream->currentSizeBytes() <= 5000);
+            }
         }
     }
     WHEN("Eviction of oldest data is not opted for") {
@@ -364,7 +393,7 @@ SCENARIO("Stream detects and recovers from corruption", "[stream]") {
     WHEN("I corrupt the second header in the first segment") {
         std::fstream file(temp_dir.path() / first_segment->first, std::ios::in | std::ios::out | std::ios::binary);
         REQUIRE(file);
-        file.seekp(log_header_size + stream_value_size);
+        file.seekp(aws::store::stream::LOG_ENTRY_HEADER_SIZE + stream_value_size);
         std::string corrupted_header = "A";
         file.write(corrupted_header.c_str(), static_cast<std::streamsize>(corrupted_header.size()));
         file.close();
