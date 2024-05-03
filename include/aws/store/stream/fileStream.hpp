@@ -55,6 +55,10 @@ class FileSegment {
         return _highest_seq_num;
     }
 
+    std::uint64_t getLatestTimestampMs() const noexcept {
+        return _latest_timestamp_ms;
+    }
+
     std::uint32_t totalSizeBytes() const noexcept {
         return _total_bytes;
     }
@@ -65,6 +69,7 @@ class FileSegment {
     std::shared_ptr<logging::Logger> _logger;
     std::uint64_t _base_seq_num{1U};
     std::uint64_t _highest_seq_num{0U};
+    std::uint64_t _latest_timestamp_ms{0U};
     std::uint32_t _total_bytes{0U};
     std::string _segment_id;
 
@@ -110,6 +115,7 @@ class __attribute__((visibility("default"))) FileStream : public StreamInterface
                                                        const bool remove_oldest_segments_if_full) noexcept;
     StreamError makeNextSegment() noexcept;
     StreamError loadExistingSegments() noexcept;
+    std::vector<FileSegment>::iterator eraseSegment(std::vector<FileSegment>::iterator) noexcept;
 
   public:
     static common::Expected<std::shared_ptr<FileStream>, StreamError> openOrCreate(StreamOptions &&) noexcept;
@@ -120,6 +126,8 @@ class __attribute__((visibility("default"))) FileStream : public StreamInterface
     common::Expected<uint64_t, StreamError> append(common::OwnedSlice &&, const AppendOptions &) noexcept override;
 
     common::Expected<OwnedRecord, StreamError> read(const uint64_t, const ReadOptions &) const noexcept override;
+
+    void removeOlderRecords(uint64_t older_than_timestamp_ms) noexcept override;
 
     Iterator openOrCreateIterator(const std::string &identifier, IteratorOptions) noexcept override;
     StreamError deleteIterator(const std::string &identifier) noexcept override;

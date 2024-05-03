@@ -96,6 +96,17 @@ common::Expected<OwnedRecord, StreamError> MemoryStream::read(const uint64_t seq
     return StreamError{StreamErrorCode::RecordNotFound, RecordNotFoundErrorStr};
 }
 
+void MemoryStream::removeOlderRecords(const uint64_t older_than_timestamp_ms) noexcept {
+    auto record = _records.begin();
+    while (record != _records.end()) {
+        if (record->timestamp >= 0 && static_cast<uint64_t>(record->timestamp) < older_than_timestamp_ms) {
+            record = _records.erase(record);
+        } else {
+            break;
+        }
+    }
+}
+
 Iterator MemoryStream::openOrCreateIterator(const std::string &identifier, IteratorOptions) noexcept {
     return Iterator{WEAK_FROM_THIS(), identifier,
                     _iterators.count(identifier) > 0U ? _iterators[identifier] : _first_sequence_number.load()};

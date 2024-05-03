@@ -179,13 +179,9 @@ StreamError FileStream::removeSegmentsIfNewRecordBeyondMaxSize(const uint32_t re
     }
 
     // Make room while we need more room
-    while (_current_size_bytes > (max_size - record_size)) {
-        auto &to_delete = _segments.front();
-        _current_size_bytes -= to_delete.totalSizeBytes();
-        to_delete.remove();
-        // Remove from in-memory
-        std::ignore = _segments.erase(_segments.cbegin());
-        _first_sequence_number = _segments.front().getBaseSeqNum();
+    auto seg = _segments.begin();
+    while (_current_size_bytes > (max_size - record_size) && seg != _segments.end()) {
+        seg = eraseSegment(seg);
     }
     return StreamError{StreamErrorCode::NoError, {}};
 }
@@ -242,6 +238,32 @@ common::Expected<OwnedRecord, StreamError> FileStream::read(const uint64_t seque
     }
 
     return StreamError{StreamErrorCode::RecordNotFound, RecordNotFoundErrorStr};
+}
+
+std::vector<FileSegment>::iterator FileStream::eraseSegment(std::vector<FileSegment>::iterator segment) noexcept {
+    _current_size_bytes -= segment->totalSizeBytes();
+    segment->remove();
+    // Remove from in-memory
+    auto out = _segments.erase(segment);
+    if (_segments.empty()) {
+        // use the next available sequence number
+        _first_sequence_number = segment->getHighestSeqNum() + 1;
+    } else {
+        _first_sequence_number = _segments.front().getBaseSeqNum();
+    }
+    return out;
+}
+
+void FileStream::removeOlderRecords(const uint64_t older_than_timestamp_ms) noexcept {
+    std::lock_guard<std::mutex> lock(_segments_lock);
+    auto seg = _segments.begin();
+    while (seg != _segments.end()) {
+        if (seg->getLatestTimestampMs() < older_than_timestamp_ms) {
+            seg = eraseSegment(seg);
+        } else {
+            break;
+        }
+    }
 }
 
 Iterator FileStream::openOrCreateIterator(const std::string &identifier, IteratorOptions) noexcept {

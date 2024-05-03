@@ -190,6 +190,7 @@ StreamError FileSegment::open(const bool full_corruption_check_on_open) noexcept
         _total_bytes += static_cast<std::uint32_t>(header.payload_length_bytes) + LOG_ENTRY_HEADER_SIZE;
         _highest_seq_num =
             std::max(_highest_seq_num, _base_seq_num + static_cast<std::uint64_t>(header.relative_sequence_number));
+        _latest_timestamp_ms = std::max(_latest_timestamp_ms, my_ntohll(static_cast<uint64_t>(header.timestamp)));
     }
 }
 
@@ -252,6 +253,7 @@ common::Expected<uint64_t, filesystem::FileError> FileSegment::append(const comm
 
     _highest_seq_num = std::max(_highest_seq_num, sequence_number);
     _total_bytes += d.size() + static_cast<uint32_t>(sizeof(LogEntryHeader));
+    _latest_timestamp_ms = static_cast<uint64_t>(timestamp_ms);
 
     return d.size() + sizeof(LogEntryHeader);
 }

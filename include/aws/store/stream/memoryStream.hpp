@@ -34,6 +34,8 @@ class __attribute__((visibility("default"))) MemoryStream : public StreamInterfa
     common::Expected<OwnedRecord, StreamError> read(const uint64_t sequence_number,
                                                     const ReadOptions &) const noexcept override;
 
+    void removeOlderRecords(uint64_t older_than_timestamp_ms) noexcept override;
+
     Iterator openOrCreateIterator(const std::string &identifier, IteratorOptions) noexcept override;
     StreamError deleteIterator(const std::string &identifier) noexcept override;
 

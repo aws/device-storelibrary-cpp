@@ -54,7 +54,7 @@ class PosixFileLike : public FileLike {
     FILE *_f = nullptr;
 
   public:
-    explicit PosixFileLike(std::filesystem::path &&path) : _path(std::move(path)) {};
+    explicit PosixFileLike(std::filesystem::path &&path) : _path(std::move(path)){};
     PosixFileLike(PosixFileLike &&) = delete;
     PosixFileLike(PosixFileLike &) = delete;
     PosixFileLike &operator=(PosixFileLike &) = delete;
@@ -133,7 +133,7 @@ class PosixUnbufferedFileLike : public FileLike {
     std::filesystem::path _path;
 
   public:
-    explicit PosixUnbufferedFileLike(std::filesystem::path &&path) : _path(std::move(path)) {};
+    explicit PosixUnbufferedFileLike(std::filesystem::path &&path) : _path(std::move(path)){};
     PosixUnbufferedFileLike(PosixUnbufferedFileLike &&) = delete;
     PosixUnbufferedFileLike(PosixUnbufferedFileLike &) = delete;
     PosixUnbufferedFileLike &operator=(PosixUnbufferedFileLike &) = delete;
@@ -227,7 +227,7 @@ class PosixFileSystem : public FileSystemInterface {
     std::filesystem::path _base_path;
 
   public:
-    explicit PosixFileSystem(std::filesystem::path base_path) : _base_path(std::move(base_path)) {};
+    explicit PosixFileSystem(std::filesystem::path base_path) : _base_path(std::move(base_path)){};
 
     virtual common::Expected<std::unique_ptr<FileLike>, FileError> open(const std::string &identifier) override {
         if (!_initialized) {
@@ -280,7 +280,7 @@ class PosixFileSystem : public FileSystemInterface {
 
 class PosixUnbufferedFileSystem : public PosixFileSystem {
   public:
-    explicit PosixUnbufferedFileSystem(std::filesystem::path base_path) : PosixFileSystem(std::move(base_path)) {};
+    explicit PosixUnbufferedFileSystem(std::filesystem::path base_path) : PosixFileSystem(std::move(base_path)){};
 
     virtual common::Expected<std::unique_ptr<FileLike>, FileError> open(const std::string &identifier) override {
         if (!_initialized) {

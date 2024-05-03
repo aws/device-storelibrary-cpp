@@ -184,6 +184,18 @@ namespace stream __attribute__((visibility("default"))) {
                                                                 const ReadOptions &) const noexcept = 0;
 
         /**
+         * Attempt to remove records from the stream that are older than the provided timestamp.
+         *
+         * This operation is a best-effort, and it is not guaranteed that ALL older records will be
+         * removed.
+         * For example, the file stream implementation is based on segments (groups of records),
+         * and segments will only be deleted if all of their records are expired.
+         *
+         * @param older_than_timestamp_ms timestamp for which stream records will be compared against
+         */
+        virtual void removeOlderRecords(uint64_t older_than_timestamp_ms) noexcept = 0;
+
+        /**
          * Create an iterator identified by the chosen identifier. If an iterator already exists with the same
          * identifier, this iterator will start from the last record checkpoint() was called for the same identifier.
          * If no iterator exists with the same identifier, this iterator will start from the beginning of the stream.

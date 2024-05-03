@@ -8,6 +8,7 @@
 #include <memory>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <vector>
 
 class StreamLogger final : public aws::store::logging::Logger {
@@ -464,6 +465,97 @@ SCENARIO("Stream detects and recovers from corruption", "[stream]") {
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+SCENARIO("Old records can be removed", "[stream]") {
+    auto temp_dir = aws::store::test::utils::TempDir();
+    auto fs = std::make_shared<aws::store::test::utils::SpyFileSystem>(
+        std::make_shared<aws::store::filesystem::PosixFileSystem>(temp_dir.path()));
+
+    auto stream_or = open_stream(fs);
+    REQUIRE(stream_or.ok());
+    auto stream = std::move(stream_or.val());
+
+    WHEN("I append enough values to create multiple stream segments") {
+        std::string value;
+        uint32_t stream_value_size = 1024 * 1024 / 4; // segment size is 1024 * 1024
+        aws::store::test::utils::random_string(value, stream_value_size);
+        uint64_t num_records = 20; // put in enough records to create multiple segments
+
+        for (uint64_t i = 0; i < num_records; ++i) {
+            auto seq_or = stream->append(aws::store::common::BorrowedSlice{value}, aws::store::stream::AppendOptions{});
+            REQUIRE(seq_or.ok());
+            std::this_thread::sleep_for(std::chrono::milliseconds(5)); // give each record a distinct timestamp
+        }
+
+        // verify stream has multiple segments
+        std::map<std::string, std::vector<std::string>> segments =
+            read_stream_values_by_segment(fs, temp_dir.path(), stream_value_size);
+        REQUIRE(segments.size() > 3);
+
+        THEN("I can expire records from a segment") {
+            auto iter = segments.begin();
+            auto first_seq_num_second_seg = iter->second.size();
+
+            // lookup a record within the second segment
+            auto v_or = stream->read(first_seq_num_second_seg + 1, aws::store::stream::ReadOptions{});
+            REQUIRE(v_or.ok());
+            auto timestamp_to_remove = v_or.val().timestamp;
+
+            auto size_before = stream->currentSizeBytes();
+            stream->removeOlderRecords(static_cast<uint64_t>(timestamp_to_remove));
+            REQUIRE(size_before > stream->currentSizeBytes());
+
+            // only the first segment is removed.
+            // second segment is NOT removed, because not ALL of its records are expired
+            for (uint64_t i = 0; i < num_records; ++i) {
+                v_or = stream->read(i, aws::store::stream::ReadOptions{});
+                auto expected = i >= first_seq_num_second_seg;
+                REQUIRE(v_or.ok() == expected);
+            }
+        }
+
+        THEN("I can remove old records") {
+            uint64_t curr_timestamp_ms = static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
+                                                                   std::chrono::system_clock::now().time_since_epoch())
+                                                                   .count());
+            auto size_before = stream->currentSizeBytes();
+            stream->removeOlderRecords(curr_timestamp_ms + 5000);
+            REQUIRE(size_before > stream->currentSizeBytes());
+
+            // all values have been removed
+            for (uint64_t i = 0; i < num_records; ++i) {
+                auto v_or = stream->read(i, aws::store::stream::ReadOptions{});
+                REQUIRE(!v_or.ok());
+            }
+
+            THEN("I can still append new records") {
+                for (uint64_t i = 0; i < num_records; ++i) {
+                    auto seq_or =
+                        stream->append(aws::store::common::BorrowedSlice{"val"}, aws::store::stream::AppendOptions{});
+                    REQUIRE(seq_or.ok());
+                }
+                for (uint64_t i = num_records; i < num_records * 2; ++i) {
+                    auto v_or = stream->read(i, aws::store::stream::ReadOptions{});
+                    REQUIRE(v_or.ok());
+                }
+            }
+        }
+        THEN("I can't remove later records") {
+            auto v_or = stream->read(0, aws::store::stream::ReadOptions{});
+            REQUIRE(v_or.ok());
+
+            auto size_before = stream->currentSizeBytes();
+            stream->removeOlderRecords(static_cast<uint64_t>(v_or.val().timestamp));
+            REQUIRE(size_before == stream->currentSizeBytes());
+
+            // no values have been removed
+            for (uint64_t i = 0; i < num_records; ++i) {
+                v_or = stream->read(i, aws::store::stream::ReadOptions{});
+                REQUIRE(v_or.ok());
             }
         }
     }
