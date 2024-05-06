@@ -243,15 +243,18 @@ common::Expected<OwnedRecord, StreamError> FileStream::read(const uint64_t seque
 
 std::vector<FileSegment>::iterator FileStream::eraseSegment(std::vector<FileSegment>::iterator segment) noexcept {
     _current_size_bytes -= segment->totalSizeBytes();
+    auto prev_highest_sequence_num = segment->getHighestSeqNum();
     segment->remove();
+
     // Remove from in-memory
     auto out = _segments.erase(segment);
     if (_segments.empty()) {
         // use the next available sequence number
-        _first_sequence_number = segment->getHighestSeqNum() + 1;
+        _first_sequence_number = prev_highest_sequence_num + 1;
     } else {
         _first_sequence_number = _segments.front().getBaseSeqNum();
     }
+
     return out;
 }
 
