@@ -17,6 +17,7 @@ namespace store {
 namespace stream {
 std::shared_ptr<MemoryStream> MemoryStream::openOrCreate(StreamOptions &&opts) noexcept {
     // coverity[autosar_cpp14_a20_8_6_violation] constructor is private, cannot use make_shared
+    // coverity[misra_cpp_2008_rule_18_4_1_violation] constructor is private, cannot use make_shared
     return std::shared_ptr<MemoryStream>(new MemoryStream(std::move(opts)));
 }
 

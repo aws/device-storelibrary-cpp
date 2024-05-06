@@ -31,6 +31,7 @@ common::Expected<std::shared_ptr<KV>, KVError> KV::openOrCreate(KVOptions &&o) n
     }
 
     // coverity[autosar_cpp14_a20_8_6_violation] constructor is private, cannot use make_shared
+    // coverity[misra_cpp_2008_rule_18_4_1_violation] constructor is private, cannot use make_shared
     auto kv = std::shared_ptr<KV>(new KV(std::move(opts)));
     auto err = kv->initialize();
     if (!err.ok()) {

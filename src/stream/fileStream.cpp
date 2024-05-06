@@ -24,6 +24,7 @@ namespace store {
 namespace stream {
 common::Expected<std::shared_ptr<FileStream>, StreamError> FileStream::openOrCreate(StreamOptions &&opts) noexcept {
     // coverity[autosar_cpp14_a20_8_6_violation] constructor is private, cannot use make_shared
+    // coverity[misra_cpp_2008_rule_18_4_1_violation] constructor is private, cannot use make_shared
     auto stream = std::shared_ptr<FileStream>(new FileStream(std::move(opts)));
     auto err = stream->loadExistingSegments();
     if (!err.ok()) {

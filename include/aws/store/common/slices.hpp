@@ -13,7 +13,7 @@ class BorrowedSlice {
     const uint32_t _size;
 
   public:
-    BorrowedSlice() : _data(nullptr), _size(0U){};
+    BorrowedSlice() : _data(nullptr), _size(0U) {};
     BorrowedSlice(const void *data, const size_t size) : _data(data), _size(static_cast<uint32_t>(size)) {
         // coverity[misra_cpp_2008_rule_5_2_12_violation] false positive
         assert(size <= UINT32_MAX);
@@ -51,6 +51,7 @@ class OwnedSlice : private std::unique_ptr<uint8_t[]> {
     OwnedSlice() = default;
     explicit OwnedSlice(const BorrowedSlice b) : _size(b.size()) {
         // coverity[autosar_cpp14_a20_8_5_violation] cannot construct arbitrary size with make_unique
+        // coverity[misra_cpp_2008_rule_18_4_1_violation] cannot construct arbitrary size with make_unique
         std::unique_ptr<uint8_t[]> mem{new (std::nothrow) uint8_t[_size]};
         std::ignore = memcpy(mem.get(), b.data(), b.size());
         swap(mem);
@@ -58,6 +59,7 @@ class OwnedSlice : private std::unique_ptr<uint8_t[]> {
 
     explicit OwnedSlice(const uint32_t size) : _size(size) {
         // coverity[autosar_cpp14_a20_8_5_violation] cannot construct arbitrary size with make_unique
+        // coverity[misra_cpp_2008_rule_18_4_1_violation] cannot construct arbitrary size with make_unique
         std::unique_ptr<uint8_t[]> mem{new (std::nothrow) uint8_t[_size]};
         swap(mem);
     }
