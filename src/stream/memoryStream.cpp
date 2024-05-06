@@ -96,10 +96,10 @@ common::Expected<OwnedRecord, StreamError> MemoryStream::read(const uint64_t seq
     return StreamError{StreamErrorCode::RecordNotFound, RecordNotFoundErrorStr};
 }
 
-void MemoryStream::removeOlderRecords(const uint64_t older_than_timestamp_ms) noexcept {
+void MemoryStream::removeOlderRecords(const int64_t older_than_timestamp_ms) noexcept {
     auto record = _records.begin();
     while (record != _records.end()) {
-        if (record->timestamp >= 0 && static_cast<uint64_t>(record->timestamp) < older_than_timestamp_ms) {
+        if (record->timestamp < older_than_timestamp_ms) {
             record = _records.erase(record);
         } else {
             break;

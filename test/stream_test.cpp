@@ -503,10 +503,9 @@ SCENARIO("Old records can be removed", "[stream]") {
             // lookup a record within the second segment
             auto v_or = stream->read(first_seq_num_second_seg + 1, aws::store::stream::ReadOptions{});
             REQUIRE(v_or.ok());
-            auto timestamp_to_remove = v_or.val().timestamp;
 
             auto size_before = stream->currentSizeBytes();
-            stream->removeOlderRecords(static_cast<uint64_t>(timestamp_to_remove));
+            stream->removeOlderRecords(v_or.val().timestamp);
             REQUIRE(size_before > stream->currentSizeBytes());
 
             // only the first segment is removed.
@@ -519,9 +518,9 @@ SCENARIO("Old records can be removed", "[stream]") {
         }
 
         THEN("I can remove old records") {
-            uint64_t curr_timestamp_ms = static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
-                                                                   std::chrono::system_clock::now().time_since_epoch())
-                                                                   .count());
+            auto curr_timestamp_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                         std::chrono::system_clock::now().time_since_epoch())
+                                         .count();
             auto size_before = stream->currentSizeBytes();
             stream->removeOlderRecords(curr_timestamp_ms + 5000);
             REQUIRE(size_before > stream->currentSizeBytes());
@@ -549,7 +548,7 @@ SCENARIO("Old records can be removed", "[stream]") {
             REQUIRE(v_or.ok());
 
             auto size_before = stream->currentSizeBytes();
-            stream->removeOlderRecords(static_cast<uint64_t>(v_or.val().timestamp));
+            stream->removeOlderRecords(v_or.val().timestamp);
             REQUIRE(size_before == stream->currentSizeBytes());
 
             // no values have been removed

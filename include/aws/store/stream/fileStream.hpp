@@ -55,7 +55,7 @@ class FileSegment {
         return _highest_seq_num;
     }
 
-    std::uint64_t getLatestTimestampMs() const noexcept {
+    std::int64_t getLatestTimestampMs() const noexcept {
         return _latest_timestamp_ms;
     }
 
@@ -69,7 +69,7 @@ class FileSegment {
     std::shared_ptr<logging::Logger> _logger;
     std::uint64_t _base_seq_num{1U};
     std::uint64_t _highest_seq_num{0U};
-    std::uint64_t _latest_timestamp_ms{0U};
+    std::int64_t _latest_timestamp_ms{0};
     std::uint32_t _total_bytes{0U};
     std::string _segment_id;
 
@@ -127,7 +127,7 @@ class __attribute__((visibility("default"))) FileStream : public StreamInterface
 
     common::Expected<OwnedRecord, StreamError> read(const uint64_t, const ReadOptions &) const noexcept override;
 
-    void removeOlderRecords(uint64_t older_than_timestamp_ms) noexcept override;
+    void removeOlderRecords(int64_t older_than_timestamp_ms) noexcept override;
 
     Iterator openOrCreateIterator(const std::string &identifier, IteratorOptions) noexcept override;
     StreamError deleteIterator(const std::string &identifier) noexcept override;
