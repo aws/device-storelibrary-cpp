@@ -190,8 +190,7 @@ StreamError FileSegment::open(const bool full_corruption_check_on_open) noexcept
         _total_bytes += static_cast<std::uint32_t>(header.payload_length_bytes) + LOG_ENTRY_HEADER_SIZE;
         _highest_seq_num =
             std::max(_highest_seq_num, _base_seq_num + static_cast<std::uint64_t>(header.relative_sequence_number));
-        _latest_timestamp_ms =
-            std::max(_latest_timestamp_ms, static_cast<int64_t>(my_ntohll(static_cast<uint64_t>(header.timestamp))));
+        _latest_timestamp_ms = std::max(_latest_timestamp_ms, header.timestamp);
     }
 }
 

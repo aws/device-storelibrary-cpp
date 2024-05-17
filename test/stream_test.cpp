@@ -496,6 +496,12 @@ SCENARIO("Old records can be removed", "[stream]") {
             read_stream_values_by_segment(fs, temp_dir.path(), stream_value_size);
         REQUIRE(segments.size() > 3);
 
+        // reopen the stream to make sure we can read
+        // latest timestamp properly from segment headers
+        stream_or = open_stream(fs);
+        REQUIRE(stream_or.ok());
+        stream = std::move(stream_or.val());
+
         THEN("I can expire records from a segment") {
             auto iter = segments.begin();
             auto first_seq_num_second_seg = iter->second.size();
