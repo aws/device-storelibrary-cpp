@@ -193,7 +193,7 @@ namespace stream __attribute__((visibility("default"))) {
          *
          * @param older_than_timestamp_ms timestamp for which stream records will be compared against
          */
-        virtual void removeOlderRecords(int64_t older_than_timestamp_ms) noexcept = 0;
+        virtual uint64_t removeOlderRecords(int64_t older_than_timestamp_ms) noexcept = 0;
 
         /**
          * Create an iterator identified by the chosen identifier. If an iterator already exists with the same

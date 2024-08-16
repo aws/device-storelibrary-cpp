@@ -127,7 +127,7 @@ class __attribute__((visibility("default"))) FileStream : public StreamInterface
 
     common::Expected<OwnedRecord, StreamError> read(const uint64_t, const ReadOptions &) const noexcept override;
 
-    void removeOlderRecords(int64_t older_than_timestamp_ms) noexcept override;
+    uint64_t removeOlderRecords(int64_t older_than_timestamp_ms) noexcept override;
 
     Iterator openOrCreateIterator(const std::string &identifier, IteratorOptions) noexcept override;
     StreamError deleteIterator(const std::string &identifier) noexcept override;

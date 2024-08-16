@@ -258,16 +258,19 @@ std::vector<FileSegment>::iterator FileStream::eraseSegment(std::vector<FileSegm
     return out;
 }
 
-void FileStream::removeOlderRecords(const int64_t older_than_timestamp_ms) noexcept {
+uint64_t FileStream::removeOlderRecords(const int64_t older_than_timestamp_ms) noexcept {
     std::lock_guard<std::mutex> lock(_segments_lock);
+    uint64_t totalSizeBytes = 0;
     auto seg = _segments.begin();
     while (seg != _segments.end()) {
         if (seg->getLatestTimestampMs() < older_than_timestamp_ms) {
+            totalSizeBytes += seg->totalSizeBytes();
             seg = eraseSegment(seg);
         } else {
             break;
         }
     }
+    return totalSizeBytes;
 }
 
 Iterator FileStream::openOrCreateIterator(const std::string &identifier, IteratorOptions) noexcept {

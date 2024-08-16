@@ -97,15 +97,18 @@ common::Expected<OwnedRecord, StreamError> MemoryStream::read(const uint64_t seq
     return StreamError{StreamErrorCode::RecordNotFound, RecordNotFoundErrorStr};
 }
 
-void MemoryStream::removeOlderRecords(const int64_t older_than_timestamp_ms) noexcept {
+uint64_t MemoryStream::removeOlderRecords(const int64_t older_than_timestamp_ms) noexcept {
+    uint64_t totalSizeBytes = 0;
     auto record = _records.begin();
     while (record != _records.end()) {
         if (record->timestamp < older_than_timestamp_ms) {
+            totalSizeBytes += record->data.size();
             record = _records.erase(record);
         } else {
             break;
         }
     }
+    return totalSizeBytes;
 }
 
 Iterator MemoryStream::openOrCreateIterator(const std::string &identifier, IteratorOptions) noexcept {
