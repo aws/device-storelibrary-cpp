@@ -1,0 +1,10 @@
+---
+# We'll use defaults from the LLVM style, but with 4 columns indentation.
+BasedOnStyle: LLVM
+IndentWidth: 4
+# Use up to 120 columns
+ColumnLimit: 120
+Language: Cpp
+# Don't be "smart" about determining where the * and & go
+DerivePointerAlignment: false
+AllowShortFunctionsOnASingleLine: None
