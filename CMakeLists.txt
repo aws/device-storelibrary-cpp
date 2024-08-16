@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10.2)
-project(aws-store)
+project(device-storelibrary-cpp)
 
 option(STORE_UNITY_BUILD "Build store using a unity build" ON)
 if(STORE_UNITY_BUILD)
