@@ -1,3 +1,6 @@
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 #include "test_utils.hpp"
 #include <aws/store/filesystem/posixFileSystem.hpp>
 #include <aws/store/stream/fileStream.hpp>

@@ -1,3 +1,6 @@
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 #include <algorithm>
 #include <aws/store/common/crc32.hpp>
 #include <aws/store/common/expected.hpp>

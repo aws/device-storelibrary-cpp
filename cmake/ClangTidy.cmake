@@ -1,3 +1,6 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 if(NOT CLANGTIDY_EXECUTABLE)
     set(CLANGTIDY_EXECUTABLE clang-tidy)
 endif()

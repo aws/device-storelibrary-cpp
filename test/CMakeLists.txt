@@ -1,3 +1,6 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 # Find Catch2 if we can. If we cannot, then download it with CPM
 find_package(Catch2 CONFIG QUIET)
 if(NOT Catch2_FOUND)
