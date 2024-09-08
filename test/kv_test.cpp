@@ -7,6 +7,7 @@
 #include <memory>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 class KVLogger final : public aws::store::logging::Logger {
@@ -152,7 +153,7 @@ SCENARIO("I open a KV map from a shadow file", "[kv]") {
             kv_or.val().reset();
 
             // Truncate map file, making it corrupt
-            ::truncate((temp_dir.path() / "test-kv-map").c_str(), 150);
+            std::ignore = ::truncate((temp_dir.path() / "test-kv-map").c_str(), 150);
 
             // This will verify that we're still able to load the file and read as much as is uncorrupted.
             std::filesystem::rename(temp_dir.path() / "test-kv-map",
