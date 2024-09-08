@@ -18,8 +18,12 @@ if(CMAKE_BUILD_TYPE MATCHES "Release" AND STORE_USE_LTO)
     message("IPO enabled, debugging will not work")
 endif()
 
+# TODO: MSVC is not supported right now. Build only works without error on Linux
 if(MSVC)
-    list(APPEND STORE_COMPILE_FLAGS "/EHs-c-" "/D_HAS_EXCEPTIONS=0" "/Wall" "/WX")
+    # /wd4820 ignore extra padding added to structs
+    # /wd4626 ignore implicitly deleted assignment operator
+    # /wd5027 ignore implicitly deleted move assignment operator
+    list(APPEND STORE_COMPILE_FLAGS "/EHs-c-" "/D_HAS_EXCEPTIONS=0" "/Wall" "/WX" "/wd4820" "/wd4626" "/wd5027")
     if(NOT CMAKE_BUILD_TYPE MATCHES "Debug")
         # Keep RTTI in debug for UBSan
         list(APPEND STORE_COMPILE_FLAGS "/GR-")
