@@ -3,6 +3,7 @@
 #include <cstring>
 #include <memory> // for unique_ptr
 #include <string>
+#include <utility>
 
 namespace aws {
 namespace store {
