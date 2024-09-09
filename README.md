@@ -5,7 +5,8 @@ The database also provides simple primitives enabling reliable data upload by of
 
 # Getting Started
 ## Requirements
-1. Install CMake and the relevant build tools for your platform. Ensure these are available in your executable path.
+1. Linux (Windows is not yet supported)
+2. Install CMake and the relevant build tools for your platform. Ensure these are available in your executable path.
 
 ## Using the Device Store Library
 Example usage of Stream Store and KV Store can be found [here](https://github.com/aws/device-storelibrary-cpp/blob/main/src/main.cpp#L48)
@@ -14,14 +15,9 @@ Example usage of Stream Store and KV Store can be found [here](https://github.co
 ### Building from source
 1. Clone this repository `git clone https://github.com/aws/device-storelibrary-cpp.git`
 2. Create your build directory. Replace `<BUILD_DIR>` with your build directory name 
-3. Build the project: 
+3. Build the project where `<BUILD_TYPE>` can be `Debug`, `RelWithDebInfo`, or `Release`: 
     ```
-    cd <BUILD_DIR>
-    cmake <path-to-root-of-this-source-code> \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_INSTALL_PREFIX=<path-to-install> \
-    cmake --build . --config=Release
-    cmake --install . --config=Release
+    cmake --build <BUILD_DIR> --config <BUILD_TYPE> --target release
     ```
    
 ### Consume Library using CPM
