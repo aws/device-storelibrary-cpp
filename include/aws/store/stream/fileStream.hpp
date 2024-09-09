@@ -19,6 +19,8 @@ namespace aws {
 namespace store {
 namespace stream {
 
+// DO NOT MODIFY!
+// Required to maintain compatibility with AWS Greengrass Stream Manager's header size
 constexpr uint8_t LOG_ENTRY_HEADER_SIZE = 32U;
 
 struct LogEntryHeader;

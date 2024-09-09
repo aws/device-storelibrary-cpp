@@ -19,6 +19,7 @@ set_target_properties(tests PROPERTIES CXX_STANDARD 17)
 target_link_libraries(tests PRIVATE Catch2::Catch2WithMain stream)
 target_clangformat_setup(tests)
 target_compile_options(tests PRIVATE ${STORE_COMPILE_FLAGS})
+target_link_options(tests PRIVATE ${STORE_LINK_FLAGS})
 
 if(CMAKE_BUILD_TYPE MATCHES "Debug")
     include(../cmake/Sanitizers.cmake)

@@ -21,8 +21,12 @@ if(CMAKE_BUILD_TYPE MATCHES "Release" AND STORE_USE_LTO)
     message("IPO enabled, debugging will not work")
 endif()
 
+# TODO: MSVC is not supported right now. Build only works without error on Linux
 if(MSVC)
-    list(APPEND STORE_COMPILE_FLAGS "/EHs-c-" "/D_HAS_EXCEPTIONS=0" "/Wall" "/WX")
+    # /wd4820 ignore extra padding added to structs
+    # /wd4626 ignore implicitly deleted assignment operator
+    # /wd5027 ignore implicitly deleted move assignment operator
+    list(APPEND STORE_COMPILE_FLAGS "/EHs-c-" "/D_HAS_EXCEPTIONS=0" "/Wall" "/WX" "/wd4820" "/wd4626" "/wd5027")
     if(NOT CMAKE_BUILD_TYPE MATCHES "Debug")
         # Keep RTTI in debug for UBSan
         list(APPEND STORE_COMPILE_FLAGS "/GR-")
@@ -39,7 +43,7 @@ else()
         "-pedantic"
     )
     if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND STORE_USE_LLD)
-        list(APPEND STORE_COMPILE_FLAGS "-fuse-ld=lld")
+        list(APPEND STORE_LINK_FLAGS "-fuse-ld=lld")
     endif()
     if(NOT CMAKE_BUILD_TYPE MATCHES "Debug")
         # Keep RTTI in debug for UBSan
@@ -67,6 +71,7 @@ target_include_directories(
     kv PUBLIC "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>" "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
 )
 target_compile_options(kv PRIVATE ${STORE_COMPILE_FLAGS})
+target_link_options(kv PRIVATE ${STORE_LINK_FLAGS})
 target_clangformat_setup(kv)
 target_clangtidy_setup(kv)
 target_cppcheck_setup(kv)
@@ -89,6 +94,7 @@ add_library(
 set_target_properties(stream PROPERTIES CXX_STANDARD 11 CXX_VISIBILITY_PRESET hidden)
 target_link_libraries(stream PUBLIC kv)
 target_compile_options(stream PRIVATE ${STORE_COMPILE_FLAGS})
+target_link_options(stream PRIVATE ${STORE_LINK_FLAGS})
 target_clangformat_setup(stream)
 target_clangtidy_setup(stream)
 target_cppcheck_setup(stream)
@@ -124,6 +130,7 @@ if(STORE_BUILD_EXAMPLE)
     set_target_properties(example PROPERTIES CXX_STANDARD 17)
     target_link_libraries(example PRIVATE stream)
     target_compile_options(example PRIVATE ${STORE_COMPILE_FLAGS})
+    target_link_options(example PRIVATE ${STORE_LINK_FLAGS})
     target_clangformat_setup(example)
     target_clangtidy_setup(example)
     target_cppcheck_setup(example)
