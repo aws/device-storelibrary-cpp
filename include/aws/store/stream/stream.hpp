@@ -25,13 +25,14 @@ namespace stream __attribute__((visibility("default"))) {
         common::OwnedSlice data{};
         int64_t timestamp{};
         uint64_t sequence_number{};
+        common::OwnedSlice metadata{};
 
         OwnedRecord() = default;
 
         // coverity[autosar_cpp14_a15_4_3_violation] false positive, all implementations are noexcept
         // coverity[misra_cpp_2008_rule_15_4_1_violation] false positive, implementation is noexcept
         OwnedRecord(common::OwnedSlice &&idata, const int64_t itimestamp, const uint64_t isequence_number,
-                    const uint32_t ioffset) noexcept;
+                    const uint32_t ioffset, common::OwnedSlice &&imetadata) noexcept;
     };
 
     enum class StreamErrorCode : std::uint8_t {
@@ -163,7 +164,7 @@ namespace stream __attribute__((visibility("default"))) {
          *
          * @return the sequence number of the record appended.
          */
-        virtual common::Expected<uint64_t, StreamError> append(const common::BorrowedSlice,
+        virtual common::Expected<uint64_t, StreamError> append(const common::BorrowedSlice, const common::BorrowedSlice,
                                                                const AppendOptions &) noexcept = 0;
 
         /**
@@ -171,7 +172,7 @@ namespace stream __attribute__((visibility("default"))) {
          *
          * @return the sequence number of the record appended.
          */
-        virtual common::Expected<uint64_t, StreamError> append(common::OwnedSlice &&,
+        virtual common::Expected<uint64_t, StreamError> append(common::OwnedSlice &&, common::OwnedSlice &&,
                                                                const AppendOptions &) noexcept = 0;
 
         /**

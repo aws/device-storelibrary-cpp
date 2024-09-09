@@ -69,14 +69,15 @@ constexpr int32_t MAGIC_AND_VERSION = MAGIC_BYTES << 8 | static_cast<int8_t>(VER
 struct LogEntryHeader {
     int32_t magic_and_version;
     int32_t relative_sequence_number;
-    int32_t byte_position;
+    int64_t byte_position;
     int64_t crc;
     int64_t timestamp;
+    int32_t metadata_length_bytes;
     int32_t payload_length_bytes;
 };
 #pragma pack(pop)
 
-static_assert(sizeof(LogEntryHeader) == LOG_ENTRY_HEADER_SIZE, "Header size must be 32 bytes!");
+static_assert(sizeof(LogEntryHeader) == LOG_ENTRY_HEADER_SIZE, "Header size must be 36 bytes!");
 
 static std::string string(const store::stream::StreamErrorCode e) noexcept {
     std::string v{};
@@ -187,7 +188,9 @@ StreamError FileSegment::open(const bool full_corruption_check_on_open) noexcept
 
         offset += LOG_ENTRY_HEADER_SIZE;
         offset += static_cast<uint32_t>(header.payload_length_bytes);
-        _total_bytes += static_cast<std::uint32_t>(header.payload_length_bytes) + LOG_ENTRY_HEADER_SIZE;
+        offset += static_cast<uint32_t>(header.metadata_length_bytes);
+        _total_bytes += static_cast<std::uint32_t>(header.payload_length_bytes) +
+                        static_cast<std::uint32_t>(header.metadata_length_bytes) + LOG_ENTRY_HEADER_SIZE;
         _highest_seq_num =
             std::max(_highest_seq_num, _base_seq_num + static_cast<std::uint64_t>(header.relative_sequence_number));
         _latest_timestamp_ms = std::max(_latest_timestamp_ms, header.timestamp);
@@ -199,6 +202,8 @@ LogEntryHeader FileSegment::convertSliceToHeader(const common::OwnedSlice &data)
     // coverity[autosar_cpp14_a12_0_2_violation] Use memcpy instead of reinterpret cast to avoid UB.
     std::ignore = memcpy(&header, data.data(), sizeof(LogEntryHeader));
 
+    header.metadata_length_bytes =
+        static_cast<int32_t>(my_ntohl(static_cast<std::uint32_t>(header.metadata_length_bytes)));
     header.payload_length_bytes =
         static_cast<int32_t>(my_ntohl(static_cast<std::uint32_t>(header.payload_length_bytes)));
     header.relative_sequence_number =
@@ -210,24 +215,25 @@ LogEntryHeader FileSegment::convertSliceToHeader(const common::OwnedSlice &data)
     return header;
 }
 
-common::Expected<uint64_t, filesystem::FileError> FileSegment::append(const common::BorrowedSlice d,
-                                                                      const int64_t timestamp_ms,
-                                                                      const uint64_t sequence_number,
-                                                                      const bool sync) noexcept {
+common::Expected<uint64_t, filesystem::FileError>
+FileSegment::append(const common::BorrowedSlice d, const int64_t timestamp_ms, const uint64_t sequence_number,
+                    const common::BorrowedSlice metadata, const bool sync) noexcept {
     const auto ts = static_cast<int64_t>(my_htonll(static_cast<std::uint64_t>(timestamp_ms)));
+    const auto metadata_len_swap = static_cast<int32_t>(my_htonl(metadata.size()));
     const auto data_len_swap = static_cast<int32_t>(my_htonl(d.size()));
-    const auto byte_position = static_cast<int32_t>(my_htonl(_total_bytes));
+    const auto byte_position = static_cast<int64_t>(my_htonll(_total_bytes));
 
     const auto crc = static_cast<int64_t>(my_htonll(store::common::crc32::crc32_of(
-        {common::BorrowedSlice{&ts, sizeof(ts)}, common::BorrowedSlice{&data_len_swap, sizeof(data_len_swap)}, d})));
-    const auto header = LogEntryHeader{
-        static_cast<int32_t>(my_htonl(static_cast<std::uint32_t>(MAGIC_AND_VERSION))),
-        static_cast<int32_t>(my_htonl(static_cast<std::uint32_t>(sequence_number - _base_seq_num))),
-        byte_position,
-        crc,
-        ts,
-        static_cast<int32_t>(my_htonl(d.size())),
-    };
+        {common::BorrowedSlice{&ts, sizeof(ts)}, common::BorrowedSlice{&metadata_len_swap, sizeof(metadata_len_swap)},
+         metadata, common::BorrowedSlice{&data_len_swap, sizeof(data_len_swap)}, d})));
+    const auto header =
+        LogEntryHeader{static_cast<int32_t>(my_htonl(static_cast<std::uint32_t>(MAGIC_AND_VERSION))),
+                       static_cast<int32_t>(my_htonl(static_cast<std::uint32_t>(sequence_number - _base_seq_num))),
+                       byte_position,
+                       crc,
+                       ts,
+                       static_cast<int32_t>(my_htonl(metadata.size())),
+                       static_cast<int32_t>(my_htonl(d.size()))};
 
     // If an error happens when appending, truncate the file to the current size so that we don't have any
     // partial data in the file, and then return the error.
@@ -236,26 +242,36 @@ common::Expected<uint64_t, filesystem::FileError> FileSegment::append(const comm
         std::ignore = _f->truncate(_total_bytes);
         return e;
     }
+
+    // append metadata
+    if (metadata.size() > 0) {
+        e = _f->append(metadata);
+        if (!e.ok()) {
+            std::ignore = _f->truncate(_total_bytes);
+            return e;
+        }
+    }
+    // append data
     e = _f->append(d);
     if (!e.ok()) {
         std::ignore = _f->truncate(_total_bytes);
         return e;
     }
+
     e = _f->flush();
     if (!e.ok()) {
         std::ignore = _f->truncate(_total_bytes);
         return e;
     }
-
     if (sync) {
         _f->sync();
     }
 
     _highest_seq_num = std::max(_highest_seq_num, sequence_number);
-    _total_bytes += d.size() + static_cast<uint32_t>(sizeof(LogEntryHeader));
+    _total_bytes += d.size() + metadata.size() + static_cast<uint32_t>(sizeof(LogEntryHeader));
     _latest_timestamp_ms = timestamp_ms;
 
-    return d.size() + sizeof(LogEntryHeader);
+    return d.size() + metadata.size() + sizeof(LogEntryHeader);
 }
 
 common::Expected<OwnedRecord, StreamError> FileSegment::read(const uint64_t sequence_number,
@@ -298,34 +314,48 @@ common::Expected<OwnedRecord, StreamError> FileSegment::read(const uint64_t sequ
         // We found the one we want, or the next available sequence number was acceptable to us
         if ((header.relative_sequence_number == expected_rel_seq_num) ||
             ((header.relative_sequence_number > expected_rel_seq_num) && read_options.may_return_later_records)) {
-            auto data_or =
+
+            // read metadata
+            auto metadata_or =
                 _f->read(offset + LOG_ENTRY_HEADER_SIZE,
-                         offset + LOG_ENTRY_HEADER_SIZE + static_cast<std::uint32_t>(header.payload_length_bytes));
+                         offset + LOG_ENTRY_HEADER_SIZE + static_cast<std::uint32_t>(header.metadata_length_bytes));
+            if (!metadata_or.ok()) {
+                return StreamError{StreamErrorCode::ReadError, header_data_or.err().msg};
+            }
+            auto metadata = std::move(metadata_or.val());
+            const auto metadata_len_swap =
+                static_cast<int32_t>(my_htonl(static_cast<std::uint32_t>(header.metadata_length_bytes)));
+
+            // read data
+            auto data_or =
+                _f->read(offset + LOG_ENTRY_HEADER_SIZE + static_cast<std::uint32_t>(header.metadata_length_bytes),
+                         offset + LOG_ENTRY_HEADER_SIZE + static_cast<std::uint32_t>(header.metadata_length_bytes) +
+                             static_cast<std::uint32_t>(header.payload_length_bytes));
             if (!data_or.ok()) {
                 return StreamError{StreamErrorCode::ReadError, header_data_or.err().msg};
             }
             auto data = std::move(data_or.val());
             const auto data_len_swap =
                 static_cast<int32_t>(my_htonl(static_cast<std::uint32_t>(header.payload_length_bytes)));
+
             const auto ts_swap = static_cast<int64_t>(my_htonll(static_cast<std::uint64_t>(header.timestamp)));
 
             if (read_options.check_for_corruption &&
                 (header.crc != static_cast<int64_t>(store::common::crc32::crc32_of(
                                    {common::BorrowedSlice{&ts_swap, sizeof(ts_swap)},
+                                    common::BorrowedSlice{&metadata_len_swap, sizeof(metadata_len_swap)},
+                                    common::BorrowedSlice{metadata.data(), metadata.size()},
                                     common::BorrowedSlice{&data_len_swap, sizeof(data_len_swap)},
                                     common::BorrowedSlice{data.data(), data.size()}})))) {
                 return StreamError{StreamErrorCode::RecordDataCorrupted, {}};
             }
 
-            return OwnedRecord{
-                std::move(data),
-                header.timestamp,
-                sequence_number,
-                offset + LOG_ENTRY_HEADER_SIZE,
-            };
+            return OwnedRecord{std::move(data), header.timestamp, sequence_number, offset + LOG_ENTRY_HEADER_SIZE,
+                               std::move(metadata)};
         }
 
         offset += LOG_ENTRY_HEADER_SIZE;
+        offset += static_cast<std::uint32_t>(header.metadata_length_bytes);
         offset += static_cast<std::uint32_t>(header.payload_length_bytes);
     }
 }

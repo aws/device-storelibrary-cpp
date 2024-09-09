@@ -16,7 +16,8 @@ namespace aws {
 namespace store {
 namespace stream {
 
-constexpr uint8_t LOG_ENTRY_HEADER_SIZE = 32U;
+constexpr uint8_t LOG_ENTRY_HEADER_SIZE = 40U;
+static const common::BorrowedSlice EMPTY_METADATA = aws::store::common::BorrowedSlice{nullptr, 0};
 
 struct LogEntryHeader;
 class FileSegment {
@@ -41,7 +42,9 @@ class FileSegment {
     }
 
     common::Expected<uint64_t, filesystem::FileError> append(const common::BorrowedSlice d, const int64_t timestamp_ms,
-                                                             const uint64_t sequence_number, const bool sync) noexcept;
+                                                             const uint64_t sequence_number,
+                                                             const common::BorrowedSlice metadata,
+                                                             const bool sync) noexcept;
 
     common::Expected<OwnedRecord, StreamError> read(const uint64_t sequence_number, const ReadOptions &) const noexcept;
 
@@ -59,7 +62,7 @@ class FileSegment {
         return _latest_timestamp_ms;
     }
 
-    std::uint32_t totalSizeBytes() const noexcept {
+    std::uint64_t totalSizeBytes() const noexcept {
         return _total_bytes;
     }
 
@@ -70,7 +73,7 @@ class FileSegment {
     std::uint64_t _base_seq_num{1U};
     std::uint64_t _highest_seq_num{0U};
     std::int64_t _latest_timestamp_ms{0};
-    std::uint32_t _total_bytes{0U};
+    std::uint64_t _total_bytes{0U};
     std::string _segment_id;
 
     static LogEntryHeader convertSliceToHeader(const common::OwnedSlice &) noexcept;
@@ -120,10 +123,11 @@ class __attribute__((visibility("default"))) FileStream : public StreamInterface
   public:
     static common::Expected<std::shared_ptr<FileStream>, StreamError> openOrCreate(StreamOptions &&) noexcept;
 
-    common::Expected<uint64_t, StreamError> append(const common::BorrowedSlice,
+    common::Expected<uint64_t, StreamError> append(const common::BorrowedSlice, const common::BorrowedSlice,
                                                    const AppendOptions &) noexcept override;
 
-    common::Expected<uint64_t, StreamError> append(common::OwnedSlice &&, const AppendOptions &) noexcept override;
+    common::Expected<uint64_t, StreamError> append(common::OwnedSlice &&, common::OwnedSlice &&,
+                                                   const AppendOptions &) noexcept override;
 
     common::Expected<OwnedRecord, StreamError> read(const uint64_t, const ReadOptions &) const noexcept override;
 

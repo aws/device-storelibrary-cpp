@@ -91,8 +91,9 @@ int64_t timestamp() noexcept {
 }
 
 OwnedRecord::OwnedRecord(common::OwnedSlice &&idata, const int64_t itimestamp, const uint64_t isequence_number,
-                         const uint32_t ioffset) noexcept
-    : offset(ioffset), data(std::move(idata)), timestamp(itimestamp), sequence_number(isequence_number) {
+                         const uint32_t ioffset, common::OwnedSlice &&imetadata) noexcept
+    : offset(ioffset), data(std::move(idata)), timestamp(itimestamp), sequence_number(isequence_number),
+      metadata(std::move(imetadata)) {
 }
 
 CheckpointableOwnedRecord::CheckpointableOwnedRecord(OwnedRecord &&o,

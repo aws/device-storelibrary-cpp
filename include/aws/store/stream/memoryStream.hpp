@@ -26,10 +26,11 @@ class __attribute__((visibility("default"))) MemoryStream : public StreamInterfa
   public:
     static std::shared_ptr<MemoryStream> openOrCreate(StreamOptions &&) noexcept;
 
-    common::Expected<uint64_t, StreamError> append(const common::BorrowedSlice,
+    common::Expected<uint64_t, StreamError> append(const common::BorrowedSlice, const common::BorrowedSlice,
                                                    const AppendOptions &) noexcept override;
 
-    common::Expected<uint64_t, StreamError> append(common::OwnedSlice &&, const AppendOptions &) noexcept override;
+    common::Expected<uint64_t, StreamError> append(common::OwnedSlice &&, common::OwnedSlice &&,
+                                                   const AppendOptions &) noexcept override;
 
     common::Expected<OwnedRecord, StreamError> read(const uint64_t sequence_number,
                                                     const ReadOptions &) const noexcept override;

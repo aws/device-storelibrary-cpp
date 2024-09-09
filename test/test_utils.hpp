@@ -167,7 +167,7 @@ class SpyFileLike : public store::filesystem::FileLike {
         _real->sync();
     }
 
-    filesystem::FileError truncate(const uint32_t s) override {
+    filesystem::FileError truncate(const uint64_t s) override {
         if (!_mocks.empty() && _mocks.front().first == "truncate") {
             const auto mock = _mocks.front();
             _mocks.pop_front();

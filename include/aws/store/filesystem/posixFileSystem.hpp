@@ -116,7 +116,7 @@ class PosixFileLike : public FileLike {
         aws::store::filesystem::sync(fileno(_f));
     }
 
-    virtual FileError truncate(const uint32_t max) override {
+    virtual FileError truncate(const uint64_t max) override {
         // Flush buffers before truncating since truncation is operating on the FD directly rather than the file
         // stream
         std::ignore = flush();
@@ -213,7 +213,7 @@ class PosixUnbufferedFileLike : public FileLike {
         aws::store::filesystem::sync(_f);
     }
 
-    virtual FileError truncate(const uint32_t max) override {
+    virtual FileError truncate(const uint64_t max) override {
         if (ftruncate(_f, static_cast<off_t>(max)) != 0) {
             return errnoToFileError(errno);
         }

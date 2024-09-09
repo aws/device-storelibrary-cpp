@@ -152,7 +152,7 @@ SCENARIO("Stream validates data length", "[stream]") {
 
     std::string value{};
     auto seq_or = stream->append(aws::store::common::BorrowedSlice{value.data(), UINT32_MAX},
-                                 aws::store::stream::AppendOptions{});
+                                 aws::store::stream::EMPTY_METADATA, aws::store::stream::AppendOptions{});
     REQUIRE(!seq_or.ok());
     REQUIRE(seq_or.err().code == aws::store::stream::StreamErrorCode::RecordTooLarge);
 }
@@ -172,7 +172,8 @@ SCENARIO("I can append data to a stream", "[stream]") {
             aws::store::common::OwnedSlice data{1 * 1024 * 1024};
 
             for (int i = 0; i < 30; i++) {
-                auto seq_or = stream->append(aws::store::common::BorrowedSlice{data.data(), data.size()}, append_opts);
+                auto seq_or = stream->append(aws::store::common::BorrowedSlice{data.data(), data.size()},
+                                             aws::store::stream::EMPTY_METADATA, append_opts);
                 REQUIRE(seq_or.ok());
             }
 
@@ -207,7 +208,8 @@ SCENARIO("I can append data to a stream", "[stream]") {
             aws::store::common::OwnedSlice data{61};
 
             for (int i = 0; i < 1000; i++) {
-                auto seq_or = stream->append(aws::store::common::BorrowedSlice{data.data(), data.size()}, append_opts);
+                auto seq_or = stream->append(aws::store::common::BorrowedSlice{data.data(), data.size()},
+                                             aws::store::stream::EMPTY_METADATA, append_opts);
                 REQUIRE(seq_or.ok());
                 // We never exceed the max size of the stream
                 REQUIRE(stream->currentSizeBytes() <= 5000);
@@ -229,7 +231,8 @@ SCENARIO("I can append data to a stream", "[stream]") {
 
             // fill the stream with 9 records since each record is 1MB and there is 32B overhead per record
             for (int i = 0; i < 9; i++) {
-                auto seq_or = stream->append(aws::store::common::BorrowedSlice{data.data(), data.size()}, append_opts);
+                auto seq_or = stream->append(aws::store::common::BorrowedSlice{data.data(), data.size()},
+                                             aws::store::stream::EMPTY_METADATA, append_opts);
                 REQUIRE(seq_or.ok());
             }
             // Check that it has filled by looking at the total size now
@@ -237,7 +240,8 @@ SCENARIO("I can append data to a stream", "[stream]") {
             REQUIRE(stream->currentSizeBytes() < 10 * 1024 * 1024);
 
             // fail when trying to add another record
-            auto seq_or = stream->append(aws::store::common::BorrowedSlice{data.data(), data.size()}, append_opts);
+            auto seq_or = stream->append(aws::store::common::BorrowedSlice{data.data(), data.size()},
+                                         aws::store::stream::EMPTY_METADATA, append_opts);
             REQUIRE(!seq_or.ok());
             REQUIRE(seq_or.err().code == aws::store::stream::StreamErrorCode::StreamFull);
             // Check that it hasn't rolled over by looking at the first sequence number
@@ -254,7 +258,8 @@ SCENARIO("I can delete an iterator") {
         auto stream_or = open_stream(fs);
         REQUIRE(stream_or.ok());
         auto stream = std::move(stream_or.val());
-        auto app_or = stream->append(aws::store::common::BorrowedSlice{"val"}, aws::store::stream::AppendOptions{});
+        auto app_or = stream->append(aws::store::common::BorrowedSlice{"val"}, aws::store::stream::EMPTY_METADATA,
+                                     aws::store::stream::AppendOptions{});
         REQUIRE(app_or.ok());
 
         auto it = stream->openOrCreateIterator("ita", aws::store::stream::IteratorOptions{});
@@ -294,11 +299,14 @@ SCENARIO("I can create a stream", "[stream]") {
         GENERATE(take(5, aws::store::test::utils::random(1, 1 * 1024 * 1024, 0, static_cast<char>(255))));
 
     WHEN("I append values") {
-        auto seq_or = stream->append(aws::store::common::BorrowedSlice{value}, aws::store::stream::AppendOptions{});
+        auto seq_or = stream->append(aws::store::common::BorrowedSlice{value}, aws::store::stream::EMPTY_METADATA,
+                                     aws::store::stream::AppendOptions{});
         REQUIRE(seq_or.ok());
-        seq_or = stream->append(aws::store::common::BorrowedSlice{value}, aws::store::stream::AppendOptions{});
+        seq_or = stream->append(aws::store::common::BorrowedSlice{value}, aws::store::stream::EMPTY_METADATA,
+                                aws::store::stream::AppendOptions{});
         REQUIRE(seq_or.ok());
-        seq_or = stream->append(aws::store::common::BorrowedSlice{value}, aws::store::stream::AppendOptions{});
+        seq_or = stream->append(aws::store::common::BorrowedSlice{value}, aws::store::stream::EMPTY_METADATA,
+                                aws::store::stream::AppendOptions{});
         REQUIRE(seq_or.ok());
 
         auto it = stream->openOrCreateIterator("ita", aws::store::stream::IteratorOptions{});
@@ -376,7 +384,10 @@ SCENARIO("Stream detects and recovers from corruption", "[stream]") {
     for (auto i = 0; i < num_stream_values; i++) {
         std::string value;
         aws::store::test::utils::random_string(value, stream_value_size);
-        REQUIRE(stream->append(aws::store::common::BorrowedSlice{value}, aws::store::stream::AppendOptions{}).ok());
+        REQUIRE(stream
+                    ->append(aws::store::common::BorrowedSlice{value}, aws::store::stream::EMPTY_METADATA,
+                             aws::store::stream::AppendOptions{})
+                    .ok());
     }
 
     // sanity check: verify we can read all values in the stream
@@ -486,7 +497,8 @@ SCENARIO("Old records can be removed", "[stream]") {
         uint64_t num_records = 20; // put in enough records to create multiple segments
 
         for (uint64_t i = 0; i < num_records; ++i) {
-            auto seq_or = stream->append(aws::store::common::BorrowedSlice{value}, aws::store::stream::AppendOptions{});
+            auto seq_or = stream->append(aws::store::common::BorrowedSlice{value}, aws::store::stream::EMPTY_METADATA,
+                                         aws::store::stream::AppendOptions{});
             REQUIRE(seq_or.ok());
             std::this_thread::sleep_for(std::chrono::milliseconds(5)); // give each record a distinct timestamp
         }
@@ -540,7 +552,8 @@ SCENARIO("Old records can be removed", "[stream]") {
             THEN("I can still append new records") {
                 for (uint64_t i = 0; i < num_records; ++i) {
                     auto seq_or =
-                        stream->append(aws::store::common::BorrowedSlice{"val"}, aws::store::stream::AppendOptions{});
+                        stream->append(aws::store::common::BorrowedSlice{"val"}, aws::store::stream::EMPTY_METADATA,
+                                       aws::store::stream::AppendOptions{});
                     REQUIRE(seq_or.ok());
                 }
                 for (uint64_t i = num_records; i < num_records * 2; ++i) {

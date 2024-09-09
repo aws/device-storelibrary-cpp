@@ -34,7 +34,7 @@ class FileLike {
 
     virtual void sync() = 0;
 
-    virtual FileError truncate(uint32_t) = 0;
+    virtual FileError truncate(uint64_t) = 0;
 
     FileLike(FileLike &) = delete;
 

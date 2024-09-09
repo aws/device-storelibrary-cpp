@@ -129,10 +129,12 @@ StreamError FileStream::makeNextSegment() noexcept {
 }
 
 common::Expected<uint64_t, StreamError> FileStream::append(const common::BorrowedSlice d,
+                                                           const common::BorrowedSlice metadata,
                                                            const AppendOptions &append_opts) noexcept {
     std::lock_guard<std::mutex> lock(_segments_lock);
 
-    auto err = removeSegmentsIfNewRecordBeyondMaxSize(d.size(), append_opts.remove_oldest_segments_if_full);
+    auto err =
+        removeSegmentsIfNewRecordBeyondMaxSize(metadata.size() + d.size(), append_opts.remove_oldest_segments_if_full);
     if (!err.ok()) {
         return err;
     }
@@ -149,7 +151,7 @@ common::Expected<uint64_t, StreamError> FileStream::append(const common::Borrowe
     auto &seg = _segments.back();
     auto seq = _next_sequence_number.fetch_add(1U);
 
-    auto e = seg.append(d, timestamp(), seq, append_opts.sync_on_append);
+    auto e = seg.append(d, timestamp(), seq, metadata, append_opts.sync_on_append);
     if (!e.ok()) {
         return fileErrorToStreamError(e.err());
     }
@@ -187,10 +189,11 @@ StreamError FileStream::removeSegmentsIfNewRecordBeyondMaxSize(const uint32_t re
     return StreamError{StreamErrorCode::NoError, {}};
 }
 
-common::Expected<uint64_t, StreamError> FileStream::append(common::OwnedSlice &&d,
+common::Expected<uint64_t, StreamError> FileStream::append(common::OwnedSlice &&d, common::OwnedSlice &&metadata,
                                                            const AppendOptions &append_opts) noexcept {
     const auto x = std::move(d);
-    return append(common::BorrowedSlice(x.data(), x.size()), append_opts);
+    const auto y = std::move(metadata);
+    return append(common::BorrowedSlice(x.data(), x.size()), common::BorrowedSlice(y.data(), y.size()), append_opts);
 }
 
 common::Expected<OwnedRecord, StreamError> FileStream::read(const uint64_t sequence_number,

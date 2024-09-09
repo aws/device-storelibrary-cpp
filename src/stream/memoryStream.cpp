@@ -22,6 +22,7 @@ std::shared_ptr<MemoryStream> MemoryStream::openOrCreate(StreamOptions &&opts) n
 }
 
 common::Expected<uint64_t, StreamError> MemoryStream::append(const common::BorrowedSlice d,
+                                                             const common::BorrowedSlice metadata,
                                                              const AppendOptions &) noexcept {
     const auto record_size = d.size();
     auto err = remove_records_if_new_record_beyond_max_size(record_size);
@@ -31,7 +32,7 @@ common::Expected<uint64_t, StreamError> MemoryStream::append(const common::Borro
 
     auto seq = _next_sequence_number.fetch_add(1U);
     _current_size_bytes += d.size();
-    _records.emplace_back(common::OwnedSlice(d), timestamp(), seq, 0);
+    _records.emplace_back(common::OwnedSlice(d), timestamp(), seq, 0, common::OwnedSlice(metadata));
     return seq;
 }
 
@@ -60,17 +61,19 @@ StreamError MemoryStream::remove_records_if_new_record_beyond_max_size(const uin
     return StreamError{StreamErrorCode::NoError, {}};
 }
 
-common::Expected<uint64_t, StreamError> MemoryStream::append(common::OwnedSlice &&d, const AppendOptions &) noexcept {
+common::Expected<uint64_t, StreamError> MemoryStream::append(common::OwnedSlice &&d, common::OwnedSlice &&md,
+                                                             const AppendOptions &) noexcept {
     auto data = std::move(d);
-    const auto record_size = data.size();
+    auto metadata = std::move(md);
+    const auto record_size = data.size() + metadata.size();
     auto err = remove_records_if_new_record_beyond_max_size(record_size);
     if (!err.ok()) {
         return err;
     }
 
     uint64_t seq = _next_sequence_number.fetch_add(1U);
-    _current_size_bytes += data.size();
-    _records.emplace_back(std::move(data), timestamp(), seq, 0);
+    _current_size_bytes += metadata.size() + data.size();
+    _records.emplace_back(std::move(data), timestamp(), seq, 0, std::move(metadata));
     return seq;
 }
 
@@ -86,11 +89,8 @@ common::Expected<OwnedRecord, StreamError> MemoryStream::read(const uint64_t seq
         if (r.sequence_number == sequence_number) {
             return OwnedRecord{
                 // TODO: This is copying the data because the file-based version needs to return an owned record
-                common::OwnedSlice{common::BorrowedSlice(r.data.data(), r.data.size())},
-                r.timestamp,
-                r.sequence_number,
-                0U,
-            };
+                common::OwnedSlice{common::BorrowedSlice(r.data.data(), r.data.size())}, r.timestamp, r.sequence_number,
+                0, common::OwnedSlice{common::BorrowedSlice(r.metadata.data(), r.metadata.size())}};
         }
     }
 
